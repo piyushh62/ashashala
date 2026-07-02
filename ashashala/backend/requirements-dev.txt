@@ -1,0 +1,10 @@
+# AshaShala Backend Development Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# Core dependencies
+-r requirements.txt
+
+# Additional dev tools
+ipython==8.28.0
+ipdb==0.13.13
+httpx==0.27.2
