@@ -86,7 +86,7 @@ def create_app() -> FastAPI:
     register_exception_handlers(app)
 
     # Register the tenant-isolation session event (import side effect).
-    import app.db.tenant_filter  # noqa: F401
+    from app.db import tenant_filter  # noqa: F401
 
     # Mount routers.
     app.include_router(health_router)

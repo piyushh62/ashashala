@@ -1,0 +1,2 @@
+# Ignore the local Python virtual environment
+venv/
