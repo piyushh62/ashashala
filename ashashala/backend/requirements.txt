@@ -21,6 +21,9 @@ qdrant-client==1.12.1
 # Object Storage
 boto3==1.35.30
 
+# Agent orchestration (Phase 4)
+langgraph==0.2.45
+
 # RAG ingestion (Phase 2)
 pypdf==5.1.0
 python-docx==1.1.2

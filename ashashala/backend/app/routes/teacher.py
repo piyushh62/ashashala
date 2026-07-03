@@ -10,6 +10,8 @@ from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.db.session import get_db
 from app.deps import require_role
 from app.models.document import Document, DocStatus, SourceType
+from app.models.flagged_answer import FlaggedAnswer, FlagStatus
+from app.models.learning import Quiz, QuizStatus
 from app.models.school import School
 from app.models.structure import TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
@@ -18,8 +20,11 @@ from app.schemas.teacher import (
     DocumentOut,
     ExamTimetableCreate,
     ExamTimetableOut,
+    FlaggedAnswerOut,
+    FlaggedAnswerOverride,
     MaterialUrlCreate,
     MaterialYoutubeCreate,
+    QuizApproval,
     TimetableCreate,
     TimetableOut,
 )
@@ -171,3 +176,50 @@ async def teacher_dashboard(teacher: User = Depends(_guard), db: AsyncSession = 
         "subjects": sorted({a.subject_id for a in assignments}),
         "materials_uploaded": len(materials),
     }
+
+
+@router.get("/flagged-answers", response_model=list[FlaggedAnswerOut])
+async def list_flagged_answers(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[FlaggedAnswerOut]:
+    """Open teacher review queue for this school (Evaluator-flagged short answers)."""
+    rows = (await db.execute(
+        select(FlaggedAnswer)
+        .where(FlaggedAnswer.status == FlagStatus.open)
+        .order_by(FlaggedAnswer.created_at.desc())
+    )).scalars().all()
+    return [FlaggedAnswerOut.model_validate(r) for r in rows]
+
+
+@router.post("/flagged-answers/{answer_id}/override")
+async def override_flagged_answer(answer_id: str, body: FlaggedAnswerOverride, request: Request,
+                                  teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    """Teacher sets the authoritative grade for a flagged answer and resolves it."""
+    flagged = await db.get(FlaggedAnswer, answer_id)
+    if flagged is None or flagged.school_id != teacher.school_id:
+        raise NotFoundError("FlaggedAnswer", answer_id)
+
+    flagged.override_score = body.score
+    flagged.override_feedback = body.feedback
+    flagged.status = FlagStatus.resolved
+    flagged.resolved_by_teacher_id = teacher.id
+    db.add(flagged)
+    await record_audit(db, action="ANSWER_GRADE_OVERRIDE", actor=teacher, target_type="flagged_answer",
+                       target_id=answer_id, payload={"score": body.score}, request=request)
+    return {"status": "resolved", "id": answer_id, "score": body.score}
+
+
+@router.post("/quizzes/{quiz_id}/approve")
+async def approve_quiz(quiz_id: str, body: QuizApproval, request: Request,
+                       teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    """Approve (or keep draft) a quiz so it appears in the student's curated list."""
+    quiz = await db.get(Quiz, quiz_id)
+    if quiz is None or quiz.school_id != teacher.school_id:
+        raise NotFoundError("Quiz", quiz_id)
+    await _assert_assigned(db, teacher, quiz.class_id, quiz.subject_id)
+
+    if body.approved:
+        quiz.status = QuizStatus.approved
+        quiz.created_by_teacher_id = teacher.id
+        db.add(quiz)
+        await record_audit(db, action="QUIZ_APPROVE", actor=teacher, target_type="quiz",
+                           target_id=quiz_id, request=request)
+    return {"status": quiz.status.value, "id": quiz_id}

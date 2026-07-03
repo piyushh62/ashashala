@@ -124,6 +124,20 @@ async def dashboard(admin: User = Depends(_guard), db: AsyncSession = Depends(ge
                              tokens_today_by_school=tokens_today, error_rate=error_rate)
 
 
+@router.get("/schools", response_model=list[SchoolOut])
+async def list_schools(admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[SchoolOut]:
+    schools = (await db.execute(select(School))).scalars().all()
+    return [SchoolOut.model_validate(s) for s in schools]
+
+
+@router.get("/schools/{school_id}", response_model=SchoolOut)
+async def get_school(school_id: str, admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> SchoolOut:
+    school = await db.get(School, school_id)
+    if school is None:
+        raise NotFoundError("School", school_id)
+    return SchoolOut.model_validate(school)
+
+
 @router.delete("/users/{user_id}/data")
 async def delete_user_data(user_id: str, request: Request, reason: str = Body(embed=True, default="compliance"),
                            admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:

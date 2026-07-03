@@ -5,28 +5,28 @@
 #
 # RE-VERIFY before each phase (NVIDIA IDs drift / get deprecated):
 #   https://build.nvidia.com/models?pageSize=96&filters=publisher%3Anvidia
-# Lines marked "# VERIFY" are NOT exercised in Phase 1 (health check only calls
-# fast_chat) — confirm their exact IDs against the live catalog before the phase
-# that first uses them (OCR/ASR/vision/safety -> Phase 2/3).
+# Lines marked "# VERIFY" are not exercised in Phase 1 (health only hits
+# fast_chat) — confirm exact IDs against the live catalog before first use.
 #
 # Gemini rules (PROJECT_PROMPT.md Section 1):
-#   - default          -> gemini-2.5-flash-lite
-#   - reasoning/vision -> gemini-2.5-flash
-#   - NEVER gemini-2.5-pro (paid). gemini-2.0-flash is shut down — do not use.
+#   default -> gemini-2.5-flash-lite ; reasoning/vision -> gemini-2.5-flash.
+#   NEVER gemini-2.5-pro (paid). gemini-2.0-flash is shut down. gemini-1.5-* is
+#   NOT the spec target — the Phase 1 tests assert the 2.5 IDs below.
 
 roles:
   # Fast chat — general tutoring, quick responses, intent classification.
-  # Spec: Gemini primary, NVIDIA general model as fallback only.
   fast_chat:
     gemini: "gemini-2.5-flash-lite"
-    nvidia_fallback: "meta/llama-3.1-8b-instruct"
+    nvidia_primary: "meta/llama-3.1-8b-instruct"
+    nvidia_fallback: "meta/llama-3.1-70b-instruct"
 
   # Reasoning — evaluation/grading, lesson planning.
   reasoning:
     gemini: "gemini-2.5-flash"
-    nvidia_fallback: "nvidia/llama-3.1-nemotron-ultra-253b-v1"   # VERIFY (Nemotron Ultra)
+    nvidia_primary: "nvidia/llama-3.1-nemotron-ultra-253b-v1"   # VERIFY (Nemotron Ultra)
+    nvidia_fallback: "meta/llama-3.1-70b-instruct"
 
-  # Multilingual Indic — Gujarati/Hindi/etc. Routed NVIDIA-direct (no Gemini).
+  # Multilingual Indic — Gujarati/Hindi/etc. Routed NVIDIA-direct (Sarvam-M).
   multilingual_indic:
     nvidia_primary: "sarvamai/sarvam-m"                          # Sarvam-M (Indic)
     nvidia_fallback: "meta/llama-4-maverick-17b-128e-instruct"   # VERIFY (Maverick multilingual)
@@ -43,23 +43,32 @@ roles:
   # ASR — speech to text (multilingual incl. Hindi/Gujarati). NVIDIA only.
   asr:
     nvidia_primary: "nvidia/canary-1b-asr"                       # VERIFY (streaming ASR id)
+    nvidia_fallback: "nvidia/parakeet-rnnt-1.1b"                 # VERIFY
 
-  # Embeddings — RAG. Gemini text-embedding-004 = 768 dims (matches Qdrant).
-  # NOTE: the NVIDIA fallback below outputs 1024 dims — do NOT mix it into the
-  # same 768-dim collection. Resolve the embedding-dimension decision before
-  # wiring the NVIDIA embedder in Phase 2. VERIFY id + dims.
+  # Embeddings — RAG. Gemini text-embedding-004 = 768 dims (Qdrant gemini_768).
+  # NVIDIA nv-embedqa-e5-v5 = 1024 dims (Qdrant nvidia_1024). Kept in separate
+  # named vectors so dimensions never collide.
   embeddings:
     gemini: "text-embedding-004"
-    nvidia_fallback: "nvidia/nv-embedqa-e5-v5"                   # VERIFY (1024-dim!)
+    nvidia_fallback: "nvidia/nv-embedqa-e5-v5"                   # VERIFY (1024-dim)
 
   # Safety — jailbreak detection. Takes a PRE-COMPUTED embedding, not raw text.
   safety_jailbreak:
     nvidia_primary: "nvidia/nemoguard-jailbreak-detect"         # VERIFY (deferred, Section 7.7)
 
+  # TTS — text to speech (server-side voice fallback).
+  tts:
+    nvidia_primary: "nvidia/fastpitch-hifigan"                  # VERIFY
+    nvidia_fallback: "nvidia/tts-en-us"                         # VERIFY
+
 # Provider configuration (informational; timeouts live in app/core/config.py).
 providers:
   gemini:
     base_url: "https://generativelanguage.googleapis.com"
+    timeout: 60
+    max_retries: 2
   nvidia:
     base_url: "https://integrate.api.nvidia.com/v1"
-    rate_limit_rpm: 40   # Free tier
+    timeout: 60
+    max_retries: 2
+    rate_limit_rpm: 40  # Free tier limit

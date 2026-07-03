@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, time
+from datetime import date, datetime, time
 
 from pydantic import BaseModel, Field
 
@@ -75,3 +75,30 @@ class ExamTimetableOut(BaseModel):
     syllabus_ref: str | None
 
     model_config = {"from_attributes": True}
+
+
+class FlaggedAnswerOut(BaseModel):
+    id: str
+    quiz_attempt_id: str
+    quiz_id: str
+    student_id: str
+    question_text: str
+    student_answer: str
+    expected_answer: str | None = None
+    ai_score: float | None = None
+    ai_confidence: float | None = None
+    flag_reason: str
+    status: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class FlaggedAnswerOverride(BaseModel):
+    score: float = Field(ge=0.0, le=1.0)
+    feedback: str | None = None
+
+
+class QuizApproval(BaseModel):
+    approved: bool
+    feedback: str | None = None

@@ -6,6 +6,7 @@ package is imported (Alembic autogenerate + create_all rely on this).
 
 from app.models.audit import AuditLog
 from app.models.document import Chunk, DocStatus, Document, OcrCache, SourceType
+from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import (
     ChatSession,
     Message,
@@ -36,6 +37,8 @@ __all__ = [
     "Document",
     "Enrollment",
     "ExamTimetable",
+    "FlaggedAnswer",
+    "FlagStatus",
     "LlmUsage",
     "Message",
     "MessageRole",

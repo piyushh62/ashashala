@@ -20,6 +20,7 @@ dependencies = [
     "google-generativeai==0.8.3",
     "openai==1.54.0",
     "qdrant-client==1.12.1",
+    "langgraph==0.2.45",
     "boto3==1.35.30",
     "python-jose[cryptography]==3.3.0",
     "passlib[bcrypt]==1.7.4",
