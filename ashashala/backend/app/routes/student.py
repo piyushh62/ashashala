@@ -1,6 +1,10 @@
 """Student routes: dashboard, classes, timetable, quizzes, progress, export, chat, voice."""
 
-from __future__ import annotations
+# NOTE: do NOT add `from __future__ import annotations` here. This module uses
+# @limiter.limit(...) (slowapi) on some routes, which wraps endpoints in a
+# closure defined in slowapi's own module. Postponed annotations would need to
+# resolve forward refs against that wrapper's __globals__ (slowapi's, not
+# this module's), causing NameError on QuizStartRequest/QuizOut/etc. at import time.
 
 import json
 import logging
