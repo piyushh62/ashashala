@@ -30,7 +30,7 @@ from app.schemas.teacher import (
 )
 from app.services.audit_service import record_audit
 from app.services.ingestion.pipeline import ingest_document
-from app.services.r2_client import get_r2_client
+from app.services.r2_client import get_storage_client
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["Teacher"])
 _guard = require_role(UserRole.teacher)
@@ -85,7 +85,7 @@ async def upload_file(request: Request, tasks: BackgroundTasks, file: UploadFile
 
     data = await file.read()
     key = f"school_{teacher.school_id}/class_{class_id}/{file.filename}"
-    storage_url = await get_r2_client().upload_bytes(key, data, file.content_type or "application/octet-stream")
+    storage_url = await get_storage_client().upload_bytes(key, data, file.content_type or "application/octet-stream")
     doc = await _create_and_schedule(db, tasks, teacher, request, class_id=class_id, subject_id=subject_id,
                                      filename=file.filename or key, source_type=source_type,
                                      source_ref=file.filename, storage_url=storage_url, data=data)

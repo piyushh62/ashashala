@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -30,11 +30,53 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str = Field(..., description="Qdrant Cloud API key")
 
     # --- Required: Object Storage ---
-    R2_ACCOUNT_ID: str = Field(..., description="Cloudflare R2 account ID")
-    R2_ACCESS_KEY_ID: str = Field(..., description="Cloudflare R2 access key ID")
-    R2_SECRET_ACCESS_KEY: str = Field(..., description="Cloudflare R2 secret access key")
-    R2_BUCKET_NAME: str = Field(..., description="Cloudflare R2 bucket name")
-    R2_PUBLIC_URL: str = Field(..., description="Cloudflare R2 public URL base")
+    # Cloudflare R2 can still be used via R2_* variables.
+    # Generic S3-compatible storage can use STORAGE_* variables.
+    R2_ACCOUNT_ID: str | None = Field(
+        default=None,
+        description="Cloudflare R2 account ID",
+    )
+    R2_ACCESS_KEY_ID: str | None = Field(
+        default=None,
+        description="Cloudflare R2 access key ID",
+    )
+    R2_SECRET_ACCESS_KEY: str | None = Field(
+        default=None,
+        description="Cloudflare R2 secret access key",
+    )
+    R2_BUCKET_NAME: str | None = Field(
+        default=None,
+        description="Cloudflare R2 bucket name",
+    )
+    R2_PUBLIC_URL: str | None = Field(
+        default=None,
+        description="Cloudflare R2 public URL base",
+    )
+
+    STORAGE_ENDPOINT_URL: str | None = Field(
+        default=None,
+        description="S3-compatible object storage endpoint URL",
+    )
+    STORAGE_ACCESS_KEY_ID: str | None = Field(
+        default=None,
+        description="S3-compatible object storage access key ID",
+    )
+    STORAGE_SECRET_ACCESS_KEY: str | None = Field(
+        default=None,
+        description="S3-compatible object storage secret access key",
+    )
+    STORAGE_BUCKET_NAME: str | None = Field(
+        default=None,
+        description="S3-compatible object storage bucket name",
+    )
+    STORAGE_PUBLIC_URL: str | None = Field(
+        default=None,
+        description="S3-compatible object storage public URL base",
+    )
+    STORAGE_REGION: str = Field(
+        default="auto",
+        description="S3-compatible object storage region",
+    )
 
     # --- Required: Auth ---
     JWT_SECRET: str = Field(..., description="JWT access token secret (64 chars)")
@@ -70,6 +112,60 @@ class Settings(BaseSettings):
     NVIDIA_TIMEOUT: int = Field(default=45, description="NVIDIA API timeout")
     QDRANT_TIMEOUT: int = Field(default=10, description="Qdrant query timeout")
     R2_TIMEOUT: int = Field(default=60, description="R2 upload timeout")
+
+    @model_validator(mode="after")
+    def validate_storage_config(self):
+        r2_enabled = all(
+            [
+                self.R2_ACCOUNT_ID,
+                self.R2_ACCESS_KEY_ID,
+                self.R2_SECRET_ACCESS_KEY,
+                self.R2_BUCKET_NAME,
+                self.R2_PUBLIC_URL,
+            ]
+        )
+        storage_enabled = all(
+            [
+                self.STORAGE_ENDPOINT_URL,
+                self.STORAGE_ACCESS_KEY_ID,
+                self.STORAGE_SECRET_ACCESS_KEY,
+                self.STORAGE_BUCKET_NAME,
+                self.STORAGE_PUBLIC_URL,
+            ]
+        )
+        if not (r2_enabled or storage_enabled):
+            raise ValueError(
+                "Either R2_* or STORAGE_* object storage credentials must be configured."
+            )
+        return self
+
+    @property
+    def storage_endpoint_url(self) -> str:
+        if self.STORAGE_ENDPOINT_URL:
+            return self.STORAGE_ENDPOINT_URL
+        if self.R2_ACCOUNT_ID:
+            return f"https://{self.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+        raise ValueError("No object storage endpoint configured")
+
+    @property
+    def storage_access_key_id(self) -> str:
+        return self.STORAGE_ACCESS_KEY_ID or self.R2_ACCESS_KEY_ID  # type: ignore[return-value]
+
+    @property
+    def storage_secret_access_key(self) -> str:
+        return self.STORAGE_SECRET_ACCESS_KEY or self.R2_SECRET_ACCESS_KEY  # type: ignore[return-value]
+
+    @property
+    def storage_bucket_name(self) -> str:
+        return self.STORAGE_BUCKET_NAME or self.R2_BUCKET_NAME  # type: ignore[return-value]
+
+    @property
+    def storage_public_url(self) -> str:
+        return self.STORAGE_PUBLIC_URL or self.R2_PUBLIC_URL  # type: ignore[return-value]
+
+    @property
+    def storage_region(self) -> str:
+        return self.STORAGE_REGION
 
     @field_validator("JWT_SECRET", "JWT_REFRESH_SECRET")
     @classmethod

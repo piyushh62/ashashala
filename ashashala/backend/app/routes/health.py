@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.db.session import ping_db
 from app.services.gemini_client import get_gemini_client
 from app.services.nvidia_client import get_nvidia_client
-from app.services.r2_client import get_r2_client
+from app.services.r2_client import get_storage_client
 from app.services.rag.store import get_qdrant_store
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ async def health() -> dict:
     checks = {
         "db": await _safe(ping_db()),
         "vector_db": await _safe(get_qdrant_store().health_check()),
-        "r2": await _safe(get_r2_client().health_check()),
+        "storage": await _safe(get_storage_client().health_check()),
         "gemini": await _safe(get_gemini_client().health_check()),
         "nvidia_llm": await _safe(get_nvidia_client().health_check()),
     }

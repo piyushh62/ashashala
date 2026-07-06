@@ -88,12 +88,24 @@ All configuration is via environment variables (see `.env.example`). Key setting
 | `R2_ACCOUNT_ID` | Cloudflare R2 account ID | Yes |
 | `R2_ACCESS_KEY_ID` | R2 access key | Yes |
 | `R2_SECRET_ACCESS_KEY` | R2 secret key | Yes |
-| `R2_BUCKET_NAME` | R2 bucket name | Yes |
-| `R2_PUBLIC_URL` | R2 public URL base | Yes |
+| `R2_BUCKET_NAME` | R2 bucket name | Yes if using Cloudflare R2 |
+| `R2_PUBLIC_URL` | R2 public URL base | Yes if using Cloudflare R2 |
+| `STORAGE_ENDPOINT_URL` | S3-compatible object storage endpoint URL | Yes if using generic S3 provider |
+| `STORAGE_ACCESS_KEY_ID` | Storage access key | Yes if using generic S3 provider |
+| `STORAGE_SECRET_ACCESS_KEY` | Storage secret access key | Yes if using generic S3 provider |
+| `STORAGE_BUCKET_NAME` | Storage bucket name | Yes if using generic S3 provider |
+| `STORAGE_PUBLIC_URL` | Storage public URL base | Yes if using generic S3 provider |
+| `STORAGE_REGION` | Storage region | Optional, default `auto` |
 | `JWT_SECRET` | JWT signing secret (32+ chars) | Yes |
 | `JWT_REFRESH_SECRET` | JWT refresh secret (32+ chars) | Yes |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins | Yes |
 | `SENTRY_DSN` | Sentry DSN for error tracking | No |
+| `STORAGE_ENDPOINT_URL` | S3-compatible object storage endpoint URL | Yes if using generic S3 provider |
+| `STORAGE_ACCESS_KEY_ID` | Storage access key | Yes if using generic S3 provider |
+| `STORAGE_SECRET_ACCESS_KEY` | Storage secret access key | Yes if using generic S3 provider |
+| `STORAGE_BUCKET_NAME` | Storage bucket name | Yes if using generic S3 provider |
+| `STORAGE_PUBLIC_URL` | Storage public URL base | Yes if using generic S3 provider |
+| `STORAGE_REGION` | Storage region | Optional, default `auto` |
 
 ## Model Registry
 

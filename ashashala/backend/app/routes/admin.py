@@ -27,7 +27,7 @@ from app.schemas.admin import (
     TempPasswordResponse,
 )
 from app.services.audit_service import record_audit
-from app.services.r2_client import get_r2_client
+from app.services.r2_client import get_storage_client
 from app.services.rag.store import get_qdrant_store
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Super Admin"])
@@ -156,7 +156,7 @@ async def delete_user_data(user_id: str, request: Request, reason: str = Body(em
             if doc.storage_url:
                 try:
                     key = doc.storage_url.split("/", 3)[-1]
-                    await get_r2_client().delete_object(key)
+                    await get_storage_client().delete_object(key)
                 except Exception:  # noqa: BLE001
                     pass
             await db.delete(doc)
