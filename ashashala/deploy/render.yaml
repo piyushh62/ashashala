@@ -18,10 +18,10 @@ services:
     branch: main
     autoDeploy: true
 
-    # Build context is the repo root (contains backend/ and config/) — see the
-    # Dockerfile header for why config/ must be a sibling of backend/.
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: .
+    # Build context must be the inner project folder because the Dockerfile
+    # expects backend/ and config/ to exist at the context root.
+    dockerfilePath: ./ashashala/backend/Dockerfile
+    dockerContext: ./ashashala
 
     healthCheckPath: /api/v1/health
 

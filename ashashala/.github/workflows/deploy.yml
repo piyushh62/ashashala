@@ -41,9 +41,10 @@ jobs:
       - name: Build & push
         uses: docker/build-push-action@v6
         with:
-          # Root context so config/ sits beside backend/ (see backend/Dockerfile).
-          context: .
-          file: ./backend/Dockerfile
+          # Use the inner project folder as the build context so backend/ and config/
+          # resolve correctly for the Dockerfile.
+          context: ./ashashala
+          file: ./ashashala/backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
