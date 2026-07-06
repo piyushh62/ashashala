@@ -30,7 +30,7 @@ async def health() -> dict:
     checks = {
         "db": await _safe(ping_db()),
         "vector_db": await _safe(get_qdrant_store().health_check()),
-        "storage": await _safe(get_storage_client().health_check()),
+        "r2": await _safe(get_storage_client().health_check()),
         "gemini": await _safe(get_gemini_client().health_check()),
         "nvidia_llm": await _safe(get_nvidia_client().health_check()),
     }

@@ -8,7 +8,7 @@
 
 import json
 import logging
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -16,16 +16,25 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.evaluator import evaluate_attempt
+from app.agents.graph import run_orchestration
 from app.agents.progress import update_mastery
 from app.agents.quiz_master import generate_quiz, strip_answers
-from app.agents.tutor import tutor_agent
+from app.agents.tutor import tutor_agent_stream
 from app.core.config import settings
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
 from app.core.ratelimit import limiter
 from app.db.session import get_db
 from app.deps import require_role
 from app.models.flagged_answer import FlaggedAnswer
-from app.models.learning import ChatSession, Message, MessageRole, ProgressRecord, Quiz, QuizAttempt, QuizStatus
+from app.models.learning import (
+    ChatSession,
+    Message,
+    MessageRole,
+    ProgressRecord,
+    Quiz,
+    QuizAttempt,
+    QuizStatus,
+)
 from app.models.structure import Enrollment, Subject
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
@@ -39,6 +48,7 @@ from app.schemas.quiz import (
 )
 from app.services.asr_service import transcribe_audio
 from app.services.audit_service import record_audit
+from app.services.topic_extractor import best_topic
 from app.services.tts_service import synthesize_speech
 
 logger = logging.getLogger(__name__)
@@ -189,32 +199,29 @@ async def data_export(student: User = Depends(_guard), db: AsyncSession = Depend
 async def chat(request: Request, body: dict, student: User = Depends(_guard), db: AsyncSession = Depends(get_db)):
     """
     SSE streaming chat endpoint.
-    
+
     Request body: {"question": "...", "class_id": "...", "subject_id": "..."}
     Returns: Server-Sent Events stream with tokens, then final citations event.
     """
     question = body.get("question", "").strip()
     class_id = body.get("class_id")
     subject_id = body.get("subject_id")
-    
+
     if not question:
         raise AppError("Question is required", error_code="VALIDATION_ERROR", status_code=400)
     if not class_id:
         raise AppError("class_id is required", error_code="VALIDATION_ERROR", status_code=400)
-    
+
     # Verify student is enrolled in this class
     class_ids = await _class_ids(db, student)
     if class_id not in class_ids:
         raise AppError("Not enrolled in this class", error_code="FORBIDDEN", status_code=403)
-    
+
     # Get or create chat session
     session = await _get_or_create_session(db, student, class_id, subject_id)
 
     # Get chat history
     history = await _get_chat_history(db, session)
-
-    # Get mastery score (topic will be extracted in Phase 4, use None for now)
-    mastery_score = await _get_mastery_score(db, student, subject_id, None)
 
     # Resolve a subject name for the prompt (User has no single subject).
     subject_name = "General"
@@ -223,13 +230,36 @@ async def chat(request: Request, body: dict, student: User = Depends(_guard), db
         if subj is not None:
             subject_name = subj.name
 
+    # Resolve the topic from the question against the student's known mastery
+    # topics, then fetch the live mastery score for that topic.
+    known_topics = (await db.execute(
+        select(ProgressRecord.topic).where(ProgressRecord.student_id == student.id)
+    )).scalars().all()
+    topic = best_topic(question, list(known_topics))
+    mastery_score = await _get_mastery_score(db, student, subject_id, topic)
+
+    # Orchestrate the turn through the LangGraph (safety_in → orchestrator).
+    orchestration = await run_orchestration(
+        message=question, school_id=student.school_id, student_id=student.id,
+        class_id=class_id, subject_id=subject_id, input_mode="text",
+    )
+    if orchestration.get("safety_blocked"):
+        raise ForbiddenError(
+            "I can't help with that. Let's keep to your class subjects — "
+            "ask your teacher if you're unsure what to study."
+        )
+    intent = orchestration.get("intent", "explain")
+
     # Save user message
     await _save_message(db, session, MessageRole.user, question)
 
     async def event_generator() -> AsyncGenerator[str, None]:
+        parts: list[str] = []
+        citations_data: list[dict] = []
+        lang = "en"
         try:
-            # Call tutor agent
-            response = await tutor_agent(
+            # Real token-by-token streaming from the tutor agent.
+            async for event in tutor_agent_stream(
                 student_id=student.id,
                 student_name=student.name,
                 grade=student.grade or 6,
@@ -239,50 +269,49 @@ async def chat(request: Request, body: dict, student: User = Depends(_guard), db
                 question=question,
                 interests=student.interests,
                 chat_history=history,
-            )
-            
-            # Stream answer tokens (simulate streaming by yielding chunks)
-            # In production, this would be true streaming from the LLM
-            answer = response.answer
-            # Yield in chunks for streaming effect
-            chunk_size = 50
-            for i in range(0, len(answer), chunk_size):
-                chunk = answer[i:i+chunk_size]
-                yield f"data: {json.dumps({'type': 'token', 'content': chunk})}\n\n"
-            
-            # Yield citations event
-            citations_data = [
-                {
-                    "source_type": c.source_type,
-                    "filename": c.filename,
-                    "title": c.title,
-                    "page": c.page,
-                    "timestamp": c.timestamp,
-                    "url": c.url,
-                }
-                for c in response.citations
-            ]
-            yield f"event: citations\ndata: {json.dumps(citations_data)}\n\n"
-            
+                mastery_score=mastery_score,
+                topic=topic,
+            ):
+                if event["type"] == "token":
+                    parts.append(event["content"])
+                    yield f"data: {json.dumps({'type': 'token', 'content': event['content']})}\n\n"
+                elif event["type"] == "citations":
+                    lang = event["lang"]
+                    citations_data = [
+                        {
+                            "source_type": c.source_type,
+                            "filename": c.filename,
+                            "title": c.title,
+                            "page": c.page,
+                            "timestamp": c.timestamp,
+                            "url": c.url,
+                        }
+                        for c in event["citations"]
+                    ]
+                    yield f"event: citations\ndata: {json.dumps(citations_data)}\n\n"
+
+            answer = "".join(parts)
+
             # Save assistant message
             await _save_message(
                 db, session, MessageRole.assistant, answer,
                 citations=citations_data,
                 model_role="explain",
-                provider="gemini" if response.lang_detected == "en" else "nvidia",
+                provider="gemini" if lang == "en" else "nvidia",
             )
-            
+
             # Audit log
             await record_audit(
                 db, action="CHAT_MESSAGE", actor=student,
                 target_type="chat_session", target_id=session.id,
-                payload={"question_hash": hash(question), "lang": response.lang_detected},
+                payload={"question_hash": hash(question), "lang": lang, "intent": intent},
                 request=request,
             )
-            
+
         except Exception as e:
+            logger.exception("Chat streaming failed: %s", e)
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
-    
+
     return StreamingResponse(
         event_generator(),
         media_type="text/event-stream",
@@ -304,20 +333,20 @@ async def voice_stt(
 ) -> dict:
     """
     Speech-to-Text endpoint.
-    
+
     Accepts audio file upload, returns transcribed text.
     Uses NVIDIA ASR model as server-side fallback.
     """
     # Read audio file
     audio_bytes = await file.read()
-    
+
     if not audio_bytes:
         raise AppError("Empty audio file", error_code="VALIDATION_ERROR", status_code=400)
-    
+
     # Check file size (limit to 10MB)
     if len(audio_bytes) > 10 * 1024 * 1024:
         raise AppError("Audio file too large (max 10MB)", error_code="VALIDATION_ERROR", status_code=400)
-    
+
     try:
         # Transcribe using ASR service
         text = await transcribe_audio(
@@ -335,12 +364,12 @@ async def voice_stt(
             payload={"language": language, "file_size": len(audio_bytes)},
             request=request,
         )
-        
+
         return {"text": text, "language": language}
-        
+
     except Exception as e:
         logger.error("STT failed: %s", e)
-        raise AppError(f"Speech recognition failed: {str(e)}", error_code="EXTERNAL_SERVICE_ERROR", status_code=502)
+        raise AppError(f"Speech recognition failed: {str(e)}", error_code="EXTERNAL_SERVICE_ERROR", status_code=502) from e
 
 
 @router.get("/voice/tts")
@@ -354,24 +383,26 @@ async def voice_tts(
 ) -> StreamingResponse:
     """
     Text-to-Speech endpoint.
-    
+
     Accepts text query parameter, returns audio stream.
     Uses NVIDIA TTS model as server-side fallback.
     """
     if not text or not text.strip():
         raise AppError("Text parameter required", error_code="VALIDATION_ERROR", status_code=400)
-    
+
     if len(text) > 5000:
         raise AppError("Text too long (max 5000 chars)", error_code="VALIDATION_ERROR", status_code=400)
-    
+
     try:
         # Synthesize speech
         audio_bytes = await synthesize_speech(
             text=text.strip(),
             language=language,
             voice=voice,
+            school_id=student.school_id,
+            user_id=student.id,
         )
-        
+
         # Audit log
         await record_audit(
             db, action="VOICE_TTS", actor=student,
@@ -379,7 +410,7 @@ async def voice_tts(
             payload={"language": language, "text_length": len(text)},
             request=request,
         )
-        
+
         # Return audio stream
         return StreamingResponse(
             iter([audio_bytes]),
@@ -389,10 +420,10 @@ async def voice_tts(
                 "Cache-Control": "no-cache",
             },
         )
-        
+
     except Exception as e:
         logger.error("TTS failed: %s", e)
-        raise AppError(f"Speech synthesis failed: {str(e)}", error_code="EXTERNAL_SERVICE_ERROR", status_code=502)
+        raise AppError(f"Speech synthesis failed: {str(e)}", error_code="EXTERNAL_SERVICE_ERROR", status_code=502) from e
 
 
 # ---------------------------------------------------------------------------

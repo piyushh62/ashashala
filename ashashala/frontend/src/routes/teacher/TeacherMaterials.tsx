@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
 import { useToast } from "../../components/ui/Toast";
 
 type Tab = "file" | "url" | "youtube";
@@ -16,7 +16,29 @@ export default function TeacherMaterials() {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
+  const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
   const materials = useQuery({ queryKey: ["teacher", "materials"], queryFn: teacherApi.materials });
+
+  // Subjects taught in the currently-selected class (a teacher can be assigned
+  // to the same class for several subjects).
+  const subjectsForClass = useMemo(
+    () => (assignments.data ?? []).filter((a) => a.class_id === classId),
+    [assignments.data, classId],
+  );
+  const classOptions = useMemo(() => {
+    const seen = new Map<string, string>();
+    for (const a of assignments.data ?? []) seen.set(a.class_id, a.class_name);
+    return Array.from(seen.entries());
+  }, [assignments.data]);
+
+  // Default to the teacher's first assignment once loaded.
+  useEffect(() => {
+    if (!classId && assignments.data?.length) {
+      setClassId(assignments.data[0].class_id);
+      setSubjectId(assignments.data[0].subject_id);
+    }
+  }, [assignments.data, classId]);
+
   const done = () => {
     toast.push("Uploaded — indexing in the background.", "success");
     setUrl("");
@@ -72,33 +94,49 @@ export default function TeacherMaterials() {
             </button>
           ))}
         </div>
-        <div className="p-5 grid md:grid-cols-3 gap-3 items-end">
-          <div>
-            <Label>Class id</Label>
-            <Input value={classId} onChange={(e) => setClassId(e.target.value)} />
+        {!assignments.isLoading && !assignments.data?.length ? (
+          <div className="p-5">
+            <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class and subject first." />
           </div>
-          <div>
-            <Label>Subject id (optional)</Label>
-            <Input value={subjectId} onChange={(e) => setSubjectId(e.target.value)} />
+        ) : (
+          <div className="p-5 grid md:grid-cols-3 gap-3 items-end">
+            <div>
+              <Label>Class</Label>
+              <Select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(""); }}>
+                <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
+                {classOptions.map(([id, name]) => (
+                  <option key={id} value={id}>{name}</option>
+                ))}
+              </Select>
+            </div>
+            <div>
+              <Label>Subject (optional)</Label>
+              <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} disabled={!classId}>
+                <option value="">No specific subject</option>
+                {subjectsForClass.map((a) => (
+                  <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
+                ))}
+              </Select>
+            </div>
+            {tab === "file" ? (
+              <div>
+                <Label>File</Label>
+                <input type="file" accept=".pdf,.docx,.txt,.jpg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              </div>
+            ) : (
+              <div>
+                <Label>{tab === "url" ? "URL" : "YouTube URL"}</Label>
+                <Input value={url} onChange={(e) => setUrl(e.target.value)} />
+              </div>
+            )}
+            <Button
+              onClick={submit}
+              disabled={!classId || (tab === "file" ? !file : !url) || upFile.isPending || upUrl.isPending || upYt.isPending}
+            >
+              Upload
+            </Button>
           </div>
-          {tab === "file" ? (
-            <div>
-              <Label>File</Label>
-              <input type="file" accept=".pdf,.docx,.txt,.jpg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-            </div>
-          ) : (
-            <div>
-              <Label>{tab === "url" ? "URL" : "YouTube URL"}</Label>
-              <Input value={url} onChange={(e) => setUrl(e.target.value)} />
-            </div>
-          )}
-          <Button
-            onClick={submit}
-            disabled={!classId || (tab === "file" ? !file : !url) || upFile.isPending || upUrl.isPending || upYt.isPending}
-          >
-            Upload
-          </Button>
-        </div>
+        )}
       </Card>
 
       <Card>

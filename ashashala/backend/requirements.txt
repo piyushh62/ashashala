@@ -30,6 +30,11 @@ python-docx==1.1.2
 trafilatura==1.12.2
 youtube-transcript-api==0.6.2
 
+# Voice — NVIDIA TTS is served over Riva gRPC, not the OpenAI REST endpoint
+# (see config/model_registry.yaml roles.tts). Lazily imported so the app still
+# boots without it; only server-side TTS synthesis needs this package.
+nvidia-riva-client==2.19.0
+
 # Auth & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4

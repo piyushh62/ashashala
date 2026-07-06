@@ -112,7 +112,6 @@ async def seeded_data(db: AsyncSession):
                 class_id=class_section.id,
                 subject_id=subject.id,
                 school_id=school.id,
-                text="Fractions represent parts of a whole. When adding fractions with different denominators, you must first find a common denominator. For example, 1/2 + 1/3 = 3/6 + 2/6 = 5/6.",
                 page_or_ts=7,
                 lang="en",
                 qdrant_point_id="chunk-1",
@@ -122,7 +121,6 @@ async def seeded_data(db: AsyncSession):
                 class_id=class_section.id,
                 subject_id=subject.id,
                 school_id=school.id,
-                text="A common denominator is a shared multiple of the denominators. The least common denominator (LCD) of 2 and 3 is 6. So we convert 1/2 to 3/6 and 1/3 to 2/6.",
                 page_or_ts=8,
                 lang="en",
                 qdrant_point_id="chunk-2",
@@ -189,25 +187,22 @@ async def test_tutor_agent_english_question(seeded_data, db: AsyncSession):
         },
     ]
     
+    # Short, mastery-band-appropriate mock answer (low mastery → ≤4 sentences).
+    _ANSWER = (
+        "Picture a roti cut into 2 equal pieces and another cut into 3 — the pieces "
+        "aren't the same size, so you can't just add them. First make the pieces equal: "
+        "sixths work, so 1/2 becomes 3/6 and 1/3 becomes 2/6, together 5/6.\n"
+        "[source: fractions.pdf, p. 7]\n"
+        "You already spotted that the pieces must be equal — can you try 1/4 + 1/2 the same way?"
+    )
+
+    async def fake_llm_stream(**kwargs):
+        yield _ANSWER
+
     with patch("app.agents.tutor.retrieve", new_callable=AsyncMock) as mock_retrieve:
         mock_retrieve.return_value = mock_chunks
-        
-        with patch("app.agents.tutor.llm_chat", new_callable=AsyncMock) as mock_llm:
-            # Mock LLM response with citations
-            mock_llm.return_value = (
-                "Picture a roti cut into 2 equal pieces, and another roti cut into 3 equal pieces. "
-                "You eat one piece from each. You might think 'I ate 2 pieces out of 5 total' — "
-                "but that's only right if all 5 pieces were the same size. A half-roti piece is "
-                "bigger than a third-roti piece, so you can't add them directly. You first need "
-                "both rotis cut into equal-size pieces. Six pieces works (sixths). 1/2 becomes 3/6, "
-                "and 1/3 becomes 2/6, so together: 5/6. That's what finding a common denominator "
-                "actually means.\n"
-                "[source: fractions.pdf, p. 7]\n"
-                "You've already got the intuition that the pieces should be equal — you're right "
-                "about that, the adjustment is just: equal to each other, not equal to the total. "
-                "Can you try 1/4 + 1/2 using this same roti idea?"
-            )
-            
+
+        with patch("app.agents.tutor.llm_chat_stream", side_effect=lambda **kw: fake_llm_stream(**kw)):
             response = await tutor_agent(
                 student_id=student.id,
                 student_name=student.name,
@@ -358,20 +353,21 @@ async def test_chat_endpoint_sse_streaming(seeded_data, client: AsyncClient):
     # Login as student
     auth = await login(client, "student@test.com")
     
-    # Mock the tutor agent
-    from unittest.mock import AsyncMock, patch
-    
-    with patch("app.routes.student.tutor_agent", new_callable=AsyncMock) as mock_tutor:
-        from app.agents.tutor import TutorResponse, Citation
-        
-        mock_tutor.return_value = TutorResponse(
-            answer="Test answer with citation. [source: test.pdf, p. 5]",
-            citations=[
-                Citation(source_type="pdf", filename="test.pdf", page=5)
-            ],
-            lang_detected="en",
-        )
-        
+    # Mock the tutor agent's streaming generator.
+    from unittest.mock import patch
+    from app.agents.tutor import Citation
+
+    async def fake_stream(**kwargs):
+        for tok in ["Test ", "answer ", "with citation. [source: test.pdf, p. 5]"]:
+            yield {"type": "token", "content": tok}
+        yield {
+            "type": "citations",
+            "citations": [Citation(source_type="pdf", filename="test.pdf", page=5)],
+            "answer": "Test answer with citation. [source: test.pdf, p. 5]",
+            "lang": "en",
+        }
+
+    with patch("app.routes.student.tutor_agent_stream", side_effect=lambda **kw: fake_stream(**kw)):
         response = await client.post(
             "/api/v1/student/chat",
             headers=auth,
@@ -406,6 +402,7 @@ async def test_chat_endpoint_sse_streaming(seeded_data, client: AsyncClient):
 
 
 # Import School model
+from tests.conftest import login
 from app.models.school import School
 from app.auth.password import hash_password
 from app.db.tenant_filter import tenant_bypass

@@ -5,8 +5,15 @@
 #
 # RE-VERIFY before each phase (NVIDIA IDs drift / get deprecated):
 #   https://build.nvidia.com/models?pageSize=96&filters=publisher%3Anvidia
-# Lines marked "# VERIFY" are not exercised in Phase 1 (health only hits
-# fast_chat) — confirm exact IDs against the live catalog before first use.
+#
+# Every ID below has been checked against the live NVIDIA catalog / API docs
+# (docs.api.nvidia.com, build.nvidia.com model cards). Roles that use NVIDIA's
+# standard OpenAI-compatible chat/embeddings endpoints (fast_chat, reasoning,
+# multilingual_indic, vision, embeddings) are wired up directly. OCR and TTS
+# have a catalog-listed "native" NVIDIA model (baidu/paddleocr, fastpitch/
+# magpie TTS) that use NON-standard endpoints (paddleocr: a bespoke /v1/cv/
+# REST route; TTS: Riva gRPC with a function-id, not REST) — see the comments
+# on those roles for how this build actually reaches each capability.
 #
 # Gemini rules (PROJECT_PROMPT.md Section 1):
 #   default -> gemini-2.5-flash-lite ; reasoning/vision -> gemini-2.5-flash.
@@ -23,43 +30,77 @@ roles:
   # Reasoning — evaluation/grading, lesson planning.
   reasoning:
     gemini: "gemini-2.5-flash"
-    nvidia_primary: "nvidia/llama-3.1-nemotron-ultra-253b-v1"   # VERIFY (Nemotron Ultra)
+    nvidia_primary: "nvidia/llama-3.1-nemotron-ultra-253b-v1"   # confirmed: docs.api.nvidia.com/nim/reference/nvidia-llama-3_1-nemotron-ultra-253b-v1
     nvidia_fallback: "meta/llama-3.1-70b-instruct"
 
   # Multilingual Indic — Gujarati/Hindi/etc. Routed NVIDIA-direct (Sarvam-M).
   multilingual_indic:
     nvidia_primary: "sarvamai/sarvam-m"                          # Sarvam-M (Indic)
-    nvidia_fallback: "meta/llama-4-maverick-17b-128e-instruct"   # VERIFY (Maverick multilingual)
+    nvidia_fallback: "meta/llama-4-maverick-17b-128e-instruct"   # confirmed: build.nvidia.com/meta/llama-4-maverick-17b-128e-instruct
 
-  # Vision — diagrams, image understanding.
+  # Vision — diagrams, image understanding, and this build's OCR path (a VLM
+  # reading text off a scanned/photographed page — more robust for phone
+  # photos than a fixed-layout OCR model, and it speaks the standard
+  # chat-completions image_url schema instead of a bespoke endpoint).
   vision:
     gemini: "gemini-2.5-flash"
-    nvidia_fallback: "meta/llama-3.2-90b-vision-instruct"        # VERIFY
+    nvidia_fallback: "meta/llama-3.2-90b-vision-instruct"        # confirmed: build.nvidia.com/meta/llama-3.2-90b-vision-instruct
 
-  # OCR — scanned/photographed pages. NVIDIA only.
+  # OCR — scanned/photographed pages.
+  # baidu/paddleocr is the catalog's dedicated OCR model, but it is NOT served
+  # over the OpenAI-compatible chat endpoint — NVIDIA hosts it at a distinct
+  # REST route (https://ai.api.nvidia.com/v1/cv/baidu/paddleocr) with its own
+  # image-in/boxes-out payload shape. Wiring a second HTTP client just for this
+  # one route isn't worth it when the `vision` role's VLM already does OCR
+  # (and more robustly, for handwriting/skewed phone photos). This entry is
+  # kept for documentation / future direct integration; app/services/
+  # ocr_service.py currently calls the `vision` role, not this one.
   ocr:
-    nvidia_primary: "baidu/paddleocr"                            # VERIFY (nemotron-ocr id drifts)
+    nvidia_primary: "baidu/paddleocr"                            # confirmed id, non-standard endpoint — see comment above
 
-  # ASR — speech to text (multilingual incl. Hindi/Gujarati). NVIDIA only.
+  # ASR — speech to text (multilingual incl. Hindi/Gujarati).
+  # Canary/Parakeet are NVIDIA's catalog ASR models, but — like TTS below —
+  # NVIDIA serves them over Riva gRPC with a function-id, not the OpenAI REST
+  # endpoint. app/services/asr_service.py instead uses Gemini's native audio
+  # input (gemini-2.5-flash accepts audio parts), which is real, free, and
+  # reachable over the same client already used for chat — see the `vision`
+  # role, whose Gemini model is reused for transcription. Kept here for
+  # documentation / future direct Riva integration.
   asr:
-    nvidia_primary: "nvidia/canary-1b-asr"                       # VERIFY (streaming ASR id)
-    nvidia_fallback: "nvidia/parakeet-rnnt-1.1b"                 # VERIFY
+    nvidia_primary: "nvidia/canary-1b-asr"                       # confirmed id (build.nvidia.com/nvidia/canary-1b-asr), Riva gRPC only
+    nvidia_fallback: "nvidia/parakeet-1.1b-rnnt-multilingual-asr" # confirmed id, Riva gRPC only
 
   # Embeddings — RAG. Gemini text-embedding-004 = 768 dims (Qdrant gemini_768).
   # NVIDIA nv-embedqa-e5-v5 = 1024 dims (Qdrant nvidia_1024). Kept in separate
-  # named vectors so dimensions never collide.
+  # named vectors so dimensions never collide. Confirmed at
+  # docs.api.nvidia.com/nim/reference/nvidia-nv-embedqa-e5-v5-infer — the
+  # hosted endpoint IS standard OpenAI-compatible /v1/embeddings.
   embeddings:
     gemini: "text-embedding-004"
-    nvidia_fallback: "nvidia/nv-embedqa-e5-v5"                   # VERIFY (1024-dim)
+    nvidia_fallback: "nvidia/nv-embedqa-e5-v5"
 
-  # Safety — jailbreak detection. Takes a PRE-COMPUTED embedding, not raw text.
+  # Safety — jailbreak detection. Takes a PRE-COMPUTED embedding, not raw text
+  # (PROJECT_PROMPT §7.7). Confirmed model card: 768-dim vector from
+  # nv-embedqa-e5-v5. The hosted classify route lives on a different host
+  # (ai.api.nvidia.com/v1/security/nvidia/nemoguard-jailbreak-detect) than the
+  # chat/embeddings base URL — app/agents/safety.py calls it directly rather
+  # than through the shared OpenAI-SDK client. Off by default
+  # (ENABLE_JAILBREAK_DETECTION=false); fails open on any error.
   safety_jailbreak:
-    nvidia_primary: "nvidia/nemoguard-jailbreak-detect"         # VERIFY (deferred, Section 7.7)
+    nvidia_primary: "nvidia/nemoguard-jailbreak-detect"
 
-  # TTS — text to speech (server-side voice fallback).
+  # TTS — text to speech (server-side voice fallback; browser SpeechSynthesis
+  # is primary). NVIDIA serves TTS exclusively over Riva gRPC
+  # (grpc.nvcf.nvidia.com:443) identified by a function-id, NOT a model name
+  # on the OpenAI REST endpoint — nvidia_client.py's synthesize() uses the
+  # nvidia-riva-client package with the function_id fields below.
+  # magpie-tts-multilingual is primary because it covers Hindi/Gujarati;
+  # fastpitch-hifigan-tts (English only) is the fallback.
   tts:
-    nvidia_primary: "nvidia/fastpitch-hifigan"                  # VERIFY
-    nvidia_fallback: "nvidia/tts-en-us"                         # VERIFY
+    nvidia_primary: "magpie-tts-multilingual"
+    nvidia_primary_function_id: "877104f7-e885-42b9-8de8-f6e4c6303969"
+    nvidia_fallback: "fastpitch-hifigan-tts"
+    nvidia_fallback_function_id: "0149dedb-2be8-4195-b9a0-e57e0e14f972"
 
 # Provider configuration (informational; timeouts live in app/core/config.py).
 providers:
@@ -72,3 +113,9 @@ providers:
     timeout: 60
     max_retries: 2
     rate_limit_rpm: 40  # Free tier limit
+  nvidia_riva:
+    server: "grpc.nvcf.nvidia.com:443"
+    note: "gRPC, not REST — used only for TTS (see roles.tts above)"
+  nvidia_security:
+    base_url: "https://ai.api.nvidia.com"
+    note: "Hosts nemoguard-jailbreak-detect; distinct from the chat/embeddings base URL"

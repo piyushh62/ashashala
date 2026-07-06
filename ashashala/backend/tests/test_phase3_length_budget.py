@@ -183,18 +183,21 @@ class TestLengthBudgetEnforcement:
                 {"text": "Fractions represent parts of a whole.", "metadata": {"filename": "math.pdf", "page_or_ts": 5}},
             ]
             
-            # Mock LLM to return a response that should be truncated to 4 sentences
-            # The prompt should enforce this, but we verify the output
-            with patch("app.agents.tutor.llm_chat", new_callable=AsyncMock) as mock_llm:
-                # Simulate a response that respects the 4-sentence budget
-                mock_llm.return_value = (
-                    "Think of a pizza cut into 4 equal slices. "
-                    "If you eat 1 slice, you ate 1/4 of the pizza. "
-                    "[source: math.pdf, p. 5] "
-                    "You're getting the hang of parts and wholes — great start! "
-                    "Can you try 1/3 of a chocolate bar?"
-                )
-                
+            # Mock the streaming LLM call to return a response that should be
+            # truncated to 4 sentences. The prompt should enforce this, but we
+            # verify the output.
+            _ANSWER = (
+                "Think of a pizza cut into 4 equal slices. "
+                "If you eat 1 slice, you ate 1/4 of the pizza. "
+                "[source: math.pdf, p. 5] "
+                "You're getting the hang of parts and wholes — great start! "
+                "Can you try 1/3 of a chocolate bar?"
+            )
+
+            async def fake_stream(**kwargs):
+                yield _ANSWER
+
+            with patch("app.agents.tutor.llm_chat_stream", side_effect=lambda **kw: fake_stream(**kw)):
                 response = await tutor_agent(
                     student_id=student.id,
                     student_name=student.name,
@@ -233,18 +236,21 @@ class TestLengthBudgetEnforcement:
                 {"text": "Adding fractions requires common denominators.", "metadata": {"filename": "math.pdf", "page_or_ts": 10}},
             ]
             
-            with patch("app.agents.tutor.llm_chat", new_callable=AsyncMock) as mock_llm:
-                mock_llm.return_value = (
-                    "Imagine two pizzas — one cut into 4 slices, another into 3 slices. "
-                    "You can't just add 1 slice from each because they're different sizes. "
-                    "First, make both pizzas have the same number of slices — say 12. "
-                    "Now 1/4 becomes 3/12, and 1/3 becomes 4/12. "
-                    "Add them: 3/12 + 4/12 = 7/12. "
-                    "[source: math.pdf, p. 10] "
-                    "You've got the common denominator idea down perfectly! "
-                    "Want to try 1/5 + 2/3?"
-                )
-                
+            _ANSWER = (
+                "Imagine two pizzas — one cut into 4 slices, another into 3 slices. "
+                "You can't just add 1 slice from each because they're different sizes. "
+                "First, make both pizzas have the same number of slices — say 12. "
+                "Now 1/4 becomes 3/12, and 1/3 becomes 4/12. "
+                "Add them: 3/12 + 4/12 = 7/12. "
+                "[source: math.pdf, p. 10] "
+                "You've got the common denominator idea down perfectly! "
+                "Want to try 1/5 + 2/3?"
+            )
+
+            async def fake_stream(**kwargs):
+                yield _ANSWER
+
+            with patch("app.agents.tutor.llm_chat_stream", side_effect=lambda **kw: fake_stream(**kw)):
                 response = await tutor_agent(
                     student_id=student.id,
                     student_name=student.name,
@@ -279,19 +285,22 @@ class TestLengthBudgetEnforcement:
                 {"text": "Complex fraction operations.", "metadata": {"filename": "math.pdf", "page_or_ts": 15}},
             ]
             
-            with patch("app.agents.tutor.llm_chat", new_callable=AsyncMock) as mock_llm:
-                mock_llm.return_value = (
-                    "Great question about complex fractions! "
-                    "Think of it like a recipe where you need to combine ingredients measured in different units. "
-                    "First, find a common unit — the least common denominator. "
-                    "Convert each fraction to that unit. "
-                    "Then add the numerators while keeping the denominator the same. "
-                    "Simplify if possible. "
-                    "[source: math.pdf, p. 15] "
-                    "Your fraction skills are really coming together — you're handling multi-step problems with ease! "
-                    "Ready for a challenge with mixed numbers?"
-                )
-                
+            _ANSWER = (
+                "Great question about complex fractions! "
+                "Think of it like a recipe where you need to combine ingredients measured in different units. "
+                "First, find a common unit — the least common denominator. "
+                "Convert each fraction to that unit. "
+                "Then add the numerators while keeping the denominator the same. "
+                "Simplify if possible. "
+                "[source: math.pdf, p. 15] "
+                "Your fraction skills are really coming together — you're handling multi-step problems with ease! "
+                "Ready for a challenge with mixed numbers?"
+            )
+
+            async def fake_stream(**kwargs):
+                yield _ANSWER
+
+            with patch("app.agents.tutor.llm_chat_stream", side_effect=lambda **kw: fake_stream(**kw)):
                 response = await tutor_agent(
                     student_id=student.id,
                     student_name=student.name,

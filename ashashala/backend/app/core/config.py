@@ -1,5 +1,4 @@
 from functools import lru_cache
-from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
@@ -106,6 +105,13 @@ class Settings(BaseSettings):
     # --- Rate limits (slowapi syntax, e.g. "30/minute") ---
     CHAT_RATE_LIMIT: str = Field(default="30/minute", description="Per-IP limit on the chat endpoint")
     QUIZ_RATE_LIMIT: str = Field(default="20/minute", description="Per-IP limit on quiz generation")
+
+    # --- Safety ---
+    ENABLE_JAILBREAK_DETECTION: bool = Field(
+        default=False,
+        description="Run the NVIDIA NeMo-Guard jailbreak classifier per chat message "
+        "(spends an embedding + classifier call on the rate-limited free tier).",
+    )
 
     # --- Timeouts (seconds) ---
     GEMINI_TIMEOUT: int = Field(default=30, description="Gemini API timeout")

@@ -29,17 +29,18 @@ async def test_cross_tenant_document_is_invisible(db):
     school_a = await make_school(db, name="A")
     school_b = await make_school(db, name="B")
     doc = await _make_doc(db, school_a.id)
+    doc_id = doc.id
 
     # School A context sees its document.
     with tenant_context(school_a.id):
-        db.expire_all()
-        found = (await db.execute(select(Document).where(Document.id == doc.id))).scalar_one_or_none()
+        db.expunge_all()  # drop identity-map objects so the next query loads fresh
+        found = (await db.execute(select(Document).where(Document.id == doc_id))).scalar_one_or_none()
     assert found is not None
 
     # School B context sees nothing (would become a 404 in a route).
     with tenant_context(school_b.id):
-        db.expire_all()
-        hidden = (await db.execute(select(Document).where(Document.id == doc.id))).scalar_one_or_none()
+        db.expunge_all()  # drop identity-map objects so the next query loads fresh
+        hidden = (await db.execute(select(Document).where(Document.id == doc_id))).scalar_one_or_none()
     assert hidden is None
 
 
@@ -47,8 +48,9 @@ async def test_cross_tenant_document_is_invisible(db):
 async def test_super_admin_context_sees_all(db):
     school_a = await make_school(db, name="A")
     doc = await _make_doc(db, school_a.id)
+    doc_id = doc.id
     # No tenant context (super admin) => no filtering.
     with tenant_context(None):
-        db.expire_all()
-        found = (await db.execute(select(Document).where(Document.id == doc.id))).scalar_one_or_none()
+        db.expunge_all()  # drop identity-map objects so the next query loads fresh
+        found = (await db.execute(select(Document).where(Document.id == doc_id))).scalar_one_or_none()
     assert found is not None

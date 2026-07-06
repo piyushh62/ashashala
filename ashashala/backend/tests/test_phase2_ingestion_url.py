@@ -21,11 +21,12 @@ async def test_url_ingestion(db, session_factory, monkeypatch):
         lambda ref, **kw: [Segment(text="The water cycle moves water around the Earth. " * 40, page_or_ts=None)],
     )
 
-    await pipeline.ingest_document(doc_id=doc.id, school_id=school.id, class_id="c1",
+    doc_id = doc.id
+    await pipeline.ingest_document(doc_id=doc_id, school_id=school.id, class_id="c1",
                                    subject_id=None, source_type=SourceType.url,
                                    source_ref="https://ex.com/a")
 
     db.expire_all()
-    assert (await db.get(Document, doc.id)).status == DocStatus.indexed
-    chunks = (await db.execute(select(Chunk).where(Chunk.doc_id == doc.id))).scalars().all()
+    assert (await db.get(Document, doc_id)).status == DocStatus.indexed
+    chunks = (await db.execute(select(Chunk).where(Chunk.doc_id == doc_id))).scalars().all()
     assert len(chunks) >= 1

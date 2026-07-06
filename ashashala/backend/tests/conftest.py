@@ -29,6 +29,16 @@ os.environ.setdefault("SUPER_ADMIN_EMAIL", "admin@ashashala.test")
 os.environ.setdefault("SUPER_ADMIN_PASSWORD", "test-admin-password")
 os.environ.setdefault("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
 
+# The test fixtures use reserved-TLD emails (e.g. adm@x.test). Newer
+# email-validator releases reject RFC 2606 special-use domains (.test, .example,
+# .invalid, .localhost). This is a *test-process-only* relaxation — production
+# never imports conftest, so EmailStr validation stays strict in the real app.
+import email_validator
+
+email_validator.SPECIAL_USE_DOMAIN_NAMES = [
+    d for d in email_validator.SPECIAL_USE_DOMAIN_NAMES if d not in {"test", "example", "invalid", "localhost"}
+]
+
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -94,7 +104,9 @@ async def make_school(db: AsyncSession, name: str = "Test School", **features) -
     with tenant_bypass():
         school = School(name=name)
         if features:
-            school.features_json = {**school.features_json, **features}
+            # features_json's column default is applied at flush, not at
+            # construction, so school.features_json is None until then.
+            school.features_json = {**(school.features_json or {}), **features}
         db.add(school)
         await db.commit()
         await db.refresh(school)

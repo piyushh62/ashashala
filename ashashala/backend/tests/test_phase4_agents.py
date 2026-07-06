@@ -110,9 +110,10 @@ async def test_full_quiz_loop(client, db, monkeypatch):
     assert res["mastery_update"]["new"] == ema(20, res["attempt_score"]) == 34
 
     # 3) Mastery persisted with the EMA value.
+    student_id = student.id
     db.expire_all()
     rec = (await db.execute(select(ProgressRecord).where(
-        ProgressRecord.student_id == student.id, ProgressRecord.topic == "Fractions"
+        ProgressRecord.student_id == student_id, ProgressRecord.topic == "Fractions"
     ))).scalars().first()
     assert rec.mastery_score == ema(20, 0.68)
 
@@ -138,6 +139,8 @@ async def test_full_quiz_loop(client, db, monkeypatch):
     assert ap.status_code == 200 and ap.json()["status"] == QuizStatus.approved.value
 
     # 6) Next practice quiz still targets the weakest topic (Fractions at 34 < Algebra 80).
+    from app.models.user import User
+    student = await db.get(User, student_id)
     topic, _sid, mastery = await quiz_master_mod.pick_weakest_topic(db, student)
     assert topic == "Fractions"
     assert mastery == ema(20, 0.68)

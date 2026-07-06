@@ -9,11 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.db.session import get_db
 from app.deps import require_role
-from app.models.document import Document, DocStatus, SourceType
+from app.models.document import DocStatus, Document, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import ProgressRecord, Quiz, QuizStatus
 from app.models.school import School
-from app.models.structure import Enrollment, TeacherAssignment
+from app.models.structure import ClassSection, Enrollment, Subject, TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
 from app.schemas.teacher import (
@@ -58,6 +58,7 @@ async def _create_and_schedule(
     db: AsyncSession, tasks: BackgroundTasks, teacher: User, request: Request, *,
     class_id: str, subject_id: str | None, filename: str, source_type: SourceType,
     source_ref: str | None, storage_url: str | None, data: bytes | None,
+    content_type: str | None = None,
 ) -> Document:
     doc = Document(school_id=teacher.school_id, class_id=class_id, subject_id=subject_id,
                    uploaded_by_teacher_id=teacher.id, filename=filename, storage_url=storage_url,
@@ -67,7 +68,8 @@ async def _create_and_schedule(
     await record_audit(db, action="MATERIAL_UPLOAD", actor=teacher, target_type="document",
                        target_id=doc.id, payload={"type": source_type.value}, request=request)
     tasks.add_task(ingest_document, doc_id=doc.id, school_id=teacher.school_id, class_id=class_id,
-                   subject_id=subject_id, source_type=source_type, data=data, source_ref=source_ref)
+                   subject_id=subject_id, source_type=source_type, data=data, source_ref=source_ref,
+                   content_type=content_type)
     return doc
 
 
@@ -88,7 +90,8 @@ async def upload_file(request: Request, tasks: BackgroundTasks, file: UploadFile
     storage_url = await get_storage_client().upload_bytes(key, data, file.content_type or "application/octet-stream")
     doc = await _create_and_schedule(db, tasks, teacher, request, class_id=class_id, subject_id=subject_id,
                                      filename=file.filename or key, source_type=source_type,
-                                     source_ref=file.filename, storage_url=storage_url, data=data)
+                                     source_ref=file.filename, storage_url=storage_url, data=data,
+                                     content_type=file.content_type)
     return DocumentOut.model_validate(doc)
 
 
@@ -161,6 +164,31 @@ async def create_exam_timetable(body: ExamTimetableCreate, request: Request,
     await record_audit(db, action="EXAM_TIMETABLE_CREATE", actor=teacher, target_type="exam_timetable",
                        target_id=ex.id, request=request)
     return ExamTimetableOut.model_validate(ex)
+
+
+@router.get("/assignments")
+async def list_assignments(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """This teacher's (class, subject) assignments with names, for the
+    Materials/Timetable pickers — avoids the frontend needing raw class/subject
+    UUIDs to build a working upload/timetable form."""
+    rows = (await db.execute(
+        select(TeacherAssignment).where(TeacherAssignment.teacher_id == teacher.id)
+    )).scalars().all()
+    class_ids = {r.class_id for r in rows}
+    subject_ids = {r.subject_id for r in rows}
+    classes = {c.id: c.name for c in (await db.execute(
+        select(ClassSection).where(ClassSection.id.in_(class_ids))
+    )).scalars().all()} if class_ids else {}
+    subjects = {s.id: s.name for s in (await db.execute(
+        select(Subject).where(Subject.id.in_(subject_ids))
+    )).scalars().all()} if subject_ids else {}
+    return [
+        {
+            "class_id": r.class_id, "class_name": classes.get(r.class_id, r.class_id),
+            "subject_id": r.subject_id, "subject_name": subjects.get(r.subject_id, r.subject_id),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/dashboard")

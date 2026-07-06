@@ -3,27 +3,26 @@
 from __future__ import annotations
 
 import re
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Optional
 
 from app.agents.prompts.tutor_prompt import StudentContext, build_tutor_prompt
 from app.agents.safety import safety_wrapper
 from app.services.lang_detect import detect_lang
-from app.services.llm_router import chat as llm_chat
+from app.services.llm_router import chat_stream as llm_chat_stream
 from app.services.rag.retriever import retrieve
-from app.services.rag.store import get_qdrant_store
 
 
 @dataclass
 class Citation:
     """Parsed citation with authoritative metadata from retrieved chunks."""
     source_type: str  # pdf, url, youtube
-    filename: Optional[str] = None
-    title: Optional[str] = None
-    page: Optional[int] = None
-    timestamp: Optional[str] = None
-    url: Optional[str] = None
-    chunk_id: Optional[str] = None
+    filename: str | None = None
+    title: str | None = None
+    page: int | None = None
+    timestamp: str | None = None
+    url: str | None = None
+    chunk_id: str | None = None
 
 
 @dataclass
@@ -119,6 +118,110 @@ def parse_citations(answer: str, retrieved_chunks: list[dict]) -> list[Citation]
     return citations
 
 
+async def _prepare(
+    *,
+    subject: str,
+    class_id: str,
+    school_id: str,
+    question: str,
+    student_name: str,
+    grade: int,
+    interests: str | None,
+    chat_history: list[dict] | None,
+    mastery_score: int | None,
+    topic: str | None,
+) -> tuple[str, list[dict], str]:
+    """Shared setup for the tutor: safety → retrieve → build prompt.
+
+    Returns (prompt, retrieved_chunks, lang_detected).
+    """
+    lang_detected = detect_lang(question)
+
+    # Safety guard (harmful content + subject + optional jailbreak). Raises
+    # ForbiddenError → HTTP 403 for blocked questions.
+    await safety_wrapper(question, subject, school_id=school_id)
+
+    # Retrieve top-20 chunks from Qdrant, filtered by class_id (the security
+    # boundary for the knowledge base).
+    retrieved = await retrieve(
+        school_id=school_id, class_id=class_id, query=question,
+        lang=lang_detected, limit=20,
+    )
+
+    retrieved_chunks_str = "\n\n".join(
+        f"[Chunk {i+1}] {(chunk.get('payload') or {}).get('text', '')}"
+        for i, chunk in enumerate(retrieved)
+    )
+
+    history_str = ""
+    if chat_history:
+        history_str = "\n".join(
+            f"{msg.get('role', 'user')}: {msg.get('content', '')}"
+            for msg in chat_history[-6:]
+        )
+
+    student_ctx = StudentContext(
+        name=student_name, grade=grade, subject=subject, interests=interests,
+    )
+    prompt = build_tutor_prompt(
+        student=student_ctx,
+        mastery_score=mastery_score if mastery_score is not None else 50,
+        topic=topic,
+        retrieved_chunks=retrieved_chunks_str,
+        history=history_str,
+        question=question,
+        lang=lang_detected,
+    )
+    return prompt, retrieved, lang_detected
+
+
+async def tutor_agent_stream(
+    student_id: str,
+    student_name: str,
+    grade: int,
+    subject: str,
+    class_id: str,
+    school_id: str,
+    question: str,
+    interests: str | None = None,
+    chat_history: list[dict] | None = None,
+    mastery_score: int | None = None,
+    topic: str | None = None,
+) -> AsyncIterator[dict]:
+    """Stream the tutor's answer token-by-token, then emit a final citations
+    event once the full answer is known.
+
+    Yields dicts:
+      {"type": "token", "content": str}                                   (many)
+      {"type": "citations", "citations": [...], "answer": str, "lang": str} (once)
+
+    Citations are parsed from the *complete* answer, so they can only be sent
+    after the last token — hence the trailing event.
+    """
+    prompt, retrieved, lang_detected = await _prepare(
+        subject=subject, class_id=class_id, school_id=school_id, question=question,
+        student_name=student_name, grade=grade, interests=interests,
+        chat_history=chat_history, mastery_score=mastery_score, topic=topic,
+    )
+
+    parts: list[str] = []
+    async for delta in llm_chat_stream(
+        messages=[{"role": "user", "content": prompt}],
+        task="explain", lang_hint=lang_detected, school_id=school_id, user_id=student_id,
+    ):
+        parts.append(delta)
+        yield {"type": "token", "content": delta}
+
+    answer = "".join(parts)
+    citations = parse_citations(answer, retrieved)
+    yield {
+        "type": "citations",
+        "citations": citations,
+        "answer": answer,
+        "lang": lang_detected,
+    }
+
+
 async def tutor_agent(
     student_id: str,
     student_name: str,
@@ -127,91 +230,25 @@ async def tutor_agent(
     class_id: str,
     school_id: str,
     question: str,
-    interests: Optional[str] = None,
-    chat_history: Optional[list[dict]] = None,
+    interests: str | None = None,
+    chat_history: list[dict] | None = None,
+    mastery_score: int | None = None,
+    topic: str | None = None,
 ) -> TutorResponse:
-    """
-    Main tutor agent function - processes student question and returns
-    streaming-ready answer with citations.
+    """Non-streaming tutor: collect the full streamed answer into a
+    TutorResponse. Used by callers that want the complete result at once."""
+    answer = ""
+    citations: list[Citation] = []
+    lang_detected = "en"
+    async for event in tutor_agent_stream(
+        student_id=student_id, student_name=student_name, grade=grade,
+        subject=subject, class_id=class_id, school_id=school_id, question=question,
+        interests=interests, chat_history=chat_history,
+        mastery_score=mastery_score, topic=topic,
+    ):
+        if event["type"] == "citations":
+            answer = event["answer"]
+            citations = event["citations"]
+            lang_detected = event["lang"]
 
-    Args:
-        student_id: Student UUID
-        student_name: Student name
-        grade: Grade level
-        subject: Subject name
-        class_id: Class UUID for RAG filtering
-        school_id: School UUID for tenant isolation
-        question: Student's question
-        interests: Optional student interests
-        chat_history: Optional previous messages
-
-    Returns:
-        TutorResponse with answer, citations, and detected language
-    """
-    # 1. Detect language of question
-    lang_detected = detect_lang(question)
-
-    # 2. Safety check - topic relevance
-    await safety_wrapper(question, subject)
-
-    # 3. Retrieve top-20 chunks from Qdrant (filtered by class_id)
-    retrieved = await retrieve(
-        school_id=school_id,
-        class_id=class_id,
-        query=question,
-        lang=lang_detected,
-        limit=20,
-    )
-
-    # 4. Format retrieved chunks for prompt (text lives inside the payload)
-    retrieved_chunks_str = "\n\n".join([
-        f"[Chunk {i+1}] {(chunk.get('payload') or {}).get('text', '')}"
-        for i, chunk in enumerate(retrieved)
-    ])
-
-    # 5. Format chat history
-    history_str = ""
-    if chat_history:
-        history_str = "\n".join([
-            f"{msg.get('role', 'user')}: {msg.get('content', '')}"
-            for msg in chat_history[-6:]  # Last 6 messages
-        ])
-
-    # 6. Get mastery score for topic (placeholder - will come from Progress agent)
-    # For now, use a default or fetch from progress table
-    mastery_score = 50  # TODO: Fetch from ProgressRecord
-
-    # 7. Build dynamic prompt
-    student_ctx = StudentContext(
-        name=student_name,
-        grade=grade,
-        subject=subject,
-        interests=interests,
-    )
-
-    prompt = build_tutor_prompt(
-        student=student_ctx,
-        mastery_score=mastery_score,
-        topic=None,  # Will be extracted from question in Phase 4
-        retrieved_chunks=retrieved_chunks_str,
-        history=history_str,
-        question=question,
-        lang=lang_detected,
-    )
-
-    # 8. Call LLM router with explain task
-    answer = await llm_chat(
-        messages=[{"role": "user", "content": prompt}],
-        task="explain",
-        lang_hint=lang_detected,
-        school_id=school_id,
-    )
-
-    # 9. Parse citations with authoritative metadata
-    citations = parse_citations(answer, retrieved)
-
-    return TutorResponse(
-        answer=answer,
-        citations=citations,
-        lang_detected=lang_detected,
-    )
+    return TutorResponse(answer=answer, citations=citations, lang_detected=lang_detected)

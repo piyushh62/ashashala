@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import time
-from typing import Any
+from collections.abc import AsyncIterator
 
 import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class GeminiClient:
     """Gemini API client with retry, backoff, timeout, and usage logging."""
-    
+
     # Safety settings — allow educational content, block only severe harm
     SAFETY_SETTINGS = {
         HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
@@ -23,14 +23,14 @@ class GeminiClient:
         HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
     }
-    
+
     def __init__(self):
         if not settings.GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY not set in environment")
-        
+
         genai.configure(api_key=settings.GEMINI_API_KEY)
         self._model_cache: dict[str, genai.GenerativeModel] = {}
-    
+
     def _get_model(self, role: str) -> genai.GenerativeModel:
         """Get or create a GenerativeModel for the given role."""
         if role not in self._model_cache:
@@ -40,7 +40,7 @@ class GeminiClient:
                 safety_settings=self.SAFETY_SETTINGS,
             )
         return self._model_cache[role]
-    
+
     async def chat(
         self,
         messages: list[dict[str, str]],
@@ -51,7 +51,7 @@ class GeminiClient:
         **kwargs,
     ) -> str:
         """Send chat messages to Gemini with retry and timeout.
-        
+
         Args:
             messages: List of {"role": "user|model", "parts": [text]} or similar
             role: Model role from registry (fast_chat, reasoning, vision, etc.)
@@ -59,22 +59,25 @@ class GeminiClient:
             user_id: User ID for usage logging
             task: Task name for logging
             **kwargs: Additional generation config
-            
+
         Returns:
             Response text
-            
+
         Raises:
             ExternalServiceError: On API errors after retries exhausted
         """
+        if settings.MOCK_EXTERNAL_SERVICES:
+            return "[MOCK] gemini response"
+
         model = self._get_model(role)
         model_id = model_for(role, "gemini")
-        
+
         # Convert messages to Gemini format
         gemini_messages = self._convert_messages(messages)
-        
+
         start_time = time.perf_counter()
         last_error = None
-        
+
         for attempt in range(3):  # 3 attempts = 2 retries
             try:
                 # Apply timeout
@@ -90,12 +93,12 @@ class GeminiClient:
                     ),
                     timeout=settings.GEMINI_TIMEOUT,
                 )
-                
+
                 latency_ms = int((time.perf_counter() - start_time) * 1000)
-                
+
                 # Extract text
                 text = response.text if response.text else ""
-                
+
                 # Log usage
                 await self._log_usage(
                     provider="gemini",
@@ -109,37 +112,37 @@ class GeminiClient:
                     user_id=user_id,
                     status="success",
                 )
-                
+
                 logger.debug(
                     "Gemini call succeeded: role=%s, model=%s, latency=%dms, tokens=%d",
                     role, model_id, latency_ms,
                     (response.usage_metadata.prompt_token_count if response.usage_metadata else 0) +
                     (response.usage_metadata.candidates_token_count if response.usage_metadata else 0)
                 )
-                
+
                 return text
-                
-            except asyncio.TimeoutError:
+
+            except TimeoutError:
                 last_error = f"Timeout after {settings.GEMINI_TIMEOUT}s"
                 logger.warning("Gemini timeout (attempt %d/3): role=%s", attempt + 1, role)
-                
+
             except google_exceptions.ResourceExhausted as e:
                 last_error = f"Rate limited: {e}"
                 logger.warning("Gemini rate limited (attempt %d/3): role=%s", attempt + 1, role)
-                
+
             except google_exceptions.GoogleAPIError as e:
                 last_error = f"API error: {e}"
                 logger.error("Gemini API error (attempt %d/3): role=%s, error=%s", attempt + 1, role, e)
-                
+
             except Exception as e:
                 last_error = f"Unexpected error: {e}"
                 logger.exception("Gemini unexpected error (attempt %d/3): role=%s", attempt + 1, role)
-            
+
             # Exponential backoff with jitter: 1s, 2s, 4s
             if attempt < 2:
                 wait_time = (2 ** attempt) + (0.1 * attempt)  # Simple jitter
                 await asyncio.sleep(wait_time)
-        
+
         # All retries exhausted
         latency_ms = int((time.perf_counter() - start_time) * 1000)
         await self._log_usage(
@@ -155,10 +158,145 @@ class GeminiClient:
             status="error",
             error_msg=last_error,
         )
-        
+
         from app.core.exceptions import ExternalServiceError
         raise ExternalServiceError("Gemini", last_error or "Max retries exceeded")
-    
+
+    async def chat_stream(
+        self,
+        messages: list[dict[str, str]],
+        role: str,
+        school_id: str | None = None,
+        user_id: str | None = None,
+        task: str = "chat",
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream response text deltas from Gemini as they are generated.
+
+        Yields incremental text pieces. Raises ExternalServiceError if the
+        stream cannot be opened (before any token). Once tokens start flowing,
+        transient chunk errors are skipped rather than aborting the answer.
+        """
+        if settings.MOCK_EXTERNAL_SERVICES:
+            for piece in ("[MOCK] ", "streamed ", "gemini ", "response."):
+                yield piece
+            return
+
+        model = self._get_model(role)
+        model_id = model_for(role, "gemini")
+        gemini_messages = self._convert_messages(messages)
+        start_time = time.perf_counter()
+
+        try:
+            stream = await model.generate_content_async(
+                gemini_messages,
+                generation_config=genai.GenerationConfig(
+                    temperature=kwargs.get("temperature", 0.7),
+                    max_output_tokens=kwargs.get("max_tokens", 8192),
+                    top_p=kwargs.get("top_p", 0.95),
+                    top_k=kwargs.get("top_k", 40),
+                ),
+                stream=True,
+            )
+        except Exception as e:
+            from app.core.exceptions import ExternalServiceError
+            raise ExternalServiceError("Gemini", f"stream open failed: {e}") from e
+
+        prompt_tokens = completion_tokens = 0
+        async for chunk in stream:
+            try:
+                piece = chunk.text
+            except Exception:  # noqa: BLE001 — some chunks (safety/finish) carry no text
+                piece = ""
+            if getattr(chunk, "usage_metadata", None):
+                prompt_tokens = chunk.usage_metadata.prompt_token_count or prompt_tokens
+                completion_tokens = chunk.usage_metadata.candidates_token_count or completion_tokens
+            if piece:
+                yield piece
+
+        await self._log_usage(
+            provider="gemini", model_role=role, model_id=model_id, task=task,
+            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens,
+            latency_ms=int((time.perf_counter() - start_time) * 1000),
+            school_id=school_id, user_id=user_id, status="success",
+        )
+
+    async def vision(
+        self,
+        prompt: str,
+        image_bytes: bytes,
+        mime: str = "image/png",
+        role: str = "vision",
+        school_id: str | None = None,
+        user_id: str | None = None,
+        task: str = "vision",
+        **kwargs,
+    ) -> str:
+        """Send an image + text prompt to Gemini (used for OCR of scanned pages)."""
+        if settings.MOCK_EXTERNAL_SERVICES:
+            return "[MOCK] extracted text from image"
+
+        model = self._get_model(role)
+        model_id = model_for(role, "gemini")
+        start_time = time.perf_counter()
+        response = await asyncio.wait_for(
+            model.generate_content_async(
+                [prompt, {"mime_type": mime, "data": image_bytes}],
+                generation_config=genai.GenerationConfig(
+                    temperature=kwargs.get("temperature", 0.0),
+                    max_output_tokens=kwargs.get("max_tokens", 8192),
+                ),
+            ),
+            timeout=settings.GEMINI_TIMEOUT,
+        )
+        text = response.text or ""
+        await self._log_usage(
+            provider="gemini", model_role=role, model_id=model_id, task=task,
+            prompt_tokens=response.usage_metadata.prompt_token_count if response.usage_metadata else 0,
+            completion_tokens=response.usage_metadata.candidates_token_count if response.usage_metadata else 0,
+            latency_ms=int((time.perf_counter() - start_time) * 1000),
+            school_id=school_id, user_id=user_id, status="success",
+        )
+        return text
+
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        mime: str = "audio/wav",
+        language: str = "en",
+        school_id: str | None = None,
+        user_id: str | None = None,
+    ) -> str:
+        """Transcribe audio to text. Gemini 2.5-flash accepts audio parts, giving
+        a real, free server-side ASR path (spec assigns ASR to NVIDIA, but the
+        OpenAI-compatible endpoint doesn't cleanly expose it — Gemini audio is the
+        reliable free alternative)."""
+        if settings.MOCK_EXTERNAL_SERVICES:
+            return "[MOCK] transcribed audio text"
+
+        model = self._get_model("vision")  # 2.5-flash — multimodal (audio in)
+        model_id = model_for("vision", "gemini")
+        prompt = (
+            "Transcribe this audio to text in the language actually spoken. "
+            "Output ONLY the transcript with no commentary or translation."
+        )
+        start_time = time.perf_counter()
+        response = await asyncio.wait_for(
+            model.generate_content_async(
+                [prompt, {"mime_type": mime, "data": audio_bytes}],
+                generation_config=genai.GenerationConfig(temperature=0.0),
+            ),
+            timeout=settings.NVIDIA_TIMEOUT,  # audio can be slower than text
+        )
+        await self._log_usage(
+            provider="gemini", model_role="vision", model_id=model_id, task="asr",
+            prompt_tokens=response.usage_metadata.prompt_token_count if response.usage_metadata else 0,
+            completion_tokens=response.usage_metadata.candidates_token_count if response.usage_metadata else 0,
+            latency_ms=int((time.perf_counter() - start_time) * 1000),
+            school_id=school_id, user_id=user_id, status="success",
+        )
+        return (response.text or "").strip()
+
     async def embed(
         self,
         texts: list[str],
@@ -179,10 +317,10 @@ class GeminiClient:
                 ),
                 timeout=settings.GEMINI_TIMEOUT,
             )
-            
+
             latency_ms = int((time.perf_counter() - start_time) * 1000)
             embeddings = result["embedding"]
-            
+
             await self._log_usage(
                 provider="gemini",
                 model_role="embeddings",
@@ -195,9 +333,9 @@ class GeminiClient:
                 user_id=user_id,
                 status="success",
             )
-            
+
             return embeddings
-            
+
         except Exception as e:
             latency_ms = int((time.perf_counter() - start_time) * 1000)
             await self._log_usage(
@@ -214,8 +352,8 @@ class GeminiClient:
                 error_msg=str(e),
             )
             from app.core.exceptions import ExternalServiceError
-            raise ExternalServiceError("Gemini Embeddings", str(e))
-    
+            raise ExternalServiceError("Gemini Embeddings", str(e)) from e
+
     async def health_check(self) -> bool:
         """Check if Gemini API is accessible."""
         if settings.MOCK_EXTERNAL_SERVICES:
@@ -230,14 +368,14 @@ class GeminiClient:
         except Exception as e:
             logger.error("Gemini health check failed: %s", e)
             return False
-    
+
     def _convert_messages(self, messages: list[dict[str, str]]) -> list[dict]:
         """Convert standard messages to Gemini format."""
         gemini_messages = []
         for msg in messages:
             role = msg.get("role", "user")
             content = msg.get("content", "") or msg.get("parts", [""])[0]
-            
+
             if role == "system":
                 # Gemini doesn't have system role, prepend to first user message
                 if gemini_messages and gemini_messages[-1]["role"] == "user":
@@ -248,9 +386,9 @@ class GeminiClient:
                 gemini_messages.append({"role": "model", "parts": [content]})
             else:
                 gemini_messages.append({"role": "user", "parts": [content]})
-        
+
         return gemini_messages
-    
+
     async def _log_usage(
         self,
         provider: str,
@@ -265,9 +403,8 @@ class GeminiClient:
         status: str,
         error_msg: str | None = None,
     ) -> None:
-        """Log LLM usage to database. Fire-and-forget."""
-        # This will be called from the LLM router which has DB session
-        # For now, just log to stdout; router will handle DB persistence
+        """Persist one usage row (best-effort) and echo to logs. Covers every
+        Gemini path — chat, streaming, vision/OCR, embeddings."""
         logger.info(
             "LLM_USAGE: provider=%s role=%s model=%s task=%s "
             "prompt_tokens=%d completion_tokens=%d latency_ms=%d "
@@ -275,6 +412,13 @@ class GeminiClient:
             provider, model_role, model_id, task,
             prompt_tokens, completion_tokens, latency_ms,
             school_id, user_id, status, error_msg or "none"
+        )
+        from app.services.usage import record_llm_usage
+        await record_llm_usage(
+            provider=provider, model_role=model_role, model_id=model_id, task=task,
+            school_id=school_id, user_id=user_id, prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens, latency_ms=latency_ms,
+            status=status, error_message=error_msg,
         )
 
 

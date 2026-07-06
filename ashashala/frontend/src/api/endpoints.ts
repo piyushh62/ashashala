@@ -64,8 +64,10 @@ export const schoolApi = {
     grade?: number;
     interests?: string;
   }) => api.post<{ user: UserRow; temp_password: string | null }>("/api/v1/school/users", body),
+  listClasses: () => api.get<ClassSection[]>("/api/v1/school/classes"),
   createClass: (body: { name: string; grade_level: number }) =>
     api.post<ClassSection>("/api/v1/school/classes", body),
+  listSubjects: () => api.get<Subject[]>("/api/v1/school/subjects"),
   createSubject: (body: { name: string }) => api.post<Subject>("/api/v1/school/subjects", body),
   assignTeacher: (body: { teacher_id: string; class_id: string; subject_id: string }) =>
     api.post<{ id: string }>("/api/v1/school/teacher-assignments", body),
@@ -77,8 +79,16 @@ export const schoolApi = {
     api.get<AuditRow[]>(`/api/v1/school/audit${action ? `?action=${action}` : ""}`),
 };
 
+export interface TeacherAssignmentRow {
+  class_id: string;
+  class_name: string;
+  subject_id: string;
+  subject_name: string;
+}
+
 export const teacherApi = {
   dashboard: () => api.get<Record<string, unknown>>("/api/v1/teacher/dashboard"),
+  assignments: () => api.get<TeacherAssignmentRow[]>("/api/v1/teacher/assignments"),
   materials: () => api.get<DocumentRow[]>("/api/v1/teacher/materials"),
   uploadFile: (form: FormData) => api.postForm<DocumentRow>("/api/v1/teacher/materials/file", form),
   uploadUrl: (body: { class_id: string; subject_id?: string; url: string }) =>

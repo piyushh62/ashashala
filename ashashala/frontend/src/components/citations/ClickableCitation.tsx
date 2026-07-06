@@ -4,14 +4,14 @@ import type { Citation } from "../../types/api";
 //  - PDF/file -> opens the R2 URL (at page via #page= when the viewer supports it)
 //  - YouTube  -> opens the video at the timestamp
 //  - URL      -> opens in a new tab
-function tsToSeconds(ts: string | null): number | null {
+export function tsToSeconds(ts: string | null): number | null {
   if (!ts) return null;
   const m = ts.match(/(?:(\d+)m)?(\d+)s/);
   if (!m) return null;
   return (parseInt(m[1] || "0", 10) * 60) + parseInt(m[2] || "0", 10);
 }
 
-function hrefFor(c: Citation): string | null {
+export function hrefFor(c: Citation): string | null {
   if (c.source_type === "youtube" && c.url) {
     const secs = tsToSeconds(c.timestamp);
     return secs != null ? `${c.url}${c.url.includes("?") ? "&" : "?"}t=${secs}` : c.url;
@@ -22,7 +22,7 @@ function hrefFor(c: Citation): string | null {
   return null;
 }
 
-function labelFor(c: Citation): string {
+export function labelFor(c: Citation): string {
   if (c.source_type === "youtube") return `▶ ${c.title || "Video"}${c.timestamp ? ` · ${c.timestamp}` : ""}`;
   if (c.source_type === "pdf") return `📄 ${c.filename || "Document"}${c.page != null ? ` · p.${c.page}` : ""}`;
   return `🔗 ${c.title || c.url || "Source"}`;

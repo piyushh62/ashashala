@@ -138,16 +138,19 @@ async def test_tutor_agent_gujarati_question_returns_gujarati_answer(
     with patch("app.agents.tutor.retrieve", new_callable=AsyncMock) as mock_retrieve:
         mock_retrieve.return_value = []
         
-        # Mock the LLM router to return Gujarati response
-        with patch("app.agents.tutor.llm_chat", new_callable=AsyncMock) as mock_llm_chat:
-            mock_llm_chat.return_value = (
-                "અપૂર્ણાંક એ એક ભાગ છે જે પૂરનાંક નથી. "
-                "ઉદાહરણ તરીકે, 1/2 અર્થાત् એક બાબત બે સમાન ભાગોમાં વિભાજિત. "
-                "[source: maths_chapter3.pdf, p. 7] "
-                "તમે સરળ ઉદાહરણથી સમજ્યા - ખૂબ સારું! "
-                "શું તમે 1/4 + 1/2 નો સરવાળો શોધી શકો છો?"
-            )
-            
+        # Mock the LLM router's streaming to return a Gujarati response.
+        _GU_ANSWER = (
+            "અપૂર્ણાંક એ એક ભાગ છે જે પૂરનાંક નથી. "
+            "ઉદાહરણ તરીકે, 1/2 અર્થાત् એક બાબત બે સમાન ભાગોમાં વિભાજિત. "
+            "[source: maths_chapter3.pdf, p. 7] "
+            "તમે સરળ ઉદાહરણથી સમજ્યા - ખૂબ સારું! "
+            "શું તમે 1/4 + 1/2 નો સરવાળો શોધી શકો છો?"
+        )
+
+        async def fake_gu_stream(**kwargs):
+            yield _GU_ANSWER
+
+        with patch("app.agents.tutor.llm_chat_stream", side_effect=lambda **kw: fake_gu_stream(**kw)):
             response = await tutor_agent(
                 student_id=student.id,
                 student_name=student.name,
@@ -197,14 +200,18 @@ async def test_gujarati_chat_endpoint_sse_stream(
     token = login_response.json()["access_token"]
     auth_headers = {"Authorization": f"Bearer {token}"}
     
-    # Mock tutor_agent
-    with patch("app.routes.student.tutor_agent", new_callable=AsyncMock) as mock_tutor:
-        mock_tutor.return_value = TutorResponse(
-            answer="અપૂર્ણાંક એ પૂરનાંક નથી. ઉદાહરણ: 1/2. [source: maths.pdf, p. 5]",
-            citations=[Citation(source_type="pdf", filename="maths.pdf", page=5)],
-            lang_detected="gu",
-        )
-        
+    # Mock the tutor agent's streaming generator.
+    async def fake_stream(**kwargs):
+        for tok in ["અપૂર્ણાંક ", "એ પૂરનાંક નથી. ", "[source: maths.pdf, p. 5]"]:
+            yield {"type": "token", "content": tok}
+        yield {
+            "type": "citations",
+            "citations": [Citation(source_type="pdf", filename="maths.pdf", page=5)],
+            "answer": "અપૂર્ણાંક એ પૂરનાંક નથી. ઉદાહરણ: 1/2. [source: maths.pdf, p. 5]",
+            "lang": "gu",
+        }
+
+    with patch("app.routes.student.tutor_agent_stream", side_effect=lambda **kw: fake_stream(**kw)):
         # Make SSE request
         response = await client.post(
             "/api/v1/student/chat",

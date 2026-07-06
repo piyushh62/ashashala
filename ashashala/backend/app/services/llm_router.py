@@ -11,11 +11,11 @@ Every call is logged to the LlmUsage table when a DB session is supplied.
 """
 
 import logging
+from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ExternalServiceError, ValidationError
-from app.models.llm_usage import LlmUsage
 from app.services.gemini_client import get_gemini_client
 from app.services.model_registry import get_registry, model_for
 from app.services.nvidia_client import get_nvidia_client
@@ -88,7 +88,6 @@ class LLMRouter:
             try:
                 text = await self._call_provider(step, messages, school_id, user_id, task, **kwargs)
                 self._provider_health[step["provider"]] = True
-                await self._log_usage_to_db(step, task, school_id, user_id, "success")
                 return text
             except Exception as e:  # noqa: BLE001 — fall through the chain
                 last_error = e
@@ -97,7 +96,53 @@ class LLMRouter:
                     "LLM step failed (task=%s, %s, provider=%s, role=%s): %s",
                     task, step["label"], step["provider"], step["role"], e,
                 )
-                await self._log_usage_to_db(step, task, school_id, user_id, "error", str(e))
+
+        raise ExternalServiceError("LLMRouter", f"All providers failed: {last_error}")
+
+    async def route_stream(
+        self,
+        task: str,
+        messages: list[dict[str, str]],
+        lang_hint: str = "en",
+        school_id: str | None = None,
+        user_id: str | None = None,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream text deltas through the provider chain.
+
+        Fallback is only possible before the first token is emitted — once a
+        provider starts streaming to the client we can't rewind, so a mid-stream
+        failure ends the answer (and is logged) rather than restarting.
+        """
+        if not messages:
+            raise ValidationError("messages must be a non-empty list")
+
+        chain = self._resolve_chain(task, lang_hint)
+        last_error: Exception | None = None
+
+        for step in chain:
+            client = self._gemini if step["provider"] == "gemini" else self._nvidia
+            gen_kwargs = dict(kwargs)
+            if step["provider"] == "nvidia":
+                gen_kwargs["model_id"] = step.get("model_id")
+            started = False
+            try:
+                async for delta in client.chat_stream(
+                    messages=messages, role=step["role"], school_id=school_id,
+                    user_id=user_id, task=task, **gen_kwargs,
+                ):
+                    started = True
+                    yield delta
+                self._provider_health[step["provider"]] = True
+                return
+            except Exception as e:  # noqa: BLE001
+                last_error = e
+                self._provider_health[step["provider"]] = False
+                if started:
+                    logger.error("LLM stream failed mid-answer (%s): %s", step["label"], e)
+                    raise
+                logger.warning("LLM stream failed before first token (%s), trying next: %s",
+                               step["label"], e)
 
         raise ExternalServiceError("LLMRouter", f"All providers failed: {last_error}")
 
@@ -174,39 +219,6 @@ class LLMRouter:
             })
         return {"task": task, "lang_hint": lang_hint, "chain": steps}
 
-    async def _log_usage_to_db(
-        self,
-        step: dict,
-        task: str,
-        school_id: str | None,
-        user_id: str | None,
-        status: str,
-        error_msg: str | None = None,
-    ) -> None:
-        """Persist one LlmUsage row (best-effort) when a DB session is present."""
-        if self.db is None:
-            return
-        try:
-            model_id = step.get("model_id")
-            if not model_id:
-                try:
-                    model_id = model_for(step["role"], step["provider"])
-                except Exception:  # noqa: BLE001
-                    model_id = None
-            self.db.add(LlmUsage(
-                provider=step["provider"],
-                model_role=step["role"],
-                model_id=model_id,
-                task=task,
-                school_id=school_id,
-                user_id=user_id,
-                status=status,
-                error_message=error_msg,
-            ))
-            await self.db.flush()
-        except Exception as e:  # noqa: BLE001
-            logger.error("Failed to log LLM usage to DB: %s", e)
-
 
 # --- Module-level convenience matching PROJECT_PROMPT.md Section 3 signature ---
 async def chat(
@@ -227,6 +239,23 @@ async def chat(
     return await router.route(
         task, messages, lang_hint=lang_hint, school_id=school_id, user_id=user_id, **kwargs
     )
+
+
+async def chat_stream(
+    messages: list[dict[str, str]],
+    task: str = "explain",
+    lang_hint: str = "en",
+    school_id: str | None = None,
+    user_id: str | None = None,
+    db: AsyncSession | None = None,
+    **kwargs,
+) -> AsyncIterator[str]:
+    """Stream a chat response through the routing chain, yielding text deltas."""
+    router = LLMRouter(db=db)
+    async for delta in router.route_stream(
+        task, messages, lang_hint=lang_hint, school_id=school_id, user_id=user_id, **kwargs
+    ):
+        yield delta
 
 
 async def get_llm_router(db: AsyncSession | None = None) -> LLMRouter:

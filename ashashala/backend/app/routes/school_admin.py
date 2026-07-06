@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query, Request, UploadFile
 from sqlalchemy import func, select
@@ -18,7 +18,6 @@ from app.deps import require_role
 from app.models.audit import AuditLog
 from app.models.learning import ProgressRecord
 from app.models.llm_usage import LlmUsage
-from app.models.school import School
 from app.models.structure import (
     ClassSection,
     Enrollment,
@@ -132,6 +131,18 @@ async def update_user(user_id: str, body: UserUpdate, request: Request,
     return UserOut.model_validate(user)
 
 
+@router.get("/classes", response_model=list[ClassOut])
+async def list_classes(admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[ClassOut]:
+    rows = (await db.execute(select(ClassSection).order_by(ClassSection.grade_level, ClassSection.name))).scalars().all()
+    return [ClassOut.model_validate(c) for c in rows]
+
+
+@router.get("/subjects", response_model=list[SubjectOut])
+async def list_subjects(admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[SubjectOut]:
+    rows = (await db.execute(select(Subject).order_by(Subject.name))).scalars().all()
+    return [SubjectOut.model_validate(s) for s in rows]
+
+
 @router.post("/classes", response_model=ClassOut)
 async def create_class(body: ClassCreate, request: Request,
                        admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> ClassOut:
@@ -181,7 +192,7 @@ async def enroll_student(body: EnrollmentCreate, request: Request,
 async def link_parent(body: ParentLinkCreate, request: Request,
                       admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
     link = ParentStudentLink(parent_id=body.parent_id, student_id=body.student_id,
-                             school_id=admin.school_id, consent_given_at=datetime.now(timezone.utc))
+                             school_id=admin.school_id, consent_given_at=datetime.now(UTC))
     db.add(link)
     await db.flush()
     await record_audit(db, action="PARENT_LINK", actor=admin, target_type="parent_student_link",
@@ -229,7 +240,7 @@ async def llm_usage(days: int = Query(default=7, ge=1, le=30),
                     admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
     """LLM cost mini-dashboard: tokens per provider per day for this school,
     today's totals, and an over-quota warning."""
-    since = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(UTC) - timedelta(days=days)
     tokens = func.coalesce(func.sum(LlmUsage.prompt_tokens + LlmUsage.completion_tokens), 0)
 
     # Per-provider, per-day breakdown.
@@ -246,7 +257,7 @@ async def llm_usage(days: int = Query(default=7, ge=1, le=30),
     ]
 
     # Today's totals + error rate.
-    start_today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    start_today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
     today_tokens = (await db.execute(
         select(tokens).where(LlmUsage.school_id == admin.school_id, LlmUsage.ts >= start_today)
     )).scalar_one()

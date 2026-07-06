@@ -39,14 +39,15 @@ async def test_txt_ingestion_indexes_and_chunks(db, session_factory, monkeypatch
     doc = await _pending_doc(db, school.id)
     _patch_pipeline(monkeypatch, session_factory)
 
+    doc_id = doc.id
     text = ("Photosynthesis is how plants make food. " * 60).encode()
-    await pipeline.ingest_document(doc_id=doc.id, school_id=school.id, class_id="c1",
+    await pipeline.ingest_document(doc_id=doc_id, school_id=school.id, class_id="c1",
                                    subject_id=None, source_type=SourceType.txt, data=text)
 
     db.expire_all()
-    refreshed = await db.get(Document, doc.id)
+    refreshed = await db.get(Document, doc_id)
     assert refreshed.status == DocStatus.indexed
 
-    chunks = (await db.execute(select(Chunk).where(Chunk.doc_id == doc.id))).scalars().all()
+    chunks = (await db.execute(select(Chunk).where(Chunk.doc_id == doc_id))).scalars().all()
     assert len(chunks) >= 1
     assert all(c.vector_name == "gemini_768" for c in chunks)

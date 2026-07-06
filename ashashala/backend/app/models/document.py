@@ -5,7 +5,8 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum as SQLEnum, String, Text
+from sqlalchemy import DateTime, String, Text
+from sqlalchemy import Enum as SQLEnum
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -42,6 +43,7 @@ class Document(Base, UUIDPk, TenantScoped):
         SQLEnum(DocStatus, name="doc_status"), default=DocStatus.pending
     )
     error_msg: Mapped[str | None] = mapped_column(Text, default=None)
+    page_count: Mapped[int | None] = mapped_column(default=None)  # pages/segments extracted
 
 
 class Chunk(Base, UUIDPk, TenantScoped):

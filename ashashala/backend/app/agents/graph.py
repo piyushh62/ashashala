@@ -22,24 +22,29 @@ from __future__ import annotations
 import logging
 
 from app.agents.orchestrator import classify_intent
-from app.agents.safety import check_topic_relevance
-from app.agents.state import SessionState
+from app.agents.safety import gemini_safety_check
+from app.agents.state import SessionState, new_state
+from app.services.lang_detect import detect_lang
 
 logger = logging.getLogger(__name__)
 
 
 async def _safety_in(state: SessionState) -> SessionState:
-    """Topic guard before any work. Sets safety_blocked instead of raising so the
-    graph can short-circuit cleanly."""
-    subject = state.get("subject_id") or "general studies"
+    """Harmful-content guard before any work. Sets safety_blocked instead of
+    raising so the graph can short-circuit cleanly.
+
+    Subject-relevance is deliberately NOT checked here — this node only sees the
+    subject_id (a UUID), not the subject name. The nuanced "is this on-topic?"
+    check lives in the tutor's safety_wrapper, which has the real subject name.
+    """
     try:
-        ok = await check_topic_relevance(state["message"], subject)
+        safe, reason = await gemini_safety_check(state["message"])
     except Exception as e:  # noqa: BLE001
         logger.warning("safety_in check failed, allowing: %s", e)
-        ok = True
-    if not ok:
+        safe, reason = True, None
+    if not safe:
         state["safety_blocked"] = True
-        state["safety_reason"] = "off_topic"
+        state["safety_reason"] = reason or "harmful_content"
     return state
 
 
@@ -81,23 +86,26 @@ def build_agent_graph():
             return state
         return _node
 
+    # Node names must not collide with SessionState keys (langgraph rule), so the
+    # branch nodes are named for their agents (quiz_master/evaluator/progress_node)
+    # rather than the intent words (quiz/grade/progress).
     graph = StateGraph(SessionState)
     graph.add_node("safety_in", _safety_in)
     graph.add_node("orchestrator", _orchestrate)
     graph.add_node("tutor", lambda s: s)
-    graph.add_node("quiz", lambda s: s)
-    graph.add_node("grade", lambda s: s)
-    graph.add_node("progress", lambda s: s)
+    graph.add_node("quiz_master", lambda s: s)
+    graph.add_node("evaluator", lambda s: s)
+    graph.add_node("progress_node", lambda s: s)
     graph.add_node("safety_out", _safety_out)
 
     graph.set_entry_point("safety_in")
     graph.add_edge("safety_in", "orchestrator")
     graph.add_conditional_edges(
         "orchestrator", _route_after_orchestrator,
-        {"explain": "tutor", "quiz": "quiz", "grade": "grade",
-         "progress": "progress", "safety_out": "safety_out"},
+        {"explain": "tutor", "quiz": "quiz_master", "grade": "evaluator",
+         "progress": "progress_node", "safety_out": "safety_out"},
     )
-    for node in ("tutor", "quiz", "grade", "progress"):
+    for node in ("tutor", "quiz_master", "evaluator", "progress_node"):
         graph.add_edge(node, "safety_out")
     graph.add_edge("safety_out", END)
     return graph.compile()
@@ -112,3 +120,38 @@ def get_agent_graph():
     if _compiled is None:
         _compiled = build_agent_graph()
     return _compiled
+
+
+async def run_orchestration(
+    *,
+    message: str,
+    school_id: str,
+    student_id: str,
+    class_id: str,
+    subject_id: str | None = None,
+    input_mode: str = "text",
+) -> SessionState:
+    """Run the safety_in → orchestrator part of the graph for one turn.
+
+    Executes the compiled LangGraph when langgraph is installed; otherwise runs
+    the same nodes directly so orchestration behaves identically without the
+    dependency. Returns the resolved SessionState (intent + safety flags), which
+    the route then acts on (streams the tutor answer, starts a quiz, etc.).
+    """
+    state = new_state(
+        student_id=student_id, school_id=school_id, class_id=class_id,
+        message=message, subject_id=subject_id, input_mode=input_mode,  # type: ignore[arg-type]
+    )
+    state["lang_detected"] = detect_lang(message)
+
+    graph = get_agent_graph()
+    if graph is not None:
+        try:
+            result = await graph.ainvoke(state)
+            return result  # type: ignore[return-value]
+        except Exception as e:  # noqa: BLE001 — never let orchestration break the turn
+            logger.warning("Graph invoke failed, running nodes directly: %s", e)
+
+    state = await _safety_in(state)
+    state = await _orchestrate(state)
+    return state

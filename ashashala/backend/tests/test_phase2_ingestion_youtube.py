@@ -27,12 +27,13 @@ async def test_youtube_ingestion_keeps_timestamps(db, session_factory, monkeypat
         Segment(text="Adding fractions " * 30, page_or_ts="1m24s"),
     ])
 
-    await pipeline.ingest_document(doc_id=doc.id, school_id=school.id, class_id="c1",
+    doc_id = doc.id
+    await pipeline.ingest_document(doc_id=doc_id, school_id=school.id, class_id="c1",
                                    subject_id=None, source_type=SourceType.youtube,
                                    source_ref="https://youtu.be/abcDEFghij1")
 
     db.expire_all()
-    assert (await db.get(Document, doc.id)).status == DocStatus.indexed
-    chunks = (await db.execute(select(Chunk).where(Chunk.doc_id == doc.id))).scalars().all()
+    assert (await db.get(Document, doc_id)).status == DocStatus.indexed
+    chunks = (await db.execute(select(Chunk).where(Chunk.doc_id == doc_id))).scalars().all()
     stamps = {c.page_or_ts for c in chunks}
     assert "0m5s" in stamps and "1m24s" in stamps
