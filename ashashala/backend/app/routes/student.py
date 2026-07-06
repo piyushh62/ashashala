@@ -395,10 +395,10 @@ async def voice_tts(
 # Phase 4 — adaptive practice quiz loop
 # ---------------------------------------------------------------------------
 
-@router.post("/quiz/start", response_model="QuizOut")
+@router.post("/quiz/start", response_model=QuizOut)
 @limiter.limit(settings.QUIZ_RATE_LIMIT)
-async def quiz_start(body: "QuizStartRequest", request: Request,
-                     student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> "QuizOut":
+async def quiz_start(body: QuizStartRequest, request: Request,
+                     student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> QuizOut:
     """Generate an adaptive practice quiz targeting the student's weakest topic.
 
     Distinct from GET /quizzes (the teacher-curated, approved-only list): this is
@@ -422,9 +422,9 @@ async def quiz_start(body: "QuizStartRequest", request: Request,
     )
 
 
-@router.post("/quiz/{quiz_id}/submit", response_model="QuizSubmitResponse")
-async def quiz_submit(quiz_id: str, body: "QuizSubmitRequest", request: Request,
-                      student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> "QuizSubmitResponse":
+@router.post("/quiz/{quiz_id}/submit", response_model=QuizSubmitResponse)
+async def quiz_submit(quiz_id: str, body: QuizSubmitRequest, request: Request,
+                      student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> QuizSubmitResponse:
     """Grade an attempt (MCQ deterministic + short-answer via Evaluator),
     persist the attempt, flag low-confidence answers, and update mastery (EMA)."""
     quiz = await db.get(Quiz, quiz_id)
