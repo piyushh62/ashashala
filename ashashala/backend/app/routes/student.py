@@ -1,6 +1,6 @@
 """Student routes: dashboard, classes, timetable, quizzes, progress, export, chat, voice."""
 
-# from __future__ import annotations
+from __future__ import annotations
 
 import json
 import logging
