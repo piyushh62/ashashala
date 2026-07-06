@@ -43,7 +43,7 @@ from app.db.tenant_filter import tenant_bypass
 from app.main import app
 from app.models.school import School
 from app.models.user import User, UserRole
-import app.models  # noqa: F401 — populate Base.metadata
+from app import models as _app_models  # noqa: F401 — populate Base.metadata
 
 
 @pytest_asyncio.fixture
