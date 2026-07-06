@@ -52,4 +52,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
     CMD curl -fsS "http://localhost:${PORT}/api/v1/health" || exit 1
 
 # Shell form so ${PORT} (Render injects it) is expanded at runtime.
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
+# Seeding is idempotent (safe to re-run on every restart) and must never block
+# the API from coming up, so failures there are logged but don't stop uvicorn.
+CMD python scripts/seed.py; exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}
