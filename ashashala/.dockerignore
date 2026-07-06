@@ -1,0 +1,15 @@
+# Build context is the ashashala/ root — keep the image lean.
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+backend/.venv/
+backend/tests/
+frontend/
+docs/
+deploy/
+.github/
+**/.env
+**/*.log
+.git/

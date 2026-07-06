@@ -11,9 +11,9 @@ from app.db.session import get_db
 from app.deps import require_role
 from app.models.document import Document, DocStatus, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
-from app.models.learning import Quiz, QuizStatus
+from app.models.learning import ProgressRecord, Quiz, QuizStatus
 from app.models.school import School
-from app.models.structure import TeacherAssignment
+from app.models.structure import Enrollment, TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
 from app.schemas.teacher import (
@@ -176,6 +176,43 @@ async def teacher_dashboard(teacher: User = Depends(_guard), db: AsyncSession = 
         "subjects": sorted({a.subject_id for a in assignments}),
         "materials_uploaded": len(materials),
     }
+
+
+@router.get("/classes/{class_id}/progress")
+async def class_progress(class_id: str, teacher: User = Depends(_guard),
+                         db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Per-student mastery for a class the teacher is assigned to."""
+    await _assert_assigned(db, teacher, class_id, None)
+
+    student_ids = [
+        r.student_id for r in
+        (await db.execute(select(Enrollment).where(Enrollment.class_id == class_id))).scalars().all()
+    ]
+    if not student_ids:
+        return []
+
+    students = (await db.execute(select(User).where(User.id.in_(student_ids)))).scalars().all()
+    records = (await db.execute(
+        select(ProgressRecord).where(ProgressRecord.student_id.in_(student_ids))
+    )).scalars().all()
+
+    by_student: dict[str, list[ProgressRecord]] = {}
+    for rec in records:
+        by_student.setdefault(rec.student_id, []).append(rec)
+
+    out: list[dict] = []
+    for st in students:
+        recs = by_student.get(st.id, [])
+        avg = round(sum(r.mastery_score for r in recs) / len(recs), 1) if recs else 0.0
+        out.append({
+            "student_id": st.id,
+            "name": st.name,
+            "grade": st.grade,
+            "avg_mastery": avg,
+            "topics": [{"topic": r.topic, "score": r.mastery_score} for r in recs],
+        })
+    out.sort(key=lambda s: s["avg_mastery"])  # weakest students first
+    return out
 
 
 @router.get("/flagged-answers", response_model=list[FlaggedAnswerOut])

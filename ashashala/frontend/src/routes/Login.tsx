@@ -28,38 +28,81 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen grid place-items-center bg-gradient-to-br from-brand-50 to-slate-100 p-4">
-      <Card className="w-full max-w-sm p-8">
-        <div className="text-center mb-6">
-          <div className="text-2xl font-bold text-brand-600">AshaShala</div>
-          <p className="text-sm text-slate-500">Sign in to continue</p>
+    <div className="min-h-screen grid lg:grid-cols-2">
+      {/* Brand hero */}
+      <div className="hidden lg:flex flex-col justify-between p-12 bg-gradient-to-br from-brand-600 via-brand-700 to-violet-700 text-white relative overflow-hidden">
+        <div className="absolute -top-24 -right-24 w-96 h-96 rounded-full bg-white/10 blur-2xl" />
+        <div className="absolute bottom-0 -left-20 w-80 h-80 rounded-full bg-violet-400/20 blur-2xl" />
+        <div className="flex items-center gap-3 relative">
+          <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur grid place-items-center text-2xl font-bold">
+            अ
+          </div>
+          <span className="text-xl font-bold">AshaShala</span>
         </div>
-        <form onSubmit={submit} className="space-y-4">
-          <div>
-            <Label>Email</Label>
-            <Input
-              type="email"
-              autoComplete="username"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+        <div className="relative">
+          <h1 className="text-4xl font-bold leading-tight">
+            A patient AI tutor
+            <br />
+            for every student.
+          </h1>
+          <p className="mt-4 text-white/80 max-w-md">
+            Cited answers, example-first teaching, and native Gujarati &amp; Hindi — with the tools
+            to run a whole school.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-2">
+            {["📚 Cited answers", "🗣️ Voice in Gujarati", "🧠 Adaptive quizzes", "🔒 Tenant-isolated"].map(
+              (t) => (
+                <span key={t} className="text-sm bg-white/10 rounded-full px-3 py-1 backdrop-blur">
+                  {t}
+                </span>
+              ),
+            )}
           </div>
-          <div>
-            <Label>Password</Label>
-            <Input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+        </div>
+        <div className="relative text-white/60 text-sm">Free, open-source, self-hostable.</div>
+      </div>
+
+      {/* Form */}
+      <div className="flex items-center justify-center p-6">
+        <Card className="w-full max-w-sm p-8 animate-slide-up">
+          <div className="lg:hidden flex items-center gap-2 justify-center mb-6">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-500 text-white grid place-items-center font-bold">
+              अ
+            </div>
+            <span className="text-lg font-bold text-brand-700">AshaShala</span>
           </div>
-          <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
-          </Button>
-        </form>
-      </Card>
+          <h2 className="text-xl font-bold text-slate-800">Welcome back</h2>
+          <p className="text-sm text-slate-500 mb-6">Sign in to continue.</p>
+
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <Label>Email</Label>
+              <Input
+                type="email"
+                autoComplete="username"
+                placeholder="you@school.org"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label>Password</Label>
+              <Input
+                type="password"
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full" disabled={busy}>
+              {busy ? "Signing in…" : "Sign in →"}
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

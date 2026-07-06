@@ -1,0 +1,54 @@
+{
+  "$comment": [
+    "Northflank combined service (alternative backend host — always-on, no cold start).",
+    "Import as a template, or mirror these settings when creating a Combined Service.",
+    "Build context is the repo root so config/ sits beside backend/ (see backend/Dockerfile)."
+  ],
+  "apiVersion": "v1",
+  "spec": {
+    "kind": "Service",
+    "name": "ashashala-backend",
+    "spec": {
+      "deployment": {
+        "instances": 1,
+        "docker": { "configType": "customDockerfile" }
+      },
+      "buildSettings": {
+        "dockerfile": {
+          "buildEngine": "kaniko",
+          "dockerFilePath": "/backend/Dockerfile",
+          "dockerWorkDir": "/"
+        }
+      },
+      "ports": [
+        {
+          "name": "http",
+          "internalPort": 8000,
+          "public": true,
+          "protocol": "HTTP",
+          "healthChecks": [
+            {
+              "type": "readiness",
+              "path": "/api/v1/health",
+              "protocol": "HTTP",
+              "initialDelaySeconds": 40,
+              "periodSeconds": 30
+            }
+          ]
+        }
+      ],
+      "runtimeEnvironment": {
+        "ENVIRONMENT": "production",
+        "NVIDIA_BASE_URL": "https://integrate.api.nvidia.com/v1"
+      },
+      "secretEnvironmentNote": [
+        "Set these as Northflank secrets (NOT in this file):",
+        "GEMINI_API_KEY, NVIDIA_API_KEY, DATABASE_URL, QDRANT_URL, QDRANT_API_KEY,",
+        "R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_URL,",
+        "JWT_SECRET, JWT_REFRESH_SECRET, SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD,",
+        "ALLOWED_ORIGINS, SENTRY_DSN"
+      ],
+      "resources": { "cpu": 0.2, "memory": 512 }
+    }
+  }
+}

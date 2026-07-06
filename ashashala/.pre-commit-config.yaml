@@ -1,0 +1,68 @@
+# AshaShala — unified pre-commit hooks (repo root).
+#
+#   pip install pre-commit
+#   pre-commit install
+#   pre-commit run --all-files
+#
+# Backend Python is linted/formatted/typed with ruff+black+mypy (scoped to
+# backend/); the frontend runs its own eslint+prettier via local hooks so they
+# use the project's pinned versions and config. This supersedes the older
+# backend/.pre-commit-config.yaml.
+
+repos:
+  # ---- generic hygiene (whole repo) ----
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-added-large-files
+        args: ["--maxkb=800"]
+
+  # ---- backend: ruff (lint + format) ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^backend/
+      - id: ruff-format
+        files: ^backend/
+
+  # ---- backend: black (formatter) ----
+  - repo: https://github.com/psf/black
+    rev: 24.10.0
+    hooks:
+      - id: black
+        language_version: python3.11
+        files: ^backend/
+
+  # ---- backend: mypy (types) ----
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.11.2
+    hooks:
+      - id: mypy
+        files: ^backend/app/
+        additional_dependencies: [types-PyYAML]
+        args: [--ignore-missing-imports, --show-error-codes]
+
+  # ---- frontend: eslint + prettier (project-local tooling) ----
+  - repo: local
+    hooks:
+      - id: frontend-eslint
+        name: eslint (frontend)
+        language: system
+        pass_filenames: false
+        files: ^frontend/src/.*\.(ts|tsx)$
+        entry: bash -c 'cd frontend && npm run lint'
+      - id: frontend-prettier
+        name: prettier (frontend)
+        language: system
+        pass_filenames: false
+        files: ^frontend/.*\.(ts|tsx|css|json)$
+        entry: bash -c 'cd frontend && npm run format:check'

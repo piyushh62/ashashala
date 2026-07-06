@@ -102,11 +102,73 @@
 
 ---
 
+## 🏛️ Architecture (at a glance)
+
+```
+                          ┌────────────────────────────┐
+   Browser (5 roles)      │  React 18 + Vite + Tailwind │   Vercel (Hobby, free)
+   voice / SSE chat  ───▶ │  Zustand · TanStack · Recharts
+                          └──────────────┬─────────────┘
+                                         │  /api/v1/*  (JWT + SSE)
+                          ┌──────────────▼─────────────┐
+                          │  FastAPI (async) · Uvicorn  │   Render (Docker, free)
+                          │  RBAC · tenant filter · audit
+                          │  LangGraph agents:          │
+                          │   safety→orchestrator→      │
+                          │   {tutor|quiz|evaluator}→    │
+                          │   progress                  │
+                          │  LLM router  ─────────────┐ │
+                          └───┬─────────┬──────┬──────┼─┘
+                     Neon PG  │ Qdrant  │  R2  │  Gemini 2.5 ── NVIDIA NIM
+                  (tenant DB) │(vectors)│(files)│  (Sarvam-M for Indic)
+```
+
+Tenant isolation is enforced in one place (a SQLAlchemy `do_orm_execute`
+listener) + per-school Qdrant collections. Model IDs live only in
+`config/model_registry.yaml`. Full diagrams: `PROJECT_PROMPT.md`.
+
+---
+
+## ⚡ Quick Start (one command each)
+
+```bash
+# 0. clone
+git clone https://github.com/piyushh62/ashashala.git && cd ashashala
+
+# 1. backend  (fill 5 core values in .env: GEMINI/NVIDIA keys, DATABASE_URL, QDRANT_URL/KEY)
+cd backend && cp .env.example .env && pip install -r requirements.txt
+alembic upgrade head          # create tables (or the seed script auto-creates them)
+python scripts/seed.py        # demo data + prints login credentials
+uvicorn app.main:app --reload # → http://localhost:8000/docs
+
+# 2. frontend  (new terminal)
+cd ../frontend && cp .env.example .env && npm install && npm run dev
+# → http://localhost:5173  (Vite proxies /api → :8000)
+```
+
+### 🔑 Demo credentials (printed by `scripts/seed.py`)
+
+| Role | Email | Password |
+|------|-------|----------|
+| Super Admin | *(your `SUPER_ADMIN_EMAIL`)* | *(your `SUPER_ADMIN_PASSWORD`)* |
+| School Admin | `admin@demo.ashashala` | `demo-admin-1234` |
+| Teacher | `teacher1@demo.ashashala` | `demo-teacher-1234` |
+| Student | `student1@demo.ashashala` | `demo-student-1234` |
+| Parent | `parent1@demo.ashashala` | `demo-parent-1234` |
+
+> ⏱️ **Render free-tier cold start:** the backend **sleeps after ~15 min idle** and
+> the next request takes **~30–50 s** to wake (including the first SSE chat token).
+> This is a documented free-tier tradeoff — keep it warm with a `/api/v1/health`
+> ping every ~10 min (UptimeRobot free), or deploy `deploy/northflank.json` for an
+> always-on alternative. See `docs/runbook.md`.
+
+---
+
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- **Python 3.11+**
+- **Python 3.11+**, **Node.js 18+**
 - **Git**
 - **Free tier accounts**:
   - [Google AI Studio](https://aistudio.google.com) — Gemini API key
@@ -312,6 +374,27 @@ roles:
 ```
 
 **⚠️ Important**: NVIDIA model IDs drift and get deprecated regularly. Update from the [live catalog](https://build.nvidia.com/models?pageSize=96&filters=publisher%3Anvidia) before each phase.
+
+#### How to re-verify against the live NVIDIA catalog
+
+A role starts failing (`RuntimeError: Model ID for role=… not set` or repeated
+`nvidia` errors in `llm_usage`) → that's a deprecation, not a bug. Re-verify:
+
+1. Open the [catalog](https://build.nvidia.com/models?pageSize=96&filters=publisher%3Anvidia)
+   and find the current ID for the failing role (lines marked `# VERIFY` in the
+   YAML are the ones most likely to have moved: `ocr`, `asr`, `vision`, `reasoning`,
+   `safety_jailbreak`).
+2. Paste the new ID into `config/model_registry.yaml`. **Never** hardcode it in Python.
+3. Confirm nothing regressed — the Phase 1 test pins the critical IDs:
+   ```bash
+   cd backend && pytest tests/test_phase1_llm_router.py -v
+   ```
+   (asserts `fast_chat→gemini-2.5-flash-lite`, `reasoning→gemini-2.5-flash`,
+   `multilingual_indic→sarvamai/sarvam-m`, and that no `gemini-2.0-flash`/`2.5-pro` leaks in).
+4. Hit `/api/v1/health` — `nvidia_llm` should return to `ok`.
+
+> Gemini rules are fixed by the spec: default `gemini-2.5-flash-lite`, reasoning/vision
+> `gemini-2.5-flash`. **Never** `gemini-2.5-pro` (paid) or `gemini-2.0-flash` (shut down).
 
 ---
 
@@ -553,18 +636,34 @@ pytest --cov=app --cov-report=html
 
 ## 🚀 Deployment
 
+Deploy configs live in `deploy/` and at the repo root:
+
+| Target | File | Notes |
+|--------|------|-------|
+| Backend (primary) | `deploy/render.yaml` | Render Blueprint — free Docker Web Service, health-checked, auto-deploy from `main` |
+| Backend (always-on) | `deploy/northflank.json` | Alternative with no cold start |
+| Frontend | `vercel.json` | Builds `frontend/`, SPA rewrites |
+| CI | `.github/workflows/ci.yml` | `pytest` + frontend typecheck/build on every PR |
+| CD | `.github/workflows/deploy.yml` | Build image → GHCR → Render deploy hook on `main` |
+
 ### Backend (Render)
 
-1. Create a free web service on [Render](https://render.com)
-2. Connect GitHub repo
-3. Set environment variables (from `.env`)
-4. Deploy:
-   ```bash
-   # Render will auto-detect FastAPI and run:
-   uvicorn app.main:app --host 0.0.0.0 --port $PORT
-   ```
+1. Create a free **Docker** Web Service on [Render](https://render.com), connect the repo.
+2. Point it at `backend/Dockerfile` with the **repo root as build context** (so
+   `config/` sits beside `backend/` — see the Dockerfile header). `deploy/render.yaml`
+   encodes all of this.
+3. Set the secrets from `.env` in the dashboard (`JWT_SECRET`/`JWT_REFRESH_SECRET` can
+   be auto-generated).
+4. Health check path: `/api/v1/health`.
 
-**Note**: Render free tier sleeps after 15 minutes of inactivity. Document this tradeoff clearly for users.
+> **Render free tier sleeps after ~15 min idle** (cold start ~30–50 s). Keep it warm
+> with a `/api/v1/health` ping, or use `deploy/northflank.json`. See `docs/runbook.md`.
+
+### Frontend (Vercel)
+
+Import the repo; `vercel.json` builds `frontend/` and rewrites all routes to
+`index.html`. Set `VITE_API_URL` to the deployed backend URL, and add that Vercel
+domain to the backend's `ALLOWED_ORIGINS`.
 
 ### Database Migrations
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request, UploadFile
 from sqlalchemy import func, select
@@ -17,6 +17,7 @@ from app.db.session import get_db
 from app.deps import require_role
 from app.models.audit import AuditLog
 from app.models.learning import ProgressRecord
+from app.models.llm_usage import LlmUsage
 from app.models.school import School
 from app.models.structure import (
     ClassSection,
@@ -216,3 +217,54 @@ async def audit_viewer(action: str | None = Query(default=None), limit: int = Qu
          "actor_role": r.actor_role, "target_type": r.target_type, "target_id": r.target_id, "status": r.status}
         for r in rows
     ]
+
+
+# Free-tier soft ceiling (tokens/day). Over this we surface a warning so a
+# school admin can throttle before the provider hard-caps them.
+DAILY_TOKEN_WARN = 200_000
+
+
+@router.get("/llm-usage")
+async def llm_usage(days: int = Query(default=7, ge=1, le=30),
+                    admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    """LLM cost mini-dashboard: tokens per provider per day for this school,
+    today's totals, and an over-quota warning."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    tokens = func.coalesce(func.sum(LlmUsage.prompt_tokens + LlmUsage.completion_tokens), 0)
+
+    # Per-provider, per-day breakdown.
+    day = func.date(LlmUsage.ts)
+    rows = (await db.execute(
+        select(day, LlmUsage.provider, tokens, func.count())
+        .where(LlmUsage.school_id == admin.school_id, LlmUsage.ts >= since)
+        .group_by(day, LlmUsage.provider)
+        .order_by(day)
+    )).all()
+    by_day = [
+        {"day": str(d), "provider": provider, "tokens": int(tok), "calls": int(calls)}
+        for d, provider, tok, calls in rows
+    ]
+
+    # Today's totals + error rate.
+    start_today = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_tokens = (await db.execute(
+        select(tokens).where(LlmUsage.school_id == admin.school_id, LlmUsage.ts >= start_today)
+    )).scalar_one()
+    today_calls = (await db.execute(
+        select(func.count()).select_from(LlmUsage)
+        .where(LlmUsage.school_id == admin.school_id, LlmUsage.ts >= start_today)
+    )).scalar_one()
+    today_errors = (await db.execute(
+        select(func.count()).select_from(LlmUsage)
+        .where(LlmUsage.school_id == admin.school_id, LlmUsage.ts >= start_today, LlmUsage.status == "error")
+    )).scalar_one()
+
+    return {
+        "days": days,
+        "by_day": by_day,
+        "today_tokens": int(today_tokens),
+        "today_calls": int(today_calls),
+        "today_error_rate": round(today_errors / today_calls, 3) if today_calls else 0.0,
+        "daily_token_limit": DAILY_TOKEN_WARN,
+        "over_quota": int(today_tokens) > DAILY_TOKEN_WARN,
+    }

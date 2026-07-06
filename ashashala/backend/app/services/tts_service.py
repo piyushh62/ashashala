@@ -56,7 +56,7 @@ async def synthesize_speech(
         # Note: NVIDIA TTS models may have different interfaces
         # This is a placeholder - actual implementation depends on the specific model
         response = await client.client.chat.completions.create(
-            model=client._get_model_id("tts") if hasattr(client, '_get_model_id') else "nvidia/tts-model",
+            model=client._get_model_id("tts"),  # resolved from model_registry.yaml (no hardcoding)
             messages=messages,
             temperature=0.7,
             max_tokens=100,

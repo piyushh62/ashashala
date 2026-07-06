@@ -1,0 +1,66 @@
+# Render Blueprint — free Docker Web Service (primary backend host).
+#
+# NOTE: Render auto-detects a Blueprint named `render.yaml` at the REPO ROOT.
+# This file lives in deploy/ for organization — either copy/symlink it to the
+# repo root, or create the service manually in the Render dashboard using the
+# settings below.
+#
+# Free tier tradeoff: the service SLEEPS after ~15 min idle and cold-starts in
+# ~30-50s on the next request (documented in README). If always-on matters, use
+# deploy/northflank.json instead.
+
+services:
+  - type: web
+    name: ashashala-backend
+    runtime: docker
+    plan: free
+    region: singapore              # closest free region to India
+    branch: main
+    autoDeploy: true
+
+    # Build context is the repo root (contains backend/ and config/) — see the
+    # Dockerfile header for why config/ must be a sibling of backend/.
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+
+    healthCheckPath: /api/v1/health
+
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: NVIDIA_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+      # Secrets — set these in the Render dashboard (sync:false keeps them out of git).
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: NVIDIA_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: R2_PUBLIC_URL
+        sync: false
+      - key: SUPER_ADMIN_EMAIL
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false               # e.g. https://ashashala.vercel.app
+      - key: SENTRY_DSN
+        sync: false
+      # Generated once by Render, then held constant.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true

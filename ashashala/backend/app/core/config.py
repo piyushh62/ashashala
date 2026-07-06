@@ -61,6 +61,10 @@ class Settings(BaseSettings):
         description="When true, external clients short-circuit health checks (tests/CI)",
     )
 
+    # --- Rate limits (slowapi syntax, e.g. "30/minute") ---
+    CHAT_RATE_LIMIT: str = Field(default="30/minute", description="Per-IP limit on the chat endpoint")
+    QUIZ_RATE_LIMIT: str = Field(default="20/minute", description="Per-IP limit on quiz generation")
+
     # --- Timeouts (seconds) ---
     GEMINI_TIMEOUT: int = Field(default=30, description="Gemini API timeout")
     NVIDIA_TIMEOUT: int = Field(default=45, description="NVIDIA API timeout")

@@ -83,10 +83,22 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(AuditMiddleware)
 
+    # Rate limiting (protects free LLM quotas). Only wired when slowapi is present.
+    from app.core.ratelimit import SLOWAPI_AVAILABLE, limiter
+
+    if SLOWAPI_AVAILABLE:
+        from slowapi import _rate_limit_exceeded_handler
+        from slowapi.errors import RateLimitExceeded
+        from slowapi.middleware import SlowAPIMiddleware
+
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+        app.add_middleware(SlowAPIMiddleware)
+
     register_exception_handlers(app)
 
     # Register the tenant-isolation session event (import side effect).
-    from app.db import tenant_filter  # noqa: F401
+    import app.db.tenant_filter  # noqa: F401
 
     # Mount routers.
     app.include_router(health_router)

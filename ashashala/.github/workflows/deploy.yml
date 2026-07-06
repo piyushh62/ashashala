@@ -1,0 +1,69 @@
+name: Deploy
+
+# On every push to main: build the backend image, push it to GHCR, then trigger
+# a Render redeploy via its Deploy Hook. Render also auto-deploys from the repo,
+# so the GHCR image doubles as a versioned, pullable artifact / rollback point.
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-push:
+    name: Build & push image to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}-backend
+          tags: |
+            type=sha
+            type=raw,value=latest
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          # Root context so config/ sits beside backend/ (see backend/Dockerfile).
+          context: .
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  trigger-render:
+    name: Trigger Render redeploy
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Render deploy hook
+        # Set RENDER_DEPLOY_HOOK_URL in repo secrets (Render service > Settings >
+        # Deploy Hook). Skipped gracefully if the secret isn't configured yet.
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL not set — skipping Render trigger."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"
+          echo "Render redeploy triggered."

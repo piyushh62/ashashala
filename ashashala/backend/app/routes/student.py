@@ -17,6 +17,7 @@ from app.agents.quiz_master import generate_quiz, strip_answers
 from app.agents.tutor import tutor_agent
 from app.core.config import settings
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
+from app.core.ratelimit import limiter
 from app.db.session import get_db
 from app.deps import require_role
 from app.models.flagged_answer import FlaggedAnswer
@@ -180,6 +181,7 @@ async def data_export(student: User = Depends(_guard), db: AsyncSession = Depend
 
 
 @router.post("/chat")
+@limiter.limit(settings.CHAT_RATE_LIMIT)
 async def chat(request: Request, body: dict, student: User = Depends(_guard), db: AsyncSession = Depends(get_db)):
     """
     SSE streaming chat endpoint.
@@ -394,6 +396,7 @@ async def voice_tts(
 # ---------------------------------------------------------------------------
 
 @router.post("/quiz/start", response_model=QuizOut)
+@limiter.limit(settings.QUIZ_RATE_LIMIT)
 async def quiz_start(body: QuizStartRequest, request: Request,
                      student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> QuizOut:
     """Generate an adaptive practice quiz targeting the student's weakest topic.

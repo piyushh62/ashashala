@@ -42,8 +42,19 @@ export const adminApi = {
     ),
 };
 
+export interface LlmUsageSummary {
+  days: number;
+  by_day: { day: string; provider: string; tokens: number; calls: number }[];
+  today_tokens: number;
+  today_calls: number;
+  today_error_rate: number;
+  daily_token_limit: number;
+  over_quota: boolean;
+}
+
 export const schoolApi = {
   dashboard: () => api.get<Record<string, number>>("/api/v1/school/dashboard"),
+  llmUsage: (days = 7) => api.get<LlmUsageSummary>(`/api/v1/school/llm-usage?days=${days}`),
   listUsers: (role?: Role) =>
     api.get<UserRow[]>(`/api/v1/school/users${role ? `?role=${role}` : ""}`),
   createUser: (body: {

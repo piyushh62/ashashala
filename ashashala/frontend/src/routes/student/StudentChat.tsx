@@ -4,7 +4,7 @@ import { streamChat } from "../../api/client";
 import { studentApi } from "../../api/endpoints";
 import type { Citation } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Button, Card, Input, Spinner } from "../../components/ui";
+import { Card, Select } from "../../components/ui";
 import { CitationList } from "../../components/citations/ClickableCitation";
 import { VoiceInputButton } from "../../components/voice/VoiceInputButton";
 import { TTSToggle, speak } from "../../components/voice/TTSPlayer";
@@ -16,9 +16,15 @@ interface Msg {
   citations?: Citation[];
 }
 
+const SUGGESTIONS = [
+  "Explain fractions with an example",
+  "અપૂર્ણાંક શું છે?",
+  "Why isn't 1/2 + 1/3 = 2/5?",
+];
+
 export default function StudentChat() {
   const classes = useQuery({ queryKey: ["student", "classes"], queryFn: studentApi.classes });
-  const [classId, setClassId] = useState<string>("");
+  const [classId, setClassId] = useState("");
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Msg[]>([]);
   const [streaming, setStreaming] = useState(false);
@@ -30,7 +36,7 @@ export default function StudentChat() {
   }, [classes.data, classId]);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo(0, scrollRef.current.scrollHeight);
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
   const send = async (question: string) => {
@@ -74,71 +80,113 @@ export default function StudentChat() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-3rem)]">
-      <div className="flex items-center justify-between">
-        <PageTitle subtitle="Ask anything about your class materials — text or voice.">Tutor Chat</PageTitle>
+    <div className="flex flex-col h-[calc(100vh-7rem)]">
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <PageTitle subtitle="Ask anything about your class materials — type or hold the mic.">
+          Tutor Chat
+        </PageTitle>
         <div className="flex items-center gap-2">
           <TTSToggle />
-          {classes.data && (
-            <select
-              className="text-sm border border-slate-300 rounded-lg px-2 py-1"
-              value={classId}
-              onChange={(e) => setClassId(e.target.value)}
-            >
+          {classes.data && classes.data.class_ids.length > 0 && (
+            <Select value={classId} onChange={(e) => setClassId(e.target.value)} className="w-auto py-2">
               {classes.data.class_ids.map((c) => (
                 <option key={c} value={c}>
-                  {c.slice(0, 8)}
+                  Class {c.slice(0, 6)}
                 </option>
               ))}
-            </select>
+            </Select>
           )}
         </div>
       </div>
 
-      <Card className="flex-1 flex flex-col min-h-0 mt-2">
+      <Card className="flex-1 flex flex-col min-h-0 mt-2 overflow-hidden">
         <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4">
           {messages.length === 0 && (
-            <p className="text-center text-slate-400 mt-10">
-              Try: “Explain fractions with an example” or ask in Gujarati / Hindi.
-            </p>
-          )}
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === "user" ? "text-right" : "text-left"}>
-              <div
-                className={`inline-block max-w-[80%] px-4 py-2 rounded-2xl text-sm whitespace-pre-wrap ${
-                  m.role === "user" ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-800"
-                }`}
-              >
-                {m.content || (streaming && i === messages.length - 1 ? <Spinner /> : "")}
+            <div className="h-full flex flex-col items-center justify-center text-center">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-500 text-white grid place-items-center text-2xl mb-3">
+                अ
               </div>
-              {m.role === "assistant" && m.citations && (
-                <div className="max-w-[80%]">
-                  <CitationList citations={m.citations} />
+              <p className="text-slate-500 font-medium">Your patient tutor is ready.</p>
+              <p className="text-sm text-slate-400 mb-4">Cited, example-first answers — in your language.</p>
+              <div className="flex flex-wrap gap-2 justify-center max-w-md">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s)}
+                    className="text-sm bg-slate-100 hover:bg-brand-100 hover:text-brand-700 text-slate-600 rounded-full px-3.5 py-1.5 transition"
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => (
+            <div key={i} className={`flex gap-2.5 ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+              {m.role === "assistant" && (
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white grid place-items-center text-sm shrink-0">
+                  अ
                 </div>
               )}
+              <div className={`max-w-[78%] ${m.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
+                <div
+                  className={`px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed ${
+                    m.role === "user"
+                      ? "bg-brand-600 text-white rounded-br-md"
+                      : "bg-slate-100 text-slate-800 rounded-bl-md"
+                  }`}
+                >
+                  {m.content ? (
+                    m.content
+                  ) : streaming && i === messages.length - 1 ? (
+                    <span className="inline-flex gap-1 py-1">
+                      <Dot /> <Dot delay="150ms" /> <Dot delay="300ms" />
+                    </span>
+                  ) : (
+                    ""
+                  )}
+                </div>
+                {m.role === "assistant" && m.citations && <CitationList citations={m.citations} />}
+              </div>
             </div>
           ))}
         </div>
 
         <form
-          className="border-t border-slate-100 p-3 flex gap-2"
+          className="border-t border-slate-100 p-3 flex items-center gap-2 bg-white"
           onSubmit={(e) => {
             e.preventDefault();
             send(input);
           }}
         >
           <VoiceInputButton onTranscript={(t) => send(t)} />
-          <Input
+          <input
+            className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition"
             placeholder="Ask your tutor…"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={streaming}
           />
-          <Button type="submit" disabled={streaming || !input.trim()}>
-            Send
-          </Button>
+          <button
+            type="submit"
+            disabled={streaming || !input.trim()}
+            className="w-11 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white grid place-items-center transition disabled:opacity-40 shrink-0"
+            title="Send"
+          >
+            ➤
+          </button>
         </form>
       </Card>
     </div>
+  );
+}
+
+function Dot({ delay = "0ms" }: { delay?: string }) {
+  return (
+    <span
+      className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-bounce"
+      style={{ animationDelay: delay }}
+    />
   );
 }
