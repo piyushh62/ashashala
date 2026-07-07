@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import enum
+from datetime import datetime
 
-from sqlalchemy import Boolean, Enum as SQLEnum, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -34,3 +35,10 @@ class User(Base, UUIDPk):
     interests: Mapped[str | None] = mapped_column(String(512), default=None)  # student personalisation
     grade: Mapped[int | None] = mapped_column(Integer, default=None)          # students
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Bumped to "now" to instantly invalidate every outstanding access token
+    # and refresh token issued before this timestamp (password reset, admin
+    # reset, deactivation, logout-all). NULL = no forced invalidation yet.
+    tokens_valid_after: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )

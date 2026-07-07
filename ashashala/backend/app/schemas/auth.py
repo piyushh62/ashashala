@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
+
+from app.auth.password import validate_password_complexity
 
 
 class LoginRequest(BaseModel):
@@ -20,9 +22,15 @@ class RefreshRequest(BaseModel):
     refresh_token: str
 
 
+class LogoutRequest(BaseModel):
+    refresh_token: str
+
+
 class PasswordResetRequest(BaseModel):
     email: EmailStr
     new_password: str = Field(min_length=8)
+
+    _validate_complexity = field_validator("new_password")(validate_password_complexity)
 
 
 class MeResponse(BaseModel):

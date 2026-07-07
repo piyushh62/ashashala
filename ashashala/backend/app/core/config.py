@@ -105,6 +105,9 @@ class Settings(BaseSettings):
     # --- Rate limits (slowapi syntax, e.g. "30/minute") ---
     CHAT_RATE_LIMIT: str = Field(default="30/minute", description="Per-IP limit on the chat endpoint")
     QUIZ_RATE_LIMIT: str = Field(default="20/minute", description="Per-IP limit on quiz generation")
+    LOGIN_RATE_LIMIT: str = Field(
+        default="10/minute", description="Per-IP limit on login/refresh/password-reset"
+    )
 
     # --- Safety ---
     ENABLE_JAILBREAK_DETECTION: bool = Field(

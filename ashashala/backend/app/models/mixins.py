@@ -13,6 +13,18 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def as_utc(value: datetime) -> datetime:
+    """Attach UTC tzinfo to a naive datetime read back from the DB.
+
+    Postgres (prod) round-trips `DateTime(timezone=True)` values with tzinfo
+    intact; SQLite (tests) does not — every column using this pattern is
+    written via `utcnow()`/`datetime.now(timezone.utc)`, so a naive value read
+    back is always UTC. Comparing it against a tz-aware datetime without this
+    raises `TypeError: can't compare offset-naive and offset-aware datetimes`.
+    """
+    return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+
+
 def new_uuid() -> str:
     return str(uuid.uuid4())
 

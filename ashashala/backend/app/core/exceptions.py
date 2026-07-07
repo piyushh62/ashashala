@@ -79,6 +79,31 @@ class ExternalServiceError(AppError):
         )
 
 
+def _json_safe_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Strip non-JSON-serializable bits from pydantic/FastAPI error dicts.
+
+    Validators that raise a plain `ValueError` (e.g. our password-complexity
+    check) get that exception object embedded verbatim under `ctx.error` —
+    fine for `PydanticValidationError.errors(include_context=False)`, but
+    `RequestValidationError.errors()` (raised for request-body validation,
+    the far more common path) has no such option. Drop it unconditionally so
+    both handlers can safely `json.dumps` the result; `msg` already carries
+    the human-readable text.
+    """
+    safe = []
+    for err in errors:
+        err = dict(err)
+        ctx = err.get("ctx")
+        if isinstance(ctx, dict) and "error" in ctx:
+            ctx = {k: v for k, v in ctx.items() if k != "error"}
+            if ctx:
+                err["ctx"] = ctx
+            else:
+                err.pop("ctx", None)
+        safe.append(err)
+    return safe
+
+
 def create_error_response(
     request: Request,
     error_code: str,
@@ -125,13 +150,14 @@ def register_exception_handlers(app: FastAPI) -> None:
         request: Request, exc: RequestValidationError
     ) -> JSONResponse:
         trace_id = getattr(request.state, "trace_id", str(uuid.uuid4())[:8])
-        logger.warning("Validation error: %s (trace_id: %s)", exc.errors(), trace_id)
+        errors = _json_safe_errors(exc.errors())
+        logger.warning("Validation error: %s (trace_id: %s)", errors, trace_id)
         return create_error_response(
             request,
             "VALIDATION_ERROR",
             "Request validation failed",
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            {"errors": exc.errors()},
+            {"errors": errors},
             trace_id,
         )
 
@@ -145,7 +171,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             "VALIDATION_ERROR",
             "Data validation failed",
             status.HTTP_422_UNPROCESSABLE_ENTITY,
-            {"errors": exc.errors()},
+            {"errors": _json_safe_errors(exc.errors())},
             trace_id,
         )
 

@@ -41,8 +41,23 @@ class TempPasswordResponse(BaseModel):
     temp_password: str
 
 
+class TokenTrendDay(BaseModel):
+    day: str
+    tokens: int
+    calls: int
+
+
 class PlatformDashboard(BaseModel):
     active_schools: int
     total_users: int
     tokens_today_by_school: dict[str, int]
     error_rate: float
+    tokens_by_day: list[TokenTrendDay] = Field(default_factory=list)
+
+
+class SchoolDashboardOut(BaseModel):
+    school_id: str
+    teachers: int
+    students: int
+    classes: int
+    avg_mastery: float

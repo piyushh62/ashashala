@@ -18,6 +18,7 @@ from app.core.exceptions import register_exception_handlers
 from app.db.session import close_db
 from app.routes.admin import router as admin_router
 from app.routes.health import router as health_router
+from app.routes.notifications import router as notifications_router
 from app.routes.parent import router as parent_router
 from app.routes.school_admin import router as school_admin_router
 from app.routes.student import router as student_router
@@ -111,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(teacher_router)
     app.include_router(student_router)
     app.include_router(parent_router)
+    app.include_router(notifications_router)
 
     @app.get("/", tags=["Root"])
     async def root() -> dict:

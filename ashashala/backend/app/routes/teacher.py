@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.db.session import get_db
-from app.deps import require_role
+from app.deps import PageParams, page_params, require_role
 from app.models.document import DocStatus, Document, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import ProgressRecord, Quiz, QuizStatus
@@ -28,8 +28,10 @@ from app.schemas.teacher import (
     TimetableCreate,
     TimetableOut,
 )
+from app.schemas.pagination import Page
 from app.services.audit_service import record_audit
 from app.services.ingestion.pipeline import ingest_document
+from app.services.notification_service import notify
 from app.services.r2_client import get_storage_client
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["Teacher"])
@@ -117,12 +119,18 @@ async def upload_youtube(body: MaterialYoutubeCreate, request: Request, tasks: B
     return DocumentOut.model_validate(doc)
 
 
-@router.get("/materials", response_model=list[DocumentOut])
-async def list_materials(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[DocumentOut]:
+@router.get("/materials", response_model=Page[DocumentOut])
+async def list_materials(page: PageParams = Depends(page_params), teacher: User = Depends(_guard),
+                         db: AsyncSession = Depends(get_db)) -> Page[DocumentOut]:
+    total = (await db.execute(
+        select(func.count()).select_from(Document).where(Document.uploaded_by_teacher_id == teacher.id)
+    )).scalar_one()
     docs = (await db.execute(
         select(Document).where(Document.uploaded_by_teacher_id == teacher.id)
+        .order_by(Document.created_at.desc()).limit(page.limit).offset(page.offset)
     )).scalars().all()
-    return [DocumentOut.model_validate(d) for d in docs]
+    return Page(items=[DocumentOut.model_validate(d) for d in docs], total=total,
+               limit=page.limit, offset=page.offset)
 
 
 @router.delete("/materials/{doc_id}")
@@ -149,6 +157,27 @@ async def create_timetable(body: TimetableCreate, request: Request,
     await record_audit(db, action="TIMETABLE_CREATE", actor=teacher, target_type="timetable",
                        target_id=tt.id, request=request)
     return TimetableOut.model_validate(tt)
+
+
+@router.get("/timetable", response_model=list[TimetableOut])
+async def list_timetable(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[TimetableOut]:
+    rows = (await db.execute(
+        select(Timetable).where(Timetable.teacher_id == teacher.id)
+        .order_by(Timetable.day_of_week, Timetable.period_number)
+    )).scalars().all()
+    return [TimetableOut.model_validate(r) for r in rows]
+
+
+@router.delete("/timetable/{entry_id}")
+async def delete_timetable_entry(entry_id: str, request: Request,
+                                 teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    entry = await db.get(Timetable, entry_id)
+    if entry is None or entry.teacher_id != teacher.id:
+        raise NotFoundError("Timetable", entry_id)
+    await db.delete(entry)
+    await record_audit(db, action="TIMETABLE_DELETE", actor=teacher, target_type="timetable",
+                       target_id=entry_id, request=request)
+    return {"status": "deleted", "id": entry_id}
 
 
 @router.post("/exam-timetable", response_model=ExamTimetableOut)
@@ -243,15 +272,21 @@ async def class_progress(class_id: str, teacher: User = Depends(_guard),
     return out
 
 
-@router.get("/flagged-answers", response_model=list[FlaggedAnswerOut])
-async def list_flagged_answers(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[FlaggedAnswerOut]:
+@router.get("/flagged-answers", response_model=Page[FlaggedAnswerOut])
+async def list_flagged_answers(page: PageParams = Depends(page_params), teacher: User = Depends(_guard),
+                               db: AsyncSession = Depends(get_db)) -> Page[FlaggedAnswerOut]:
     """Open teacher review queue for this school (Evaluator-flagged short answers)."""
+    total = (await db.execute(
+        select(func.count()).select_from(FlaggedAnswer).where(FlaggedAnswer.status == FlagStatus.open)
+    )).scalar_one()
     rows = (await db.execute(
         select(FlaggedAnswer)
         .where(FlaggedAnswer.status == FlagStatus.open)
         .order_by(FlaggedAnswer.created_at.desc())
+        .limit(page.limit).offset(page.offset)
     )).scalars().all()
-    return [FlaggedAnswerOut.model_validate(r) for r in rows]
+    return Page(items=[FlaggedAnswerOut.model_validate(r) for r in rows], total=total,
+               limit=page.limit, offset=page.offset)
 
 
 @router.post("/flagged-answers/{answer_id}/override")
@@ -267,6 +302,9 @@ async def override_flagged_answer(answer_id: str, body: FlaggedAnswerOverride, r
     flagged.status = FlagStatus.resolved
     flagged.resolved_by_teacher_id = teacher.id
     db.add(flagged)
+    await notify(db, user_id=flagged.student_id, school_id=teacher.school_id, type="answer_reviewed",
+                title="Your answer was reviewed", body="A teacher reviewed one of your flagged answers.",
+                link="/student/history")
     await record_audit(db, action="ANSWER_GRADE_OVERRIDE", actor=teacher, target_type="flagged_answer",
                        target_id=answer_id, payload={"score": body.score}, request=request)
     return {"status": "resolved", "id": answer_id, "score": body.score}
@@ -285,6 +323,13 @@ async def approve_quiz(quiz_id: str, body: QuizApproval, request: Request,
         quiz.status = QuizStatus.approved
         quiz.created_by_teacher_id = teacher.id
         db.add(quiz)
+        student_ids = (await db.execute(
+            select(Enrollment.student_id).where(Enrollment.class_id == quiz.class_id)
+        )).scalars().all()
+        for student_id in student_ids:
+            await notify(db, user_id=student_id, school_id=teacher.school_id, type="quiz_approved",
+                        title="New quiz available", body=f"A new quiz on {quiz.topic} is ready.",
+                        link="/student/quiz")
         await record_audit(db, action="QUIZ_APPROVE", actor=teacher, target_type="quiz",
                            target_id=quiz_id, request=request)
     return {"status": quiz.status.value, "id": quiz_id}

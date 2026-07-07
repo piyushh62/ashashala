@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.auth.password import validate_password_complexity
 from app.models.user import UserRole
 
 
@@ -14,6 +15,11 @@ class UserCreate(BaseModel):
     password: str | None = Field(default=None, min_length=8)  # auto-generated if omitted
     grade: int | None = None
     interests: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def _check_password_complexity(cls, v: str | None) -> str | None:
+        return validate_password_complexity(v) if v is not None else v
 
 
 class UserUpdate(BaseModel):
@@ -70,9 +76,27 @@ class TeacherAssignmentCreate(BaseModel):
     subject_id: str
 
 
+class TeacherAssignmentOut(BaseModel):
+    id: str
+    teacher_id: str
+    teacher_name: str
+    class_id: str
+    class_name: str
+    subject_id: str
+    subject_name: str
+
+
 class EnrollmentCreate(BaseModel):
     student_id: str
     class_id: str
+
+
+class EnrollmentOut(BaseModel):
+    id: str
+    student_id: str
+    student_name: str
+    class_id: str
+    class_name: str
 
 
 class ParentLinkCreate(BaseModel):
@@ -80,5 +104,30 @@ class ParentLinkCreate(BaseModel):
     student_id: str
 
 
+class ParentLinkOut(BaseModel):
+    id: str
+    parent_id: str
+    parent_name: str
+    student_id: str
+    student_name: str
+
+
 class IdResponse(BaseModel):
     id: str
+
+
+class TempPasswordResponse(BaseModel):
+    temp_password: str
+
+
+class AtRiskStudentOut(BaseModel):
+    student_id: str
+    student_name: str
+    avg_mastery: float
+
+
+class ClassMasteryOut(BaseModel):
+    class_id: str
+    class_name: str
+    avg_mastery: float
+    student_count: int

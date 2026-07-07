@@ -17,6 +17,8 @@ from app.models.learning import (
     QuizStatus,
 )
 from app.models.llm_usage import LlmUsage
+from app.models.notification import Notification
+from app.models.refresh_token import RefreshToken
 from app.models.school import School
 from app.models.structure import (
     ClassSection,
@@ -42,12 +44,14 @@ __all__ = [
     "LlmUsage",
     "Message",
     "MessageRole",
+    "Notification",
     "OcrCache",
     "ParentStudentLink",
     "ProgressRecord",
     "Quiz",
     "QuizAttempt",
     "QuizStatus",
+    "RefreshToken",
     "School",
     "SourceType",
     "Subject",

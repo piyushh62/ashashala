@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.deps import get_linked_child, require_role
+from app.deps import PageParams, get_linked_child, page_params, require_role
 from app.models.learning import ProgressRecord, QuizAttempt
 from app.models.structure import Enrollment, ParentStudentLink
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
+from app.schemas.pagination import Page
+from app.schemas.quiz import QuizAttemptOut
 from app.services.audit_service import record_audit
 
 router = APIRouter(prefix="/api/v1/parent", tags=["Parent"])
@@ -49,14 +51,24 @@ async def child_dashboard(student_id: str, request: Request,
     }
 
 
-@router.get("/children/{student_id}/history")
-async def child_history(student_id: str, request: Request,
-                        parent: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+@router.get("/children/{student_id}/history", response_model=Page[QuizAttemptOut])
+async def child_history(student_id: str, request: Request, page: PageParams = Depends(page_params),
+                        parent: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> Page[QuizAttemptOut]:
     await get_linked_child(db, parent, student_id)
     await record_audit(db, action="PARENT_VIEW_CHILD", actor=parent, target_type="student",
                        target_id=student_id, request=request)
-    attempts = (await db.execute(select(QuizAttempt).where(QuizAttempt.student_id == student_id))).scalars().all()
-    return {"quiz_attempts": [{"quiz_id": a.quiz_id, "score": a.score} for a in attempts]}
+    total = (await db.execute(
+        select(func.count()).select_from(QuizAttempt).where(QuizAttempt.student_id == student_id)
+    )).scalar_one()
+    attempts = (await db.execute(
+        select(QuizAttempt).where(QuizAttempt.student_id == student_id)
+        .order_by(QuizAttempt.attempted_at.desc()).limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    items = [
+        QuizAttemptOut(quiz_id=a.quiz_id, score=a.score, attempted_at=a.attempted_at.isoformat())
+        for a in attempts
+    ]
+    return Page(items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.get("/children/{student_id}/timetable")

@@ -80,6 +80,20 @@ async def db(session_factory) -> AsyncSession:
         yield session
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """The slowapi `limiter` (app/core/ratelimit.py) is a module-level singleton
+    with in-memory storage keyed by client IP — every test client hits it as
+    '127.0.0.1', so counts accumulate across the whole test session instead of
+    resetting per test. Without this, login-heavy tests later in the run start
+    tripping 429s that have nothing to do with what they're testing."""
+    from app.core.ratelimit import SLOWAPI_AVAILABLE, limiter
+
+    if SLOWAPI_AVAILABLE:
+        limiter.reset()
+    yield
+
+
 @pytest_asyncio.fixture
 async def client(session_factory):
     async def _override_get_db():

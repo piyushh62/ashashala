@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { z } from "zod";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Input, Select, Skeleton, Table } from "../../components/ui";
+import { FormField } from "../../components/ui/FormField";
 import { useToast } from "../../components/ui/Toast";
 
 type Tab = "file" | "url" | "youtube";
+
+const PAGE_SIZE = 20;
+
+const urlSchema = z.string().url("Enter a valid URL (including https://)");
+const youtubeSchema = urlSchema.refine((v) => /youtu\.?be/.test(v), "Enter a valid YouTube URL");
 
 export default function TeacherMaterials() {
   const toast = useToast();
@@ -14,10 +21,19 @@ export default function TeacherMaterials() {
   const [classId, setClassId] = useState("");
   const [subjectId, setSubjectId] = useState("");
   const [url, setUrl] = useState("");
+  const [urlError, setUrlError] = useState<string | undefined>();
   const [file, setFile] = useState<File | null>(null);
+  const [offset, setOffset] = useState(0);
 
   const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
-  const materials = useQuery({ queryKey: ["teacher", "materials"], queryFn: teacherApi.materials });
+  const materials = useQuery({
+    queryKey: ["teacher", "materials", offset],
+    queryFn: () => teacherApi.materials(PAGE_SIZE, offset),
+  });
+  const materialRows = materials.data?.items ?? [];
+  const total = materials.data?.total ?? 0;
+  const rangeStart = total === 0 ? 0 : offset + 1;
+  const rangeEnd = offset + materialRows.length;
 
   // Subjects taught in the currently-selected class (a teacher can be assigned
   // to the same class for several subjects).
@@ -43,6 +59,7 @@ export default function TeacherMaterials() {
     toast.push("Uploaded — indexing in the background.", "success");
     setUrl("");
     setFile(null);
+    setOffset(0);
     qc.invalidateQueries({ queryKey: ["teacher", "materials"] });
   };
   const fail = () => toast.push("Upload failed — check your class/subject assignment.", "error");
@@ -70,8 +87,18 @@ export default function TeacherMaterials() {
   });
 
   const submit = () => {
-    if (tab === "file") upFile.mutate();
-    else if (tab === "url") upUrl.mutate();
+    if (tab === "file") {
+      upFile.mutate();
+      return;
+    }
+    const schema = tab === "youtube" ? youtubeSchema : urlSchema;
+    const result = schema.safeParse(url);
+    if (!result.success) {
+      setUrlError(result.error.issues[0]?.message);
+      return;
+    }
+    setUrlError(undefined);
+    if (tab === "url") upUrl.mutate();
     else upYt.mutate();
   };
 
@@ -85,7 +112,10 @@ export default function TeacherMaterials() {
           {(["file", "url", "youtube"] as Tab[]).map((t) => (
             <button
               key={t}
-              onClick={() => setTab(t)}
+              onClick={() => {
+                setTab(t);
+                setUrlError(undefined);
+              }}
               className={`px-3 py-1.5 rounded-lg text-sm ${
                 tab === t ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"
               }`}
@@ -99,35 +129,36 @@ export default function TeacherMaterials() {
             <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class and subject first." />
           </div>
         ) : (
-          <div className="p-5 grid md:grid-cols-3 gap-3 items-end">
-            <div>
-              <Label>Class</Label>
+          <div className="p-5 grid md:grid-cols-3 gap-3 items-start">
+            <FormField label="Class">
               <Select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(""); }}>
                 <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
                 {classOptions.map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </Select>
-            </div>
-            <div>
-              <Label>Subject (optional)</Label>
+            </FormField>
+            <FormField label="Subject" optional>
               <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} disabled={!classId}>
                 <option value="">No specific subject</option>
                 {subjectsForClass.map((a) => (
                   <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
                 ))}
               </Select>
-            </div>
+            </FormField>
             {tab === "file" ? (
-              <div>
-                <Label>File</Label>
+              <FormField label="File">
                 <input type="file" accept=".pdf,.docx,.txt,.jpg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              </div>
+              </FormField>
             ) : (
-              <div>
-                <Label>{tab === "url" ? "URL" : "YouTube URL"}</Label>
-                <Input value={url} onChange={(e) => setUrl(e.target.value)} />
-              </div>
+              <FormField label={tab === "url" ? "URL" : "YouTube URL"} error={urlError}>
+                <Input
+                  value={url}
+                  invalid={!!urlError}
+                  onChange={(e) => { setUrl(e.target.value); setUrlError(undefined); }}
+                  placeholder="https://…"
+                />
+              </FormField>
             )}
             <Button
               onClick={submit}
@@ -144,11 +175,11 @@ export default function TeacherMaterials() {
         <div className="p-2">
           {materials.isLoading ? (
             <Skeleton className="h-24 m-3" />
-          ) : !materials.data?.length ? (
+          ) : !materialRows.length ? (
             <EmptyState title="No materials yet" />
           ) : (
             <Table head={["Name", "Type", "Status"]}>
-              {materials.data.map((m) => (
+              {materialRows.map((m) => (
                 <tr key={m.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700 truncate max-w-xs">{m.filename}</td>
                   <td className="px-4 py-2">
@@ -162,6 +193,31 @@ export default function TeacherMaterials() {
                 </tr>
               ))}
             </Table>
+          )}
+          {total > 0 && (
+            <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
+              <span>
+                {rangeStart}–{rangeEnd} of {total}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                  disabled={offset === 0}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOffset(offset + PAGE_SIZE)}
+                  disabled={rangeEnd >= total}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </div>
       </Card>

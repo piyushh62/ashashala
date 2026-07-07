@@ -1,14 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { studentApi } from "../../api/endpoints";
 import { MasteryRadar } from "../../components/dashboard/MasteryRadar";
 import { TimetableGrid } from "../../components/dashboard/TimetableGrid";
 import { Card, CardHeader, Skeleton } from "../../components/ui";
 
+const tooltipStyle = {
+  borderRadius: 12,
+  border: "1px solid #e2e8f0",
+  boxShadow: "0 4px 16px -4px rgba(15,23,42,0.12)",
+  fontSize: 12,
+};
+
 export default function StudentDashboard() {
   const dash = useQuery({ queryKey: ["student", "dashboard"], queryFn: studentApi.dashboard });
   const tt = useQuery({ queryKey: ["student", "timetable"], queryFn: studentApi.timetable });
   const exams = useQuery({ queryKey: ["student", "exams"], queryFn: studentApi.exams });
+  const hist = useQuery({ queryKey: ["student", "history"], queryFn: () => studentApi.history() });
+
+  const trend = (hist.data?.items ?? []).map((a) => ({
+    date: new Date(a.attempted_at).toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+    score: Math.round((a.score ?? 0) * 100),
+  }));
 
   return (
     <div>
@@ -54,6 +68,27 @@ export default function StudentDashboard() {
           <div className="p-4">{tt.isLoading ? <Skeleton className="h-40" /> : <TimetableGrid rows={tt.data ?? []} />}</div>
         </Card>
       </div>
+
+      <Card className="mt-6">
+        <CardHeader title="Quiz score trend" icon="📈" />
+        <div className="p-5">
+          {hist.isLoading ? (
+            <Skeleton className="h-40" />
+          ) : trend.length < 2 ? (
+            <p className="text-sm text-slate-400 text-center py-6">Take a few more quizzes to see your trend.</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart data={trend} margin={{ left: -12 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} domain={[0, 100]} />
+                <Tooltip cursor={{ stroke: "#c4b5fd" }} contentStyle={tooltipStyle} />
+                <Line type="monotone" dataKey="score" stroke="#7c3aed" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </Card>
 
       <Card className="mt-6">
         <CardHeader title="Upcoming exams" icon="📝" />

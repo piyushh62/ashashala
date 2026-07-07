@@ -12,7 +12,7 @@ from collections.abc import AsyncGenerator
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.evaluator import evaluate_attempt
@@ -24,7 +24,7 @@ from app.core.config import settings
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
 from app.core.ratelimit import limiter
 from app.db.session import get_db
-from app.deps import require_role
+from app.deps import PageParams, page_params, require_role
 from app.models.flagged_answer import FlaggedAnswer
 from app.models.learning import (
     ChatSession,
@@ -35,11 +35,13 @@ from app.models.learning import (
     QuizAttempt,
     QuizStatus,
 )
-from app.models.structure import Enrollment, Subject
+from app.models.structure import Enrollment, Subject, TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
+from app.schemas.pagination import Page
 from app.schemas.quiz import (
     PerQuestionFeedback,
+    QuizAttemptOut,
     QuizOut,
     QuizQuestionOut,
     QuizStartRequest,
@@ -48,6 +50,7 @@ from app.schemas.quiz import (
 )
 from app.services.asr_service import transcribe_audio
 from app.services.audit_service import record_audit
+from app.services.notification_service import notify
 from app.services.topic_extractor import best_topic
 from app.services.tts_service import synthesize_speech
 
@@ -175,10 +178,21 @@ async def progress(student: User = Depends(_guard), db: AsyncSession = Depends(g
     return [{"topic": p.topic, "subject_id": p.subject_id, "mastery_score": p.mastery_score} for p in rows]
 
 
-@router.get("/history")
-async def history(student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
-    attempts = (await db.execute(select(QuizAttempt).where(QuizAttempt.student_id == student.id))).scalars().all()
-    return {"quiz_attempts": [{"quiz_id": a.quiz_id, "score": a.score} for a in attempts]}
+@router.get("/history", response_model=Page[QuizAttemptOut])
+async def history(page: PageParams = Depends(page_params), student: User = Depends(_guard),
+                  db: AsyncSession = Depends(get_db)) -> Page[QuizAttemptOut]:
+    total = (await db.execute(
+        select(func.count()).select_from(QuizAttempt).where(QuizAttempt.student_id == student.id)
+    )).scalar_one()
+    attempts = (await db.execute(
+        select(QuizAttempt).where(QuizAttempt.student_id == student.id)
+        .order_by(QuizAttempt.attempted_at.desc()).limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    items = [
+        QuizAttemptOut(quiz_id=a.quiz_id, score=a.score, attempted_at=a.attempted_at.isoformat())
+        for a in attempts
+    ]
+    return Page(items=items, total=total, limit=page.limit, offset=page.offset)
 
 
 @router.get("/data-export")
@@ -484,8 +498,10 @@ async def quiz_submit(quiz_id: str, body: QuizSubmitRequest, request: Request,
     await db.flush()
 
     # Flag low-confidence short answers for the teacher review queue.
+    flagged_count = 0
     for r in result.per_question:
         if r.flagged:
+            flagged_count += 1
             db.add(FlaggedAnswer(
                 school_id=student.school_id, quiz_attempt_id=attempt.id, quiz_id=quiz.id,
                 student_id=student.id, class_id=quiz.class_id, question_text=r.question_text,
@@ -494,6 +510,16 @@ async def quiz_submit(quiz_id: str, body: QuizSubmitRequest, request: Request,
             ))
             await record_audit(db, action="ANSWER_FLAGGED", actor=student, target_type="quiz_attempt",
                                target_id=attempt.id, payload={"q": r.index}, request=request)
+
+    if flagged_count:
+        teacher_ids = (await db.execute(
+            select(TeacherAssignment.teacher_id).where(TeacherAssignment.class_id == quiz.class_id)
+        )).scalars().all()
+        for teacher_id in set(teacher_ids):
+            await notify(db, user_id=teacher_id, school_id=student.school_id, type="answer_flagged",
+                        title="New answer(s) flagged for review",
+                        body=f"{student.name} has {flagged_count} answer(s) needing review.",
+                        link="/teacher/flagged")
 
     mastery_update = await update_mastery(
         db, student, subject_id=quiz.subject_id, topic=quiz.topic,

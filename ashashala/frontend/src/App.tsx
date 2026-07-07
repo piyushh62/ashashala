@@ -2,8 +2,10 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./stores/auth";
 import { AppLayout, type NavItem } from "./components/layout/AppLayout";
+import type { SearchSource } from "./components/layout/CommandPalette";
 import { HOME_FOR, RoleGuard } from "./components/layout/RoleGuard";
-import type { Role } from "./types/api";
+import type { Role, School, UserRow, DocumentRow } from "./types/api";
+import { adminApi, schoolApi, teacherApi } from "./api/endpoints";
 import { Spinner } from "./components/ui";
 
 import Login from "./routes/Login";
@@ -13,6 +15,7 @@ import SchoolDashboard from "./routes/school/SchoolDashboard";
 import SchoolUsers from "./routes/school/SchoolUsers";
 import SchoolStructure from "./routes/school/SchoolStructure";
 import SchoolAudit from "./routes/school/SchoolAudit";
+import TeacherDashboard from "./routes/teacher/TeacherDashboard";
 import TeacherMaterials from "./routes/teacher/TeacherMaterials";
 import TeacherTimetable from "./routes/teacher/TeacherTimetable";
 import TeacherFlagged from "./routes/teacher/TeacherFlagged";
@@ -22,39 +25,96 @@ import StudentQuiz from "./routes/student/StudentQuiz";
 import StudentHistory from "./routes/student/StudentHistory";
 import ParentChildren from "./routes/parent/ParentChildren";
 import ParentChild from "./routes/parent/ParentChild";
+import Settings from "./routes/Settings";
+
+const ALL_ROLES: Role[] = ["super_admin", "school_admin", "teacher", "student", "parent"];
+
+const ROLE_TITLE: Record<Role, string> = {
+  super_admin: "Super Admin",
+  school_admin: "School Admin",
+  teacher: "Teacher",
+  student: "Student",
+  parent: "Parent",
+};
 
 const NAV: Record<Role, NavItem[]> = {
   super_admin: [
     { to: "/admin", label: "Schools", icon: "🏫" },
     { to: "/admin/dashboard", label: "Platform", icon: "📊" },
+    { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
   school_admin: [
     { to: "/school", label: "Dashboard", icon: "📊" },
     { to: "/school/users", label: "Users", icon: "👥" },
     { to: "/school/structure", label: "Classes", icon: "🗂️" },
     { to: "/school/audit", label: "Audit", icon: "📜" },
+    { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
   teacher: [
-    { to: "/teacher", label: "Materials", icon: "📚" },
+    { to: "/teacher", label: "Dashboard", icon: "📊" },
+    { to: "/teacher/materials", label: "Materials", icon: "📚" },
     { to: "/teacher/timetable", label: "Timetable", icon: "🗓️" },
     { to: "/teacher/flagged", label: "Flagged", icon: "🚩" },
+    { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
   student: [
     { to: "/student", label: "Dashboard", icon: "📊" },
     { to: "/student/chat", label: "Tutor", icon: "💬" },
     { to: "/student/quiz", label: "Quiz", icon: "🧠" },
     { to: "/student/history", label: "History", icon: "📜" },
+    { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
-  parent: [{ to: "/parent", label: "Children", icon: "👨‍👩‍👧" }],
+  parent: [
+    { to: "/parent", label: "Children", icon: "👨‍👩‍👧" },
+    { to: "/settings", label: "Settings", icon: "⚙️" },
+  ],
+};
+
+const SEARCH_SOURCES: Partial<Record<Role, SearchSource<any>>> = {
+  super_admin: {
+    label: "Schools",
+    queryKey: ["admin", "schools"],
+    queryFn: () => adminApi.listSchools(),
+    toItem: (s: School) => ({ id: s.id, label: s.name, sublabel: s.address ?? undefined, to: "/admin" }),
+  },
+  school_admin: {
+    label: "Users",
+    queryKey: ["school", "users"],
+    queryFn: () => schoolApi.listUsers(undefined, 200).then((p) => p.items),
+    toItem: (u: UserRow) => ({ id: u.id, label: u.name, sublabel: u.email, to: "/school/users" }),
+  },
+  teacher: {
+    label: "Materials",
+    queryKey: ["teacher", "materials"],
+    queryFn: () => teacherApi.materials(200).then((p) => p.items),
+    toItem: (d: DocumentRow) => ({ id: d.id, label: d.filename, sublabel: d.source_type, to: "/teacher/materials" }),
+  },
 };
 
 function Shell({ role, title, children }: { role: Role; title: string; children: React.ReactNode }) {
   return (
     <RoleGuard allow={[role]}>
-      <AppLayout title={title} nav={NAV[role]}>
+      <AppLayout title={title} nav={NAV[role]} searchSource={SEARCH_SOURCES[role]}>
         {children}
       </AppLayout>
     </RoleGuard>
+  );
+}
+
+function SettingsRoute() {
+  return (
+    <RoleGuard allow={ALL_ROLES}>
+      <SettingsShell />
+    </RoleGuard>
+  );
+}
+
+function SettingsShell() {
+  const user = useAuth((s) => s.user)!;
+  return (
+    <AppLayout title={ROLE_TITLE[user.role]} nav={NAV[user.role]}>
+      <Settings />
+    </AppLayout>
   );
 }
 
@@ -91,7 +151,8 @@ export default function App() {
       <Route path="/school/audit" element={<Shell role="school_admin" title="School Admin"><SchoolAudit /></Shell>} />
 
       {/* Teacher */}
-      <Route path="/teacher" element={<Shell role="teacher" title="Teacher"><TeacherMaterials /></Shell>} />
+      <Route path="/teacher" element={<Shell role="teacher" title="Teacher"><TeacherDashboard /></Shell>} />
+      <Route path="/teacher/materials" element={<Shell role="teacher" title="Teacher"><TeacherMaterials /></Shell>} />
       <Route path="/teacher/timetable" element={<Shell role="teacher" title="Teacher"><TeacherTimetable /></Shell>} />
       <Route path="/teacher/flagged" element={<Shell role="teacher" title="Teacher"><TeacherFlagged /></Shell>} />
 
@@ -104,6 +165,9 @@ export default function App() {
       {/* Parent */}
       <Route path="/parent" element={<Shell role="parent" title="Parent"><ParentChildren /></Shell>} />
       <Route path="/parent/child/:id" element={<Shell role="parent" title="Parent"><ParentChild /></Shell>} />
+
+      {/* Shared */}
+      <Route path="/settings" element={<SettingsRoute />} />
 
       <Route path="/" element={<RootRedirect />} />
       <Route path="*" element={<Navigate to="/" replace />} />

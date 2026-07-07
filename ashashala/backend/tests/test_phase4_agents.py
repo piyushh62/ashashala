@@ -127,7 +127,7 @@ async def test_full_quiz_loop(client, db, monkeypatch):
     t_headers = await login(client, "tea4@x.test")
     q = await client.get("/api/v1/teacher/flagged-answers", headers=t_headers)
     assert q.status_code == 200
-    queue = q.json()
+    queue = q.json()["items"]
     assert len(queue) == 2
 
     ov = await client.post(f"/api/v1/teacher/flagged-answers/{queue[0]['id']}/override",
@@ -158,7 +158,7 @@ async def test_flagged_answer_resolved_after_override(client, db, monkeypatch):
                       json={"answers": [0, 0, 0, "x", "y"]})
 
     t_headers = await login(client, "tea4@x.test")
-    queue = (await client.get("/api/v1/teacher/flagged-answers", headers=t_headers)).json()
+    queue = (await client.get("/api/v1/teacher/flagged-answers", headers=t_headers)).json()["items"]
     await client.post(f"/api/v1/teacher/flagged-answers/{queue[0]['id']}/override",
                       headers=t_headers, json={"score": 1.0})
 
@@ -169,4 +169,5 @@ async def test_flagged_answer_resolved_after_override(client, db, monkeypatch):
     assert resolved[0].override_score == 1.0
     # The open queue shrank by one.
     remaining = (await client.get("/api/v1/teacher/flagged-answers", headers=t_headers)).json()
-    assert len(remaining) == 1
+    assert remaining["total"] == 1
+    assert len(remaining["items"]) == 1

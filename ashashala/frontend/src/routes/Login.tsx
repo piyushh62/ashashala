@@ -1,29 +1,38 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "../stores/auth";
 import { HOME_FOR } from "../components/layout/RoleGuard";
-import { Button, Card, Input, Label } from "../components/ui";
+import { Button, Card, Input } from "../components/ui";
+import { FormField } from "../components/ui/FormField";
 import { useToast } from "../components/ui/Toast";
+
+const loginSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const { login } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
 
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginForm>({ resolver: zodResolver(loginSchema) });
+
+  const submit = async ({ email, password }: LoginForm) => {
     try {
       await login(email, password);
       const role = useAuth.getState().user!.role;
       navigate(HOME_FOR[role], { replace: true });
     } catch {
       toast.push("Invalid email or password.", "error");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -74,31 +83,27 @@ export default function Login() {
           <h2 className="text-xl font-bold text-slate-800">Welcome back</h2>
           <p className="text-sm text-slate-500 mb-6">Sign in to continue.</p>
 
-          <form onSubmit={submit} className="space-y-4">
-            <div>
-              <Label>Email</Label>
+          <form onSubmit={handleSubmit(submit)} className="space-y-4">
+            <FormField label="Email" error={errors.email?.message}>
               <Input
                 type="email"
                 autoComplete="username"
                 placeholder="you@school.org"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
+                invalid={!!errors.email}
+                {...register("email")}
               />
-            </div>
-            <div>
-              <Label>Password</Label>
+            </FormField>
+            <FormField label="Password" error={errors.password?.message}>
               <Input
                 type="password"
                 autoComplete="current-password"
                 placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
+                invalid={!!errors.password}
+                {...register("password")}
               />
-            </div>
-            <Button type="submit" className="w-full" disabled={busy}>
-              {busy ? "Signing in…" : "Sign in →"}
+            </FormField>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              {isSubmitting ? "Signing in…" : "Sign in →"}
             </Button>
           </form>
         </Card>

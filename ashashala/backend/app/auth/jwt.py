@@ -4,8 +4,14 @@ HS256 with symmetric secrets from the environment (JWT_SECRET / JWT_REFRESH_SECR
 This deviates from the spec's RS256 because the provided env vars are shared
 secrets, not an RSA key pair — HS256 is the correct primitive for that input.
 
+Every token carries a `jti`. Refresh tokens' `jti` matches the id of their
+`RefreshToken` DB row (see app/models/refresh_token.py), which is how
+/auth/refresh detects rotation/reuse. Access tokens' `jti` is not looked up in
+the DB (that would mean a query on every request) — access-token validity is
+instead checked cheaply against `User.tokens_valid_after` in deps.py.
+
 Access-token payload:
-  {sub, role, school_id, class_ids, subject_ids, linked_student_ids, type, exp, iat}
+  {sub, role, school_id, class_ids, subject_ids, linked_student_ids, type, jti, exp, iat}
 """
 
 from __future__ import annotations
@@ -17,17 +23,19 @@ from jose import JWTError, jwt
 
 from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
+from app.models.mixins import new_uuid
 
 ALGORITHM = "HS256"
 ACCESS_TTL = timedelta(minutes=60)
 REFRESH_TTL = timedelta(days=14)
 
 
-def _encode(claims: dict[str, Any], secret: str, ttl: timedelta, token_type: str) -> str:
+def _encode(claims: dict[str, Any], secret: str, ttl: timedelta, token_type: str, *, jti: str) -> str:
     now = datetime.now(timezone.utc)
     payload = {
         **claims,
         "type": token_type,
+        "jti": jti,
         "iat": now,
         "exp": now + ttl,
     }
@@ -55,11 +63,13 @@ def create_access_token(
         settings.JWT_SECRET,
         ACCESS_TTL,
         "access",
+        jti=new_uuid(),
     )
 
 
-def create_refresh_token(*, sub: str) -> str:
-    return _encode({"sub": sub}, settings.JWT_REFRESH_SECRET, REFRESH_TTL, "refresh")
+def create_refresh_token(*, sub: str, jti: str) -> str:
+    """`jti` must be the id of the caller's already-created `RefreshToken` row."""
+    return _encode({"sub": sub}, settings.JWT_REFRESH_SECRET, REFRESH_TTL, "refresh", jti=jti)
 
 
 def decode_token(token: str, *, refresh: bool = False) -> dict[str, Any]:

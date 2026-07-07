@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import Depends
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+
+from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,6 +14,7 @@ from app.auth.jwt import decode_token
 from app.core.exceptions import ForbiddenError, NotFoundError, UnauthorizedError
 from app.db.session import get_db
 from app.db.tenant_filter import set_current_school_id  # noqa: F401 (registers event on import)
+from app.models.mixins import as_utc
 from app.models.structure import (
     Enrollment,
     ParentStudentLink,
@@ -42,9 +46,37 @@ async def get_current_user(
     if user is None or not user.is_active:
         raise UnauthorizedError("User not found or inactive")
 
+    # Reject tokens minted before the user's sessions were force-invalidated
+    # (password reset, admin reset, deactivation, logout-all). Cheap: no extra
+    # query, `user` is already loaded above.
+    if user.tokens_valid_after is not None:
+        issued_at = datetime.fromtimestamp(payload.get("iat", 0), tz=timezone.utc)
+        # jose's jwt.encode truncates `iat` to whole seconds (timegm on
+        # utctimetuple()), but tokens_valid_after is stored with microsecond
+        # precision. Without slack, a token legitimately minted in the same
+        # wall-clock second as the invalidation (e.g. reset-password ->
+        # immediate re-login) can floor to just *before* tokens_valid_after
+        # and get wrongly rejected. 1s tolerance matches iat's own precision.
+        if issued_at < as_utc(user.tokens_valid_after) - timedelta(seconds=1):
+            raise UnauthorizedError("Token has been revoked")
+
     # Establish tenant scope for the rest of the request from the token.
     set_current_school_id(payload.get("school_id"))
     return user
+
+
+@dataclass
+class PageParams:
+    limit: int
+    offset: int
+
+
+def page_params(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+) -> PageParams:
+    """Shared limit/offset dependency for every paginated list endpoint."""
+    return PageParams(limit=limit, offset=offset)
 
 
 def require_role(*roles: UserRole):

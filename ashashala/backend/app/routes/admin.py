@@ -5,7 +5,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Body, Depends, Request
+from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,13 +15,16 @@ from app.db.session import get_db
 from app.db.tenant_filter import tenant_bypass
 from app.deps import require_role
 from app.models.document import Document
+from app.models.learning import ProgressRecord
 from app.models.llm_usage import LlmUsage
 from app.models.school import School
+from app.models.structure import ClassSection
 from app.models.user import User, UserRole
 from app.schemas.admin import (
     PlatformDashboard,
     SchoolAdminCreate,
     SchoolCreate,
+    SchoolDashboardOut,
     SchoolOut,
     SchoolUpdate,
     TempPasswordResponse,
@@ -101,7 +104,8 @@ async def create_school_admin(school_id: str, body: SchoolAdminCreate, request: 
 
 
 @router.get("/dashboard", response_model=PlatformDashboard)
-async def dashboard(admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> PlatformDashboard:
+async def dashboard(days: int = Query(default=14, ge=1, le=90),
+                    admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> PlatformDashboard:
     active_schools = (await db.execute(
         select(func.count()).select_from(School).where(School.is_active.is_(True))
     )).scalar_one()
@@ -120,8 +124,20 @@ async def dashboard(admin: User = Depends(_guard), db: AsyncSession = Depends(ge
     )).scalar_one()
     error_rate = (errors / total) if total else 0.0
 
+    # Platform-wide token trend for the dashboard chart.
+    since_trend = datetime.now(timezone.utc) - timedelta(days=days)
+    day = func.date(LlmUsage.ts)
+    trend_rows = (await db.execute(
+        select(day, func.coalesce(func.sum(LlmUsage.prompt_tokens + LlmUsage.completion_tokens), 0), func.count())
+        .where(LlmUsage.ts >= since_trend)
+        .group_by(day)
+        .order_by(day)
+    )).all()
+    tokens_by_day = [{"day": str(d), "tokens": int(tok), "calls": int(calls)} for d, tok, calls in trend_rows]
+
     return PlatformDashboard(active_schools=active_schools, total_users=total_users,
-                             tokens_today_by_school=tokens_today, error_rate=error_rate)
+                             tokens_today_by_school=tokens_today, error_rate=error_rate,
+                             tokens_by_day=tokens_by_day)
 
 
 @router.get("/schools", response_model=list[SchoolOut])
@@ -136,6 +152,33 @@ async def get_school(school_id: str, admin: User = Depends(_guard), db: AsyncSes
     if school is None:
         raise NotFoundError("School", school_id)
     return SchoolOut.model_validate(school)
+
+
+@router.get("/schools/{school_id}/dashboard", response_model=SchoolDashboardOut)
+async def school_drill_down(school_id: str, admin: User = Depends(_guard),
+                            db: AsyncSession = Depends(get_db)) -> SchoolDashboardOut:
+    """Per-school snapshot for the platform dashboard's drill-down view."""
+    school = await db.get(School, school_id)
+    if school is None:
+        raise NotFoundError("School", school_id)
+
+    n_teachers = (await db.execute(
+        select(func.count()).select_from(User).where(User.school_id == school_id, User.role == UserRole.teacher)
+    )).scalar_one()
+    n_students = (await db.execute(
+        select(func.count()).select_from(User).where(User.school_id == school_id, User.role == UserRole.student)
+    )).scalar_one()
+    with tenant_bypass():
+        n_classes = (await db.execute(
+            select(func.count()).select_from(ClassSection).where(ClassSection.school_id == school_id)
+        )).scalar_one()
+        avg_mastery = (await db.execute(
+            select(func.coalesce(func.avg(ProgressRecord.mastery_score), 0))
+            .where(ProgressRecord.school_id == school_id)
+        )).scalar_one()
+
+    return SchoolDashboardOut(school_id=school_id, teachers=n_teachers, students=n_students,
+                              classes=n_classes, avg_mastery=round(float(avg_mastery), 1))
 
 
 @router.delete("/users/{user_id}/data")

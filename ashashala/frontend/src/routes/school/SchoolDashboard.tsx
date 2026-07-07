@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Card, CardHeader, Skeleton, StatTile } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, Skeleton, StatTile, Table } from "../../components/ui";
+import { DataBoundary } from "../../components/ui/DataBoundary";
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -14,6 +15,9 @@ const tooltipStyle = {
 export default function SchoolDashboard() {
   const q = useQuery({ queryKey: ["school", "dashboard"], queryFn: schoolApi.dashboard });
   const usage = useQuery({ queryKey: ["school", "llm-usage"], queryFn: () => schoolApi.llmUsage(7) });
+  const atRisk = useQuery({ queryKey: ["school", "at-risk"], queryFn: () => schoolApi.atRisk(10) });
+  const mastery = useQuery({ queryKey: ["school", "mastery-by-class"], queryFn: schoolApi.masteryByClass });
+  const activity = useQuery({ queryKey: ["school", "audit", "recent"], queryFn: () => schoolApi.audit() });
 
   if (q.isLoading)
     return (
@@ -24,12 +28,12 @@ export default function SchoolDashboard() {
       </div>
     );
 
-  const d = q.data ?? {};
+  const d = q.data;
   const tiles = [
-    { label: "Teachers", value: d.teachers ?? 0, icon: "🧑‍🏫", tone: "brand" as const },
-    { label: "Students", value: d.students ?? 0, icon: "🎓", tone: "green" as const },
-    { label: "Classes", value: d.classes ?? 0, icon: "🗂️", tone: "slate" as const },
-    { label: "Avg mastery", value: `${d.avg_mastery ?? 0}`, icon: "📈", tone: "amber" as const },
+    { label: "Teachers", value: d?.teachers ?? 0, icon: "🧑‍🏫", tone: "brand" as const },
+    { label: "Students", value: d?.students ?? 0, icon: "🎓", tone: "green" as const },
+    { label: "Classes", value: d?.classes ?? 0, icon: "🗂️", tone: "slate" as const },
+    { label: "Avg mastery", value: `${d?.avg_mastery ?? 0}`, icon: "📈", tone: "amber" as const },
   ];
 
   return (
@@ -40,6 +44,59 @@ export default function SchoolDashboard() {
         {tiles.map((t) => (
           <StatTile key={t.label} {...t} />
         ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader title="At-risk students" subtitle="Lowest average mastery" icon="🚨" />
+          <div className="p-2">
+            <DataBoundary
+              query={atRisk}
+              isEmpty={(rows) => rows.length === 0}
+              emptyTitle="No mastery data yet"
+              loadingFallback={<Skeleton className="h-40 m-3" />}
+            >
+              {(rows) => (
+                <Table head={["Student", "Avg mastery"]}>
+                  {rows.map((r) => (
+                    <tr key={r.student_id} className="border-b border-slate-50">
+                      <td className="px-4 py-2 font-medium text-slate-700">{r.student_name}</td>
+                      <td className="px-4 py-2">
+                        <Badge tone={r.avg_mastery < 40 ? "red" : r.avg_mastery < 70 ? "amber" : "green"}>
+                          {r.avg_mastery}
+                        </Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </Table>
+              )}
+            </DataBoundary>
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="Mastery by class" icon="🗂️" />
+          <div className="p-5">
+            <DataBoundary
+              query={mastery}
+              isEmpty={(rows) => rows.length === 0}
+              emptyTitle="No mastery data yet"
+              loadingFallback={<Skeleton className="h-40" />}
+            >
+              {(rows) => (
+                <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={rows} margin={{ left: -12 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="class_name" tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 10, fill: "#94a3b8" }} />
+                    <Tooltip cursor={{ fill: "#f1f5f9" }} contentStyle={tooltipStyle} />
+                    <Bar dataKey="avg_mastery" fill="#7c3aed" radius={[4, 4, 0, 0]} maxBarSize={44} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </DataBoundary>
+          </div>
+        </Card>
       </div>
 
       <Card className="mb-6">
@@ -79,6 +136,26 @@ export default function SchoolDashboard() {
                 </ResponsiveContainer>
               )}
             </>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <CardHeader title="Recent activity" icon="📜" />
+        <div className="p-2">
+          {activity.isLoading ? (
+            <Skeleton className="h-32 m-3" />
+          ) : !activity.data?.items.length ? (
+            <EmptyState title="No activity recorded yet" />
+          ) : (
+            <ul className="divide-y divide-slate-50">
+              {activity.data.items.slice(0, 8).map((a) => (
+                <li key={a.id} className="px-4 py-2.5 flex items-center justify-between text-sm">
+                  <span className="text-slate-700 font-medium">{a.action}</span>
+                  <span className="text-slate-400 text-xs">{new Date(a.ts).toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       </Card>

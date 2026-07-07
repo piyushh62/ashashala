@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.password import hash_password
 from app.core.exceptions import NotFoundError, ValidationError
 from app.db.session import get_db
-from app.deps import require_role
+from app.deps import PageParams, page_params, require_role
 from app.models.audit import AuditLog
 from app.models.learning import ProgressRecord
 from app.models.llm_usage import LlmUsage
@@ -27,20 +27,28 @@ from app.models.structure import (
 )
 from app.models.user import User, UserRole
 from app.schemas.school_admin import (
+    AtRiskStudentOut,
     ClassCreate,
+    ClassMasteryOut,
     ClassOut,
     EnrollmentCreate,
+    EnrollmentOut,
     IdResponse,
     ParentLinkCreate,
+    ParentLinkOut,
     SubjectCreate,
     SubjectOut,
     TeacherAssignmentCreate,
+    TeacherAssignmentOut,
+    TempPasswordResponse,
     UserCreate,
     UserCreatedResponse,
     UserOut,
     UserUpdate,
 )
+from app.schemas.pagination import Page
 from app.services.audit_service import record_audit
+from app.services.notification_service import notify
 
 router = APIRouter(prefix="/api/v1/school", tags=["School Admin"])
 _guard = require_role(UserRole.school_admin)
@@ -55,6 +63,36 @@ async def _get_school_user_or_404(db: AsyncSession, school_id: str, user_id: str
     if user is None or user.school_id != school_id:
         raise NotFoundError("User", user_id)
     return user
+
+
+async def _require_user_in_school(db: AsyncSession, school_id: str, user_id: str, role: UserRole) -> User:
+    """Resolve a user by id, requiring they belong to this school AND hold the
+    expected role — prevents wiring a raw id from another tenant (or the
+    wrong role) into a teacher-assignment/enrollment/parent-link row."""
+    user = (await db.execute(
+        select(User).where(User.id == user_id, User.school_id == school_id, User.role == role)
+    )).scalar_one_or_none()
+    if user is None:
+        raise NotFoundError(role.value.capitalize(), user_id)
+    return user
+
+
+async def _require_class_in_school(db: AsyncSession, school_id: str, class_id: str) -> ClassSection:
+    cls = (await db.execute(
+        select(ClassSection).where(ClassSection.id == class_id, ClassSection.school_id == school_id)
+    )).scalar_one_or_none()
+    if cls is None:
+        raise NotFoundError("Class", class_id)
+    return cls
+
+
+async def _require_subject_in_school(db: AsyncSession, school_id: str, subject_id: str) -> Subject:
+    subj = (await db.execute(
+        select(Subject).where(Subject.id == subject_id, Subject.school_id == school_id)
+    )).scalar_one_or_none()
+    if subj is None:
+        raise NotFoundError("Subject", subject_id)
+    return subj
 
 
 @router.post("/users", response_model=UserCreatedResponse)
@@ -102,14 +140,20 @@ async def bulk_import_students(request: Request, file: UploadFile,
     return {"created": created, "count": len(created)}
 
 
-@router.get("/users", response_model=list[UserOut])
-async def list_users(role: UserRole | None = Query(default=None),
-                     admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[UserOut]:
+@router.get("/users", response_model=Page[UserOut])
+async def list_users(role: UserRole | None = Query(default=None), page: PageParams = Depends(page_params),
+                     admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> Page[UserOut]:
     stmt = select(User).where(User.school_id == admin.school_id)
+    count_stmt = select(func.count()).select_from(User).where(User.school_id == admin.school_id)
     if role is not None:
         stmt = stmt.where(User.role == role)
-    users = (await db.execute(stmt)).scalars().all()
-    return [UserOut.model_validate(u) for u in users]
+        count_stmt = count_stmt.where(User.role == role)
+    total = (await db.execute(count_stmt)).scalar_one()
+    users = (await db.execute(
+        stmt.order_by(User.created_at).limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    return Page(items=[UserOut.model_validate(u) for u in users], total=total,
+               limit=page.limit, offset=page.offset)
 
 
 @router.patch("/users/{user_id}", response_model=UserOut)
@@ -125,6 +169,10 @@ async def update_user(user_id: str, body: UserUpdate, request: Request,
     action = "USER_DEACTIVATE" if body.is_active is False else "USER_UPDATE"
     if body.is_active is not None:
         user.is_active = body.is_active
+        if body.is_active is False:
+            # Kill any live sessions immediately rather than letting existing
+            # access/refresh tokens ride out their TTL after deactivation.
+            user.tokens_valid_after = datetime.now(UTC)
     db.add(user)
     await record_audit(db, action=action, actor=admin, target_type="user",
                        target_id=user.id, request=request)
@@ -168,36 +216,189 @@ async def create_subject(body: SubjectCreate, request: Request,
 @router.post("/teacher-assignments", response_model=IdResponse)
 async def assign_teacher(body: TeacherAssignmentCreate, request: Request,
                          admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
+    await _require_user_in_school(db, admin.school_id, body.teacher_id, UserRole.teacher)
+    cls = await _require_class_in_school(db, admin.school_id, body.class_id)
+    subj = await _require_subject_in_school(db, admin.school_id, body.subject_id)
     ta = TeacherAssignment(teacher_id=body.teacher_id, class_id=body.class_id,
                            subject_id=body.subject_id, school_id=admin.school_id)
     db.add(ta)
     await db.flush()
+    await notify(db, user_id=body.teacher_id, school_id=admin.school_id, type="teacher_assigned",
+                title="New class assignment",
+                body=f"You've been assigned to {cls.name} for {subj.name}.",
+                link="/teacher/timetable")
     await record_audit(db, action="TEACHER_ASSIGN", actor=admin, target_type="teacher_assignment",
                        target_id=ta.id, request=request)
     return IdResponse(id=ta.id)
 
 
+@router.get("/teacher-assignments", response_model=Page[TeacherAssignmentOut])
+async def list_teacher_assignments(page: PageParams = Depends(page_params), admin: User = Depends(_guard),
+                                   db: AsyncSession = Depends(get_db)) -> Page[TeacherAssignmentOut]:
+    total = (await db.execute(select(func.count()).select_from(TeacherAssignment))).scalar_one()
+    rows = (await db.execute(
+        select(TeacherAssignment).order_by(TeacherAssignment.created_at)
+        .limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    if not rows:
+        return Page(items=[], total=total, limit=page.limit, offset=page.offset)
+    teachers = {u.id: u.name for u in (await db.execute(
+        select(User).where(User.id.in_({r.teacher_id for r in rows}))
+    )).scalars().all()}
+    classes = {c.id: c.name for c in (await db.execute(
+        select(ClassSection).where(ClassSection.id.in_({r.class_id for r in rows}))
+    )).scalars().all()}
+    subjects = {s.id: s.name for s in (await db.execute(
+        select(Subject).where(Subject.id.in_({r.subject_id for r in rows}))
+    )).scalars().all()}
+    items = [
+        TeacherAssignmentOut(
+            id=r.id, teacher_id=r.teacher_id, teacher_name=teachers.get(r.teacher_id, "Unknown"),
+            class_id=r.class_id, class_name=classes.get(r.class_id, "Unknown"),
+            subject_id=r.subject_id, subject_name=subjects.get(r.subject_id, "Unknown"),
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.delete("/teacher-assignments/{assignment_id}")
+async def unassign_teacher(assignment_id: str, request: Request,
+                           admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    row = (await db.execute(
+        select(TeacherAssignment).where(TeacherAssignment.id == assignment_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise NotFoundError("TeacherAssignment", assignment_id)
+    await db.delete(row)
+    await record_audit(db, action="TEACHER_UNASSIGN", actor=admin, target_type="teacher_assignment",
+                       target_id=assignment_id, request=request)
+    return {"status": "deleted", "id": assignment_id}
+
+
 @router.post("/enrollments", response_model=IdResponse)
 async def enroll_student(body: EnrollmentCreate, request: Request,
                          admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
+    await _require_user_in_school(db, admin.school_id, body.student_id, UserRole.student)
+    cls = await _require_class_in_school(db, admin.school_id, body.class_id)
     en = Enrollment(student_id=body.student_id, class_id=body.class_id, school_id=admin.school_id)
     db.add(en)
     await db.flush()
+    await notify(db, user_id=body.student_id, school_id=admin.school_id, type="student_enrolled",
+                title="Enrolled in a new class", body=f"You've been enrolled in {cls.name}.",
+                link="/student")
     await record_audit(db, action="STUDENT_ENROLL", actor=admin, target_type="enrollment",
                        target_id=en.id, request=request)
     return IdResponse(id=en.id)
 
 
+@router.get("/enrollments", response_model=Page[EnrollmentOut])
+async def list_enrollments(page: PageParams = Depends(page_params), admin: User = Depends(_guard),
+                           db: AsyncSession = Depends(get_db)) -> Page[EnrollmentOut]:
+    total = (await db.execute(select(func.count()).select_from(Enrollment))).scalar_one()
+    rows = (await db.execute(
+        select(Enrollment).order_by(Enrollment.created_at).limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    if not rows:
+        return Page(items=[], total=total, limit=page.limit, offset=page.offset)
+    students = {u.id: u.name for u in (await db.execute(
+        select(User).where(User.id.in_({r.student_id for r in rows}))
+    )).scalars().all()}
+    classes = {c.id: c.name for c in (await db.execute(
+        select(ClassSection).where(ClassSection.id.in_({r.class_id for r in rows}))
+    )).scalars().all()}
+    items = [
+        EnrollmentOut(
+            id=r.id, student_id=r.student_id, student_name=students.get(r.student_id, "Unknown"),
+            class_id=r.class_id, class_name=classes.get(r.class_id, "Unknown"),
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.delete("/enrollments/{enrollment_id}")
+async def unenroll_student(enrollment_id: str, request: Request,
+                           admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    row = (await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise NotFoundError("Enrollment", enrollment_id)
+    await db.delete(row)
+    await record_audit(db, action="STUDENT_UNENROLL", actor=admin, target_type="enrollment",
+                       target_id=enrollment_id, request=request)
+    return {"status": "deleted", "id": enrollment_id}
+
+
 @router.post("/parent-links", response_model=IdResponse)
 async def link_parent(body: ParentLinkCreate, request: Request,
                       admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
+    await _require_user_in_school(db, admin.school_id, body.parent_id, UserRole.parent)
+    student = await _require_user_in_school(db, admin.school_id, body.student_id, UserRole.student)
     link = ParentStudentLink(parent_id=body.parent_id, student_id=body.student_id,
                              school_id=admin.school_id, consent_given_at=datetime.now(UTC))
     db.add(link)
     await db.flush()
+    await notify(db, user_id=body.parent_id, school_id=admin.school_id, type="parent_linked",
+                title="Linked to a student", body=f"You've been linked to {student.name}.",
+                link="/parent")
     await record_audit(db, action="PARENT_LINK", actor=admin, target_type="parent_student_link",
                        target_id=link.id, request=request)
     return IdResponse(id=link.id)
+
+
+@router.get("/parent-links", response_model=Page[ParentLinkOut])
+async def list_parent_links(page: PageParams = Depends(page_params), admin: User = Depends(_guard),
+                            db: AsyncSession = Depends(get_db)) -> Page[ParentLinkOut]:
+    total = (await db.execute(select(func.count()).select_from(ParentStudentLink))).scalar_one()
+    rows = (await db.execute(
+        select(ParentStudentLink).order_by(ParentStudentLink.created_at)
+        .limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    if not rows:
+        return Page(items=[], total=total, limit=page.limit, offset=page.offset)
+    users = {u.id: u.name for u in (await db.execute(
+        select(User).where(User.id.in_({r.parent_id for r in rows} | {r.student_id for r in rows}))
+    )).scalars().all()}
+    items = [
+        ParentLinkOut(
+            id=r.id, parent_id=r.parent_id, parent_name=users.get(r.parent_id, "Unknown"),
+            student_id=r.student_id, student_name=users.get(r.student_id, "Unknown"),
+        )
+        for r in rows
+    ]
+    return Page(items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.delete("/parent-links/{link_id}")
+async def unlink_parent(link_id: str, request: Request,
+                        admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    row = (await db.execute(
+        select(ParentStudentLink).where(ParentStudentLink.id == link_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise NotFoundError("ParentStudentLink", link_id)
+    await db.delete(row)
+    await record_audit(db, action="PARENT_UNLINK", actor=admin, target_type="parent_student_link",
+                       target_id=link_id, request=request)
+    return {"status": "deleted", "id": link_id}
+
+
+@router.post("/users/{user_id}/reset-password", response_model=TempPasswordResponse)
+async def reset_user_password(user_id: str, request: Request,
+                              admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> TempPasswordResponse:
+    user = await _get_school_user_or_404(db, admin.school_id, user_id)
+    temp = secrets.token_urlsafe(10)
+    user.password_hash = hash_password(temp)
+    user.tokens_valid_after = datetime.now(UTC)
+    db.add(user)
+    await notify(db, user_id=user.id, school_id=admin.school_id, type="password_reset",
+                title="Your password was reset", body="An admin reset your password.",
+                link="/settings")
+    await record_audit(db, action="PASSWORD_RESET_BY_ADMIN", actor=admin, target_type="user",
+                       target_id=user.id, request=request)
+    return TempPasswordResponse(temp_password=temp)
 
 
 @router.get("/dashboard")
@@ -216,18 +417,69 @@ async def school_dashboard(admin: User = Depends(_guard), db: AsyncSession = Dep
     }
 
 
+@router.get("/dashboard/at-risk", response_model=list[AtRiskStudentOut])
+async def at_risk_students(limit: int = Query(default=10, ge=1, le=50),
+                           admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[AtRiskStudentOut]:
+    """Students with the lowest average mastery across all tracked topics."""
+    rows = (await db.execute(
+        select(ProgressRecord.student_id, func.avg(ProgressRecord.mastery_score))
+        .group_by(ProgressRecord.student_id)
+        .order_by(func.avg(ProgressRecord.mastery_score))
+        .limit(limit)
+    )).all()
+    if not rows:
+        return []
+    names = {u.id: u.name for u in (await db.execute(
+        select(User).where(User.id.in_({sid for sid, _ in rows}))
+    )).scalars().all()}
+    return [
+        AtRiskStudentOut(student_id=sid, student_name=names.get(sid, "Unknown"), avg_mastery=round(float(avg), 1))
+        for sid, avg in rows
+    ]
+
+
+@router.get("/dashboard/mastery-by-class", response_model=list[ClassMasteryOut])
+async def mastery_by_class(admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[ClassMasteryOut]:
+    """Average mastery per class, joining enrollments to progress records."""
+    rows = (await db.execute(
+        select(
+            Enrollment.class_id,
+            func.avg(ProgressRecord.mastery_score),
+            func.count(func.distinct(Enrollment.student_id)),
+        )
+        .join(ProgressRecord, ProgressRecord.student_id == Enrollment.student_id)
+        .group_by(Enrollment.class_id)
+    )).all()
+    if not rows:
+        return []
+    classes = {c.id: c.name for c in (await db.execute(
+        select(ClassSection).where(ClassSection.id.in_({cid for cid, _, _ in rows}))
+    )).scalars().all()}
+    return [
+        ClassMasteryOut(class_id=cid, class_name=classes.get(cid, "Unknown"),
+                        avg_mastery=round(float(avg), 1), student_count=int(cnt))
+        for cid, avg, cnt in rows
+    ]
+
+
 @router.get("/audit")
-async def audit_viewer(action: str | None = Query(default=None), limit: int = Query(default=100, le=500),
-                       admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[dict]:
-    stmt = select(AuditLog).where(AuditLog.school_id == admin.school_id).order_by(AuditLog.ts.desc()).limit(limit)
+async def audit_viewer(action: str | None = Query(default=None), page: PageParams = Depends(page_params),
+                       admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    stmt = select(AuditLog).where(AuditLog.school_id == admin.school_id)
+    count_stmt = select(func.count()).select_from(AuditLog).where(AuditLog.school_id == admin.school_id)
     if action:
         stmt = stmt.where(AuditLog.action == action)
-    rows = (await db.execute(stmt)).scalars().all()
-    return [
+        count_stmt = count_stmt.where(AuditLog.action == action)
+    total = (await db.execute(count_stmt)).scalar_one()
+    rows = (await db.execute(
+        stmt.order_by(AuditLog.ts.desc()).limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    items = [
         {"id": r.id, "ts": r.ts.isoformat(), "action": r.action, "actor_user_id": r.actor_user_id,
          "actor_role": r.actor_role, "target_type": r.target_type, "target_id": r.target_id, "status": r.status}
         for r in rows
     ]
+    return {"items": items, "total": total, "limit": page.limit, "offset": page.offset}
 
 
 # Free-tier soft ceiling (tokens/day). Over this we surface a warning so a

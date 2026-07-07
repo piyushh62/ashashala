@@ -50,3 +50,9 @@ class QuizSubmitResponse(BaseModel):
     feedback_summary: str
     per_question: list[PerQuestionFeedback]
     mastery_update: dict | None = None
+
+
+class QuizAttemptOut(BaseModel):
+    quiz_id: str
+    score: float | None = None
+    attempted_at: str

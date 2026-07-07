@@ -2,6 +2,14 @@
 
 export type Role = "super_admin" | "school_admin" | "teacher" | "student" | "parent";
 
+/** Generic pagination envelope — mirrors the backend's `app.schemas.pagination.Page[T]`. */
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface Me {
   id: string;
   name: string;
@@ -27,11 +35,39 @@ export interface School {
   timezone: string;
 }
 
+export interface TokenTrendDay {
+  day: string;
+  tokens: number;
+  calls: number;
+}
+
 export interface PlatformDashboard {
   active_schools: number;
   total_users: number;
   tokens_today_by_school: Record<string, number>;
   error_rate: number;
+  tokens_by_day: TokenTrendDay[];
+}
+
+export interface SchoolDashboardOut {
+  school_id: string;
+  teachers: number;
+  students: number;
+  classes: number;
+  avg_mastery: number;
+}
+
+export interface AtRiskStudentOut {
+  student_id: string;
+  student_name: string;
+  avg_mastery: number;
+}
+
+export interface ClassMasteryOut {
+  class_id: string;
+  class_name: string;
+  avg_mastery: number;
+  student_count: number;
 }
 
 export interface UserRow {
@@ -169,4 +205,74 @@ export interface ChildRow {
   id: string;
   name: string;
   grade: number | null;
+}
+
+export interface TeacherAssignmentJoinRow {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  class_id: string;
+  class_name: string;
+  subject_id: string;
+  subject_name: string;
+}
+
+export interface EnrollmentJoinRow {
+  id: string;
+  student_id: string;
+  student_name: string;
+  class_id: string;
+  class_name: string;
+}
+
+export interface ParentLinkJoinRow {
+  id: string;
+  parent_id: string;
+  parent_name: string;
+  student_id: string;
+  student_name: string;
+}
+
+export interface TeacherTimetableRow {
+  id: string;
+  day_of_week: number;
+  period_number: number;
+  class_id: string;
+  subject_id: string;
+  room?: string | null;
+}
+
+export interface QuizAttemptRow {
+  quiz_id: string;
+  score: number;
+  attempted_at: string;
+}
+
+export interface ClassProgressStudent {
+  student_id: string;
+  name: string;
+  grade: number | null;
+  avg_mastery: number;
+  topics: { topic: string; score: number }[];
+}
+
+export interface TeacherDashboardOut {
+  classes: string[];
+  subjects: string[];
+  materials_uploaded: number;
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+export interface NotificationListOut {
+  items: Notification[];
+  unread_count: number;
 }
