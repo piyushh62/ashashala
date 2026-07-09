@@ -1,8 +1,9 @@
-import type {
-  ButtonHTMLAttributes,
-  InputHTMLAttributes,
-  ReactNode,
-  SelectHTMLAttributes,
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
 } from "react";
 
 /* ---------------------------------- Card --------------------------------- */
@@ -92,34 +93,33 @@ interface FieldExtraProps {
   invalid?: boolean;
 }
 
-export function Input({
-  className = "",
-  invalid = false,
-  ...rest
-}: InputHTMLAttributes<HTMLInputElement> & FieldExtraProps) {
-  return <input className={`${fieldCls} ${invalid ? fieldInvalidCls : ""} ${className}`} {...rest} />;
-}
+export const Input = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement> & FieldExtraProps
+>(({ className = "", invalid = false, ...rest }, ref) => {
+  return <input ref={ref} className={`${fieldCls} ${invalid ? fieldInvalidCls : ""} ${className}`} {...rest} />;
+});
+Input.displayName = "Input";
 
-export function Textarea({
-  className = "",
-  invalid = false,
-  ...rest
-}: import("react").TextareaHTMLAttributes<HTMLTextAreaElement> & FieldExtraProps) {
-  return <textarea className={`${fieldCls} ${invalid ? fieldInvalidCls : ""} ${className}`} {...rest} />;
-}
+export const Textarea = forwardRef<
+  HTMLTextAreaElement,
+  import("react").TextareaHTMLAttributes<HTMLTextAreaElement> & FieldExtraProps
+>(({ className = "", invalid = false, ...rest }, ref) => {
+  return <textarea ref={ref} className={`${fieldCls} ${invalid ? fieldInvalidCls : ""} ${className}`} {...rest} />;
+});
+Textarea.displayName = "Textarea";
 
-export function Select({
-  className = "",
-  invalid = false,
-  children,
-  ...rest
-}: SelectHTMLAttributes<HTMLSelectElement> & FieldExtraProps) {
+export const Select = forwardRef<
+  HTMLSelectElement,
+  SelectHTMLAttributes<HTMLSelectElement> & FieldExtraProps
+>(({ className = "", invalid = false, children, ...rest }, ref) => {
   return (
-    <select className={`${fieldCls} cursor-pointer ${invalid ? fieldInvalidCls : ""} ${className}`} {...rest}>
+    <select ref={ref} className={`${fieldCls} cursor-pointer ${invalid ? fieldInvalidCls : ""} ${className}`} {...rest}>
       {children}
     </select>
   );
-}
+});
+Select.displayName = "Select";
 
 export function Label({ children }: { children: ReactNode }) {
   return <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1.5">{children}</label>;
