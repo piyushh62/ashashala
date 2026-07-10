@@ -22,7 +22,10 @@ export function AgentActionQueue() {
     queryKey: ["agent-actions", "pending", offset],
     queryFn: () => agentActionsApi.list("pending", PAGE_SIZE, offset),
   });
-  const rows = q.data?.items ?? [];
+  // scheduling_agent proposals aren't handled by the generic approve/reject
+  // route — they're resolved via the dedicated Timetable page's "AI Suggest"
+  // option-selection flow, so surfacing them here would be a dead-end button.
+  const rows = (q.data?.items ?? []).filter((a) => a.agent_name !== "scheduling_agent");
   const total = q.data?.total ?? 0;
   const rangeStart = total === 0 ? 0 : offset + 1;
   const rangeEnd = offset + rows.length;

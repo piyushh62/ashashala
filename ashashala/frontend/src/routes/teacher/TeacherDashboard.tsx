@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Card, CardHeader, EmptyState, Skeleton, StatTile, Table } from "../../components/ui";
@@ -63,7 +64,11 @@ export default function TeacherDashboard() {
               {weakest.map((s) => (
                 <tr key={`${s.class_id}-${s.student_id}`} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700">{s.name}</td>
-                  <td className="px-4 py-2 text-slate-500">{s.class_name}</td>
+                  <td className="px-4 py-2 text-slate-500">
+                    <Link to={`/teacher/class-progress/${s.class_id}`} className="text-brand-600 hover:underline">
+                      {s.class_name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-2">
                     <Badge tone={s.avg_mastery < 40 ? "red" : s.avg_mastery < 70 ? "amber" : "green"}>
                       {s.avg_mastery}
@@ -75,6 +80,23 @@ export default function TeacherDashboard() {
           )}
         </div>
       </Card>
+
+      {classes.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader title="Your classes" subtitle="Jump to a class's full progress breakdown." icon="🗂️" />
+          <div className="p-5 flex flex-wrap gap-2.5">
+            {classes.map(([classId, className]) => (
+              <Link
+                key={classId}
+                to={`/teacher/class-progress/${classId}`}
+                className="text-sm font-medium rounded-xl px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition"
+              >
+                {className}
+              </Link>
+            ))}
+          </div>
+        </Card>
+      )}
     </div>
   );
 }

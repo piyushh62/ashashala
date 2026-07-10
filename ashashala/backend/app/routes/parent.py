@@ -15,7 +15,7 @@ from app.deps import PageParams, get_linked_child, page_params, require_permissi
 from app.models.communication import MessageSenderRole, ParentMessage
 from app.models.learning import ProgressRecord, QuizAttempt
 from app.models.report import Report, ReportStatus
-from app.models.structure import Enrollment, ParentStudentLink, TeacherAssignment
+from app.models.structure import Enrollment, ParentStudentLink, Subject, TeacherAssignment
 from app.models.user import User
 from app.schemas.pagination import Page
 from app.schemas.parent import (
@@ -147,6 +147,38 @@ async def child_report_pdf(student_id: str, report_id: str, request: Request,
     pdf_bytes = render_report_pdf(report, student_name=child.name)
     return Response(content=pdf_bytes, media_type="application/pdf",
                     headers={"Content-Disposition": f'attachment; filename="report-{report.id}.pdf"'})
+
+
+@router.get("/children/{student_id}/teachers")
+async def child_teachers(student_id: str, parent: User = Depends(_guard),
+                         db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Teachers assigned to this child's active classes, for the message-compose picker."""
+    await get_linked_child(db, parent, student_id)
+    class_ids = await _child_class_ids(db, student_id)
+    if not class_ids:
+        return []
+    rows = (await db.execute(
+        select(TeacherAssignment).where(
+            TeacherAssignment.class_id.in_(class_ids), TeacherAssignment.end_date.is_(None),
+        )
+    )).scalars().all()
+    if not rows:
+        return []
+    teacher_ids = {r.teacher_id for r in rows}
+    subject_ids = {r.subject_id for r in rows}
+    teachers = {t.id: t.name for t in (await db.execute(
+        select(User).where(User.id.in_(teacher_ids))
+    )).scalars().all()}
+    subjects = {s.id: s.name for s in (await db.execute(
+        select(Subject).where(Subject.id.in_(subject_ids))
+    )).scalars().all()}
+    return [
+        {
+            "teacher_id": r.teacher_id, "teacher_name": teachers.get(r.teacher_id, r.teacher_id),
+            "subject_id": r.subject_id, "subject_name": subjects.get(r.subject_id, r.subject_id),
+        }
+        for r in rows
+    ]
 
 
 async def _assert_teacher_assigned_to_child(db: AsyncSession, student_id: str, teacher_id: str) -> None:

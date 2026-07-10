@@ -2,10 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 import { useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
+import type { TimetableOptionOut } from "../../types/api";
 
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -66,6 +67,39 @@ export default function TeacherTimetable() {
       qc.invalidateQueries({ queryKey: ["teacher", "timetable"] });
     },
     onError: () => toast.push("Couldn't remove period.", "error"),
+  });
+
+  const [periodsPerWeek, setPeriodsPerWeek] = useState(3);
+  const [options, setOptions] = useState<TimetableOptionOut[] | null>(null);
+
+  const aiSuggest = useMutation({
+    mutationFn: () =>
+      teacherApi.aiSuggestTimetable({
+        class_id: form.class_id,
+        subject_id: form.subject_id,
+        periods_per_week: periodsPerWeek,
+      }),
+    onSuccess: (opts) => setOptions(opts),
+    onError: () => toast.push("Couldn't generate suggestions — check your assignment for this class/subject.", "error"),
+  });
+
+  const selectOption = useMutation({
+    mutationFn: (optionId: string) => teacherApi.selectTimetableOption(optionId),
+    onSuccess: () => {
+      toast.push("Periods added from suggestion.", "success");
+      setOptions(null);
+      qc.invalidateQueries({ queryKey: ["teacher", "timetable"] });
+    },
+    onError: (err: any) => {
+      if (err?.status === 422) toast.push("That option is no longer free — try regenerating suggestions.", "error");
+      else toast.push("Couldn't apply that suggestion.", "error");
+    },
+  });
+
+  const updateTopic = useMutation({
+    mutationFn: ({ id, topic }: { id: string; topic: string }) => teacherApi.updateTimetableEntry(id, { topic }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["teacher", "timetable"] }),
+    onError: () => toast.push("Couldn't update topic.", "error"),
   });
 
   return (
@@ -138,6 +172,64 @@ export default function TeacherTimetable() {
       </Card>
 
       <Card className="mt-6">
+        <CardHeader
+          title="AI Suggest"
+          subtitle="Let the scheduling agent propose conflict-free options for the class/subject selected above."
+        />
+        <div className="p-5">
+          <div className="flex flex-wrap items-end gap-3 mb-4">
+            <div>
+              <Label>Periods per week</Label>
+              <Input
+                type="number"
+                min={1}
+                max={10}
+                className="w-28"
+                value={periodsPerWeek}
+                onChange={(e) => setPeriodsPerWeek(Number(e.target.value))}
+              />
+            </div>
+            <Button
+              variant="subtle"
+              onClick={() => aiSuggest.mutate()}
+              disabled={!form.class_id || !form.subject_id || aiSuggest.isPending}
+            >
+              {aiSuggest.isPending ? "Generating…" : "✨ Suggest options"}
+            </Button>
+          </div>
+
+          {options && (
+            <div className="grid md:grid-cols-2 gap-4">
+              {options.map((opt) => (
+                <div key={opt.option_id} className="rounded-xl border border-slate-200 dark:border-slate-800 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <Badge tone="brand">{opt.strategy}</Badge>
+                  </div>
+                  <p className="text-sm text-slate-500 mb-3">{opt.rationale}</p>
+                  <ul className="text-sm space-y-1 mb-4">
+                    {opt.slots.map((s, i) => (
+                      <li key={i} className="flex justify-between text-slate-600">
+                        <span>{DAYS[s.day_of_week]}, period {s.period_number}</span>
+                        <span className="text-slate-400">{s.room || "—"}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={() => selectOption.mutate(opt.option_id)}
+                    disabled={selectOption.isPending}
+                  >
+                    Use this option
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card className="mt-6">
         <CardHeader title="My weekly periods" />
         <DataBoundary
           query={timetable}
@@ -147,7 +239,7 @@ export default function TeacherTimetable() {
           loadingFallback={<Skeleton className="h-24 m-3" />}
         >
           {(rows) => (
-            <Table head={["Day", "Period", "Class", "Subject", "Room", ""]}>
+            <Table head={["Day", "Period", "Class", "Subject", "Room", "Topic", ""]}>
               {[...rows]
                 .sort((a, b) => a.day_of_week - b.day_of_week || a.period_number - b.period_number)
                 .map((r) => (
@@ -157,6 +249,17 @@ export default function TeacherTimetable() {
                     <td className="px-4 py-2 text-slate-500">{names.classes.get(r.class_id) ?? r.class_id}</td>
                     <td className="px-4 py-2 text-slate-500">{names.subjects.get(r.subject_id) ?? r.subject_id}</td>
                     <td className="px-4 py-2 text-slate-500">{r.room || "—"}</td>
+                    <td className="px-4 py-2 text-slate-500">
+                      <Input
+                        defaultValue={r.topic ?? ""}
+                        placeholder="Add a topic…"
+                        className="!py-1 !px-2 text-sm w-40"
+                        onBlur={(e) => {
+                          const topic = e.target.value;
+                          if (topic !== (r.topic ?? "")) updateTopic.mutate({ id: r.id, topic });
+                        }}
+                      />
+                    </td>
                     <td className="px-4 py-2 text-right">
                       <Button
                         variant="ghost"

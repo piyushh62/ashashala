@@ -359,6 +359,30 @@ async def create_exam_timetable(body: ExamTimetableCreate, request: Request,
     return ExamTimetableOut.model_validate(ex)
 
 
+@router.get("/exam-timetable", response_model=list[ExamTimetableOut])
+async def list_exam_timetable(class_id: str | None = None, teacher: User = Depends(_guard),
+                              db: AsyncSession = Depends(get_db)) -> list[ExamTimetableOut]:
+    """Exams for classes this teacher is assigned to (optionally narrowed to one class)."""
+    class_ids = {
+        r.class_id for r in (await db.execute(
+            select(TeacherAssignment).where(
+                TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.end_date.is_(None)
+            )
+        )).scalars().all()
+    }
+    if class_id is not None:
+        if class_id not in class_ids:
+            raise ForbiddenError("Not assigned to this class")
+        class_ids = {class_id}
+    if not class_ids:
+        return []
+    rows = (await db.execute(
+        select(ExamTimetable).where(ExamTimetable.class_id.in_(class_ids))
+        .order_by(ExamTimetable.exam_date)
+    )).scalars().all()
+    return [ExamTimetableOut.model_validate(r) for r in rows]
+
+
 @router.get("/assignments")
 async def list_assignments(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[dict]:
     """This teacher's (class, subject) assignments with names, for the

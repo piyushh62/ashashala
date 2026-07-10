@@ -21,14 +21,20 @@ import TeacherTimetable from "./routes/teacher/TeacherTimetable";
 import TeacherFlagged from "./routes/teacher/TeacherFlagged";
 import TeacherStudents from "./routes/teacher/TeacherStudents";
 import TeacherAgentActions from "./routes/teacher/TeacherAgentActions";
+import TeacherExamTimetable from "./routes/teacher/TeacherExamTimetable";
+import TeacherClassProgress from "./routes/teacher/TeacherClassProgress";
+import TeacherMessages from "./routes/teacher/TeacherMessages";
 import AdminRoles from "./routes/admin/AdminRoles";
 import SchoolRoles from "./routes/school/SchoolRoles";
 import StudentDashboard from "./routes/student/StudentDashboard";
 import StudentChat from "./routes/student/StudentChat";
 import StudentQuiz from "./routes/student/StudentQuiz";
 import StudentHistory from "./routes/student/StudentHistory";
+import StudentExams from "./routes/student/StudentExams";
 import ParentChildren from "./routes/parent/ParentChildren";
 import ParentChild from "./routes/parent/ParentChild";
+import ParentReports from "./routes/parent/ParentReports";
+import ParentMessages from "./routes/parent/ParentMessages";
 import Settings from "./routes/Settings";
 
 const ALL_ROLES: Role[] = ["super_admin", "school_admin", "teacher", "student", "parent"];
@@ -60,8 +66,10 @@ const NAV: Record<Role, NavItem[]> = {
     { to: "/teacher", label: "Dashboard", icon: "📊" },
     { to: "/teacher/materials", label: "Materials", icon: "📚" },
     { to: "/teacher/timetable", label: "Timetable", icon: "🗓️" },
+    { to: "/teacher/exam-timetable", label: "Exams", icon: "📝" },
     { to: "/teacher/flagged", label: "Flagged", icon: "🚩" },
     { to: "/teacher/students", label: "Students", icon: "🧑‍🎓", permission: "teacher:portal" },
+    { to: "/teacher/messages", label: "Messages", icon: "💬" },
     { to: "/teacher/agent-actions", label: "Agent Queue", icon: "🤖", permission: "agent_action:view" },
     { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
@@ -70,6 +78,7 @@ const NAV: Record<Role, NavItem[]> = {
     { to: "/student/chat", label: "Tutor", icon: "💬" },
     { to: "/student/quiz", label: "Quiz", icon: "🧠" },
     { to: "/student/history", label: "History", icon: "📜" },
+    { to: "/student/exams", label: "Exams", icon: "📝" },
     { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
   parent: [
@@ -185,8 +194,11 @@ export default function App() {
       <Route path="/teacher" element={<Shell role="teacher" title="Teacher"><TeacherDashboard /></Shell>} />
       <Route path="/teacher/materials" element={<Shell role="teacher" title="Teacher"><TeacherMaterials /></Shell>} />
       <Route path="/teacher/timetable" element={<Shell role="teacher" title="Teacher"><TeacherTimetable /></Shell>} />
+      <Route path="/teacher/exam-timetable" element={<Shell role="teacher" title="Teacher"><TeacherExamTimetable /></Shell>} />
       <Route path="/teacher/flagged" element={<Shell role="teacher" title="Teacher"><TeacherFlagged /></Shell>} />
       <Route path="/teacher/students" element={<Shell role="teacher" title="Teacher"><TeacherStudents /></Shell>} />
+      <Route path="/teacher/messages" element={<Shell role="teacher" title="Teacher"><TeacherMessages /></Shell>} />
+      <Route path="/teacher/class-progress/:classId" element={<Shell role="teacher" title="Teacher"><TeacherClassProgress /></Shell>} />
       <Route
         path="/teacher/agent-actions"
         element={<Shell role="teacher" title="Teacher" requirePermission="agent_action:view"><TeacherAgentActions /></Shell>}
@@ -197,10 +209,13 @@ export default function App() {
       <Route path="/student/chat" element={<Shell role="student" title="Student"><StudentChat /></Shell>} />
       <Route path="/student/quiz" element={<Shell role="student" title="Student"><StudentQuiz /></Shell>} />
       <Route path="/student/history" element={<Shell role="student" title="Student"><StudentHistory /></Shell>} />
+      <Route path="/student/exams" element={<Shell role="student" title="Student"><StudentExams /></Shell>} />
 
       {/* Parent */}
       <Route path="/parent" element={<Shell role="parent" title="Parent"><ParentChildren /></Shell>} />
       <Route path="/parent/child/:id" element={<Shell role="parent" title="Parent"><ParentChild /></Shell>} />
+      <Route path="/parent/child/:id/reports" element={<Shell role="parent" title="Parent"><ParentReports /></Shell>} />
+      <Route path="/parent/child/:id/messages" element={<Shell role="parent" title="Parent"><ParentMessages /></Shell>} />
 
       {/* Shared */}
       <Route path="/settings" element={<SettingsRoute />} />

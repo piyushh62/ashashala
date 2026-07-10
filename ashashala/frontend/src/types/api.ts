@@ -241,6 +241,7 @@ export interface TeacherTimetableRow {
   class_id: string;
   subject_id: string;
   room?: string | null;
+  topic?: string | null;
 }
 
 export interface QuizAttemptRow {
@@ -315,4 +316,64 @@ export interface AgentActionOut {
   reviewed_by_user_id: string | null;
   reviewed_at: string | null;
   created_at: string;
+}
+
+/* ------------------------------ Phase 4: reports/messages ----------------- */
+
+export interface ReportOut {
+  id: string;
+  student_id: string;
+  period_start: string;
+  period_end: string;
+  mastery_snapshot_json: { topic: string; score: number }[];
+  quiz_score_trend_json: { quiz_id: string; score: number; attempted_at: string }[];
+  teacher_notes: string | null;
+  narrative: string;
+  status: "draft" | "approved" | "sent";
+  sent_at: string | null;
+}
+
+export interface ParentMessageOut {
+  id: string;
+  student_id: string;
+  parent_id: string;
+  teacher_id: string;
+  sender_role: "teacher" | "parent";
+  body: string;
+  created_at: string;
+  read_at: string | null;
+}
+
+export interface NotificationPreferenceOut {
+  in_app_enabled: boolean;
+  sms_enabled: boolean;
+  whatsapp_enabled: boolean;
+  email_enabled: boolean;
+}
+
+export interface ChildTeacherRow {
+  teacher_id: string;
+  teacher_name: string;
+  subject_id: string;
+  subject_name: string;
+}
+
+export interface ExamTimetableOut {
+  id: string;
+  class_id: string;
+  subject_id: string;
+  exam_name: string;
+  exam_date: string;
+  start_time: string | null;
+  duration_minutes: number | null;
+  syllabus_ref: string | null;
+}
+
+/* ------------------------------ Scheduling Agent (Phase 3) ---------------- */
+
+export interface TimetableOptionOut {
+  option_id: string;
+  strategy: string;
+  rationale: string;
+  slots: { day_of_week: number; period_number: number; room: string | null }[];
 }

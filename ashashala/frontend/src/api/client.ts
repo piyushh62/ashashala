@@ -107,6 +107,18 @@ export const api = {
     request<T>(path, { method: "DELETE", body: body ? JSON.stringify(body) : undefined }),
   postForm: <T>(path: string, form: FormData) =>
     request<T>(path, { method: "POST", body: form }),
+  getBlob: async (path: string): Promise<Blob> => {
+    let res = await rawFetch(path, {});
+    if (res.status === 401 && (await tryRefresh())) {
+      res = await rawFetch(path, {});
+    }
+    if (res.status === 401) {
+      onAuthLost?.();
+      throw new ApiError(401, "UNAUTHORIZED", "Session expired");
+    }
+    if (!res.ok) throw await parseError(res);
+    return res.blob();
+  },
 };
 
 // --- SSE: POST /student/chat streams tokens then a final `event: citations`. ---

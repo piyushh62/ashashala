@@ -1,15 +1,16 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { authApi } from "../api/endpoints";
+import { authApi, parentApi } from "../api/endpoints";
 import { useAuth } from "../stores/auth";
 import { PageTitle } from "../components/layout/AppLayout";
-import { Avatar, Badge, Button, Card, CardHeader, Input } from "../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, Input, Skeleton } from "../components/ui";
 import { FormField } from "../components/ui/FormField";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { useTheme } from "../stores/theme";
 import { useToast } from "../components/ui/Toast";
+import type { NotificationPreferenceOut } from "../types/api";
 
 const ROLE_LABEL: Record<string, string> = {
   super_admin: "Super Admin",
@@ -113,7 +114,64 @@ export default function Settings() {
             <ThemeToggle className="border border-slate-200 dark:border-slate-700" />
           </div>
         </Card>
+
+        {user.role === "parent" && <NotificationPreferencesCard />}
       </div>
     </div>
+  );
+}
+
+const PREF_LABELS: { key: keyof NotificationPreferenceOut; label: string; hint: string }[] = [
+  { key: "in_app_enabled", label: "In-app", hint: "Notifications inside AshaShala." },
+  { key: "sms_enabled", label: "SMS", hint: "Text messages for important updates." },
+  { key: "whatsapp_enabled", label: "WhatsApp", hint: "WhatsApp messages, where available." },
+  { key: "email_enabled", label: "Email", hint: "Email summaries and alerts." },
+];
+
+function NotificationPreferencesCard() {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const q = useQuery({ queryKey: ["parent", "notification-preferences"], queryFn: parentApi.notificationPreferences });
+
+  const update = useMutation({
+    mutationFn: (body: Partial<NotificationPreferenceOut>) => parentApi.updateNotificationPreferences(body),
+    onSuccess: (data) => qc.setQueryData(["parent", "notification-preferences"], data),
+    onError: () => toast.push("Couldn't update notification preferences.", "error"),
+  });
+
+  return (
+    <Card>
+      <CardHeader title="Notification preferences" subtitle="Choose how you'd like to hear from AshaShala." />
+      <div className="p-5 space-y-4">
+        {q.isLoading ? (
+          <Skeleton className="h-24" />
+        ) : (
+          PREF_LABELS.map(({ key, label, hint }) => (
+            <div key={key} className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</div>
+                <div className="text-xs text-slate-400 mt-0.5">{hint}</div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={!!q.data?.[key]}
+                onClick={() => update.mutate({ [key]: !q.data?.[key] })}
+                disabled={update.isPending}
+                className={`relative w-11 h-6 rounded-full transition ${
+                  q.data?.[key] ? "bg-brand-600" : "bg-slate-200 dark:bg-slate-700"
+                } disabled:opacity-50`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                    q.data?.[key] ? "translate-x-5" : ""
+                  }`}
+                />
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </Card>
   );
 }

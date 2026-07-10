@@ -6,6 +6,7 @@ import type {
   AtRiskStudentOut,
   AuditRow,
   ChildRow,
+  ChildTeacherRow,
   ClassMasteryOut,
   ClassProgressStudent,
   ClassSection,
@@ -13,17 +14,21 @@ import type {
   DocumentRow,
   EnrollmentJoinRow,
   ExamRow,
+  ExamTimetableOut,
   FlaggedAnswer,
   Me,
   Notification,
   NotificationListOut,
+  NotificationPreferenceOut,
   Page,
   ParentLinkJoinRow,
+  ParentMessageOut,
   PermissionOut,
   PlatformDashboard,
   QuizAttemptRow,
   QuizOut,
   QuizSubmitResponse,
+  ReportOut,
   RoleOut,
   RoleTemplateOut,
   School,
@@ -33,6 +38,7 @@ import type {
   TeacherAssignmentJoinRow,
   TeacherDashboardOut,
   TeacherTimetableRow,
+  TimetableOptionOut,
   TimetableRow,
   TokenResponse,
   UserRow,
@@ -185,6 +191,23 @@ export const teacherApi = {
   }) => api.post<TimetableRow>("/api/v1/teacher/timetable", body),
   listTimetable: () => api.get<TeacherTimetableRow[]>("/api/v1/teacher/timetable"),
   deleteTimetableEntry: (id: string) => api.del<{ status: string }>(`/api/v1/teacher/timetable/${id}`),
+  updateTimetableEntry: (id: string, body: Partial<{ topic: string; day_of_week: number; period_number: number; room: string }>) =>
+    api.patch<TeacherTimetableRow>(`/api/v1/teacher/timetable/${id}`, body),
+  aiSuggestTimetable: (body: { class_id: string; subject_id: string; periods_per_week: number }) =>
+    api.post<TimetableOptionOut[]>("/api/v1/teacher/timetable/ai-suggest", body),
+  selectTimetableOption: (optionId: string) =>
+    api.post<TeacherTimetableRow[]>(`/api/v1/teacher/timetable/${optionId}/select`, {}),
+  examTimetable: (classId?: string) =>
+    api.get<ExamTimetableOut[]>(`/api/v1/teacher/exam-timetable${classId ? `?class_id=${classId}` : ""}`),
+  createExamTimetable: (body: {
+    class_id: string;
+    subject_id: string;
+    exam_name: string;
+    exam_date: string;
+    start_time?: string;
+    duration_minutes?: number;
+    syllabus_ref?: string;
+  }) => api.post<ExamTimetableOut>("/api/v1/teacher/exam-timetable", body),
   flagged: (limit = 50, offset = 0) =>
     api.get<Page<FlaggedAnswer>>(`/api/v1/teacher/flagged-answers?limit=${limit}&offset=${offset}`),
   override: (id: string, body: { score: number; feedback?: string }) =>
@@ -195,6 +218,12 @@ export const teacherApi = {
     api.post<{ user: UserRow; temp_password: string | null }>("/api/v1/teacher/students", body),
   createParent: (body: { name: string; email: string; student_id: string }) =>
     api.post<{ user: UserRow; temp_password: string | null }>("/api/v1/teacher/parents", body),
+  updateReportNotes: (reportId: string, teacherNotes: string) =>
+    api.patch<ReportOut>(`/api/v1/teacher/reports/${reportId}`, { teacher_notes: teacherNotes }),
+  sendMessage: (body: { student_id: string; body: string }) =>
+    api.post<ParentMessageOut[]>("/api/v1/teacher/messages", body),
+  listMessages: (studentId: string) =>
+    api.get<ParentMessageOut[]>(`/api/v1/teacher/messages?student_id=${studentId}`),
 };
 
 export const agentActionsApi = {
@@ -239,6 +268,26 @@ export const parentApi = {
     api.get<Page<QuizAttemptRow>>(`/api/v1/parent/children/${id}/history?limit=${limit}&offset=${offset}`),
   childExamTimetable: (id: string) =>
     api.get<ExamRow[]>(`/api/v1/parent/children/${id}/exam-timetable`),
+  childReports: (id: string) => api.get<ReportOut[]>(`/api/v1/parent/children/${id}/reports`),
+  childTeachers: (id: string) => api.get<ChildTeacherRow[]>(`/api/v1/parent/children/${id}/teachers`),
+  downloadReportPdf: async (studentId: string, reportId: string) => {
+    const blob = await api.getBlob(`/api/v1/parent/children/${studentId}/reports/${reportId}/pdf`);
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `report-${reportId}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+  sendMessage: (body: { student_id: string; teacher_id: string; body: string }) =>
+    api.post<ParentMessageOut>("/api/v1/parent/messages", body),
+  listMessages: (studentId: string, teacherId?: string) =>
+    api.get<ParentMessageOut[]>(
+      `/api/v1/parent/messages?student_id=${studentId}${teacherId ? `&teacher_id=${teacherId}` : ""}`,
+    ),
+  notificationPreferences: () => api.get<NotificationPreferenceOut>("/api/v1/parent/notification-preferences"),
+  updateNotificationPreferences: (body: Partial<NotificationPreferenceOut>) =>
+    api.patch<NotificationPreferenceOut>("/api/v1/parent/notification-preferences", body),
 };
 
 export const notificationsApi = {
