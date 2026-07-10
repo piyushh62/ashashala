@@ -9,6 +9,7 @@
 import json
 import logging
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -26,6 +27,7 @@ from app.core.permissions import STUDENT_PORTAL
 from app.core.ratelimit import limiter
 from app.db.session import get_db
 from app.deps import PageParams, page_params, require_permission
+from app.models.feed import LearningFeedItem
 from app.models.flagged_answer import FlaggedAnswer
 from app.models.learning import (
     ChatSession,
@@ -163,6 +165,49 @@ async def exam_timetable(student: User = Depends(_guard), db: AsyncSession = Dep
     rows = (await db.execute(select(ExamTimetable).where(ExamTimetable.class_id.in_(class_ids)))).scalars().all()
     return [{"exam_name": e.exam_name, "exam_date": e.exam_date.isoformat(),
              "class_id": e.class_id, "subject_id": e.subject_id} for e in rows]
+
+
+@router.get("/today")
+async def today_feed(student: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[dict]:
+    """Today's Scheduled-Learning explainers, in period order, for classes this
+    student is actively enrolled in."""
+    class_ids = await _class_ids(db, student)
+    if not class_ids:
+        return []
+
+    today = datetime.now(UTC).date()
+    weekday = today.weekday()
+    if weekday > 5:
+        return []
+
+    entries = (await db.execute(
+        select(Timetable).where(
+            Timetable.class_id.in_(class_ids), Timetable.day_of_week == weekday
+        )
+    )).scalars().all()
+    if not entries:
+        return []
+
+    timetable_ids = [t.id for t in entries]
+    items = {
+        i.timetable_id: i for i in (await db.execute(
+            select(LearningFeedItem).where(
+                LearningFeedItem.timetable_id.in_(timetable_ids), LearningFeedItem.feed_date == today
+            )
+        )).scalars().all()
+    }
+
+    out: list[dict] = []
+    for entry in sorted(entries, key=lambda t: t.period_number):
+        item = items.get(entry.id)
+        if item is None:
+            continue
+        out.append({
+            "topic": item.topic, "subject_id": item.subject_id, "class_id": item.class_id,
+            "period_number": entry.period_number, "explainer": item.explainer,
+            "questions": item.questions_json,
+        })
+    return out
 
 
 @router.get("/quizzes")

@@ -3,17 +3,20 @@
 from __future__ import annotations
 
 import secrets
+import uuid
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.scheduling import generate_timetable_options
 from app.auth.password import hash_password
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
 from app.core.permissions import TEACHER_PORTAL
 from app.db.session import get_db
 from app.deps import PageParams, page_params, require_permission
+from app.models.agent_action import AgentAction, AgentActionStatus
 from app.models.document import DocStatus, Document, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import ProgressRecord, Quiz, QuizStatus
@@ -33,7 +36,9 @@ from app.schemas.teacher import (
     ParentCreate,
     QuizApproval,
     StudentCreate,
+    TimetableAiSuggestRequest,
     TimetableCreate,
+    TimetableOptionOut,
     TimetableOut,
     TimetableUpdate,
 )
@@ -42,7 +47,7 @@ from app.services.audit_service import record_audit
 from app.services.ingestion.pipeline import ingest_document
 from app.services.notification_service import notify
 from app.services.r2_client import get_storage_client
-from app.services.rbac_service import can_create_role
+from app.services.rbac_service import can_create_role, propose_agent_action
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["Teacher"])
 _guard = require_permission(TEACHER_PORTAL)
@@ -179,13 +184,127 @@ async def list_timetable(teacher: User = Depends(_guard), db: AsyncSession = Dep
     return [TimetableOut.model_validate(r) for r in rows]
 
 
+async def _has_conflict(
+    db: AsyncSession, *, teacher_id: str, class_id: str, day_of_week: int, period_number: int,
+    exclude_id: str | None = None,
+) -> bool:
+    stmt = select(Timetable.id).where(
+        Timetable.day_of_week == day_of_week, Timetable.period_number == period_number,
+        (Timetable.teacher_id == teacher_id) | (Timetable.class_id == class_id),
+    )
+    if exclude_id:
+        stmt = stmt.where(Timetable.id != exclude_id)
+    return (await db.execute(stmt)).first() is not None
+
+
+async def _get_pending_scheduling_action(db: AsyncSession, teacher: User, option_id: str) -> AgentAction:
+    action = await db.get(AgentAction, option_id)
+    if (
+        action is None
+        or action.school_id != teacher.school_id
+        or action.agent_name != "scheduling_agent"
+        or action.status != AgentActionStatus.pending
+    ):
+        raise NotFoundError("AgentAction", option_id)
+    return action
+
+
+@router.post("/timetable/ai-suggest", response_model=list[TimetableOptionOut])
+async def ai_suggest_timetable(body: TimetableAiSuggestRequest, request: Request,
+                               teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[TimetableOptionOut]:
+    await _assert_assigned(db, teacher, body.class_id, body.subject_id)
+    options = await generate_timetable_options(
+        db, teacher, class_id=body.class_id, subject_id=body.subject_id,
+        periods_per_week=body.periods_per_week,
+    )
+    batch_id = str(uuid.uuid4())
+    out: list[TimetableOptionOut] = []
+    for option in options:
+        action = await propose_agent_action(
+            db, school_id=teacher.school_id, agent_name="scheduling_agent", action_type="timetable_suggestion",
+            payload={
+                "batch_id": batch_id, "teacher_id": teacher.id, "class_id": body.class_id,
+                "subject_id": body.subject_id, "strategy": option["strategy"],
+                "rationale": option["rationale"], "slots": option["slots"],
+            },
+        )
+        out.append(TimetableOptionOut(
+            option_id=action.id, strategy=option["strategy"], rationale=option["rationale"],
+            slots=option["slots"],
+        ))
+    await record_audit(db, action="TIMETABLE_AI_SUGGEST", actor=teacher, target_type="timetable",
+                       target_id=batch_id, payload={"class_id": body.class_id, "subject_id": body.subject_id,
+                                                     "option_count": len(out)}, request=request)
+    return out
+
+
+@router.post("/timetable/{option_id}/select", response_model=list[TimetableOut])
+async def select_timetable_option(option_id: str, request: Request,
+                                  teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[TimetableOut]:
+    action = await _get_pending_scheduling_action(db, teacher, option_id)
+    payload = action.payload_json
+    class_id, subject_id = payload["class_id"], payload["subject_id"]
+
+    for slot in payload["slots"]:
+        if await _has_conflict(db, teacher_id=teacher.id, class_id=class_id,
+                               day_of_week=slot["day_of_week"], period_number=slot["period_number"]):
+            action.status = AgentActionStatus.rejected
+            action.reviewed_by_user_id = teacher.id
+            action.reviewed_at = datetime.now(UTC)
+            db.add(action)
+            await record_audit(db, action="TIMETABLE_AI_SELECT", actor=teacher, status="failure",
+                               target_type="agent_action", target_id=option_id,
+                               payload={"reason": "slot_conflict"}, request=request)
+            raise ValidationError("One or more slots in this option are no longer free — please regenerate options")
+
+    created: list[Timetable] = []
+    for slot in payload["slots"]:
+        tt = Timetable(teacher_id=teacher.id, class_id=class_id, subject_id=subject_id,
+                       day_of_week=slot["day_of_week"], period_number=slot["period_number"],
+                       room=slot.get("room"), topic=None, school_id=teacher.school_id)
+        db.add(tt)
+        created.append(tt)
+    await db.flush()
+
+    action.status = AgentActionStatus.approved
+    action.reviewed_by_user_id = teacher.id
+    action.reviewed_at = datetime.now(UTC)
+    db.add(action)
+
+    siblings = (await db.execute(
+        select(AgentAction).where(
+            AgentAction.school_id == teacher.school_id, AgentAction.agent_name == "scheduling_agent",
+            AgentAction.status == AgentActionStatus.pending,
+        )
+    )).scalars().all()
+    batch_id = payload.get("batch_id")
+    for sibling in siblings:
+        if sibling.id != action.id and sibling.payload_json.get("batch_id") == batch_id:
+            sibling.status = AgentActionStatus.rejected
+            db.add(sibling)
+
+    await record_audit(db, action="TIMETABLE_AI_SELECT", actor=teacher, target_type="agent_action",
+                       target_id=option_id, payload={"timetable_ids": [t.id for t in created]}, request=request)
+    return [TimetableOut.model_validate(t) for t in created]
+
+
 @router.patch("/timetable/{entry_id}", response_model=TimetableOut)
 async def update_timetable_entry(entry_id: str, body: TimetableUpdate, request: Request,
                                  teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> TimetableOut:
     entry = await db.get(Timetable, entry_id)
     if entry is None or entry.teacher_id != teacher.id:
         raise NotFoundError("Timetable", entry_id)
-    entry.topic = body.topic
+
+    updates = body.model_dump(exclude_unset=True)
+    new_day = updates.get("day_of_week", entry.day_of_week)
+    new_period = updates.get("period_number", entry.period_number)
+    if "day_of_week" in updates or "period_number" in updates:
+        if await _has_conflict(db, teacher_id=teacher.id, class_id=entry.class_id,
+                               day_of_week=new_day, period_number=new_period, exclude_id=entry.id):
+            raise ValidationError("That slot conflicts with an existing timetable entry")
+
+    for field, value in updates.items():
+        setattr(entry, field, value)
     db.add(entry)
     await record_audit(db, action="TIMETABLE_UPDATE", actor=teacher, target_type="timetable",
                        target_id=entry_id, request=request)

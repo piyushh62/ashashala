@@ -30,6 +30,9 @@ INDIC_LANGS = {"gu", "hi", "mr", "ta", "te", "bn", "kn", "ml", "pa", "ur"}
 ROUTING_TABLE: dict[str, tuple[str, str, str, str]] = {
     "evaluate": ("gemini", "reasoning", "nvidia", "reasoning"),
     "vision": ("gemini", "vision", "nvidia", "vision"),
+    # Scheduling needs constraint-following (pick only from supplied free
+    # slots), not just fluent prose — routed like evaluate.
+    "schedule": ("gemini", "reasoning", "nvidia", "reasoning"),
     # Everything else is fast_chat (explain / chat / classify / default).
     "explain": ("gemini", "fast_chat", "nvidia", "fast_chat"),
     "chat": ("gemini", "fast_chat", "nvidia", "fast_chat"),

@@ -59,6 +59,28 @@ class TimetableOut(BaseModel):
 
 class TimetableUpdate(BaseModel):
     topic: str | None = None
+    day_of_week: int | None = Field(default=None, ge=0, le=6)
+    period_number: int | None = Field(default=None, ge=1)
+    room: str | None = None
+
+
+class TimetableAiSuggestRequest(BaseModel):
+    class_id: str
+    subject_id: str
+    periods_per_week: int = Field(ge=1, le=10)
+
+
+class TimetableSlotOut(BaseModel):
+    day_of_week: int
+    period_number: int
+    room: str | None = None
+
+
+class TimetableOptionOut(BaseModel):
+    option_id: str
+    strategy: str
+    rationale: str
+    slots: list[TimetableSlotOut]
 
 
 class ExamTimetableCreate(BaseModel):

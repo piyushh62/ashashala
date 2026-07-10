@@ -7,6 +7,7 @@ package is imported (Alembic autogenerate + create_all rely on this).
 from app.models.agent_action import AgentAction, AgentActionStatus
 from app.models.audit import AuditLog
 from app.models.document import Chunk, DocStatus, Document, OcrCache, SourceType
+from app.models.feed import LearningFeedItem
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import (
     ChatSession,
@@ -54,6 +55,7 @@ __all__ = [
     "ExamTimetable",
     "FlaggedAnswer",
     "FlagStatus",
+    "LearningFeedItem",
     "LlmUsage",
     "Message",
     "MessageRole",

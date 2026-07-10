@@ -135,6 +135,23 @@ class Settings(BaseSettings):
         default=60, description="APScheduler poll interval for pending sms/whatsapp notifications"
     )
 
+    # --- Phase 3: proactive agents (Scheduling, Insight, Scheduled-Learning) ---
+    SCHEDULING_MAX_PERIODS_PER_DAY: int = Field(
+        default=8, description="Highest period_number the Scheduling Agent's free-slot grid considers"
+    )
+    INSIGHT_STRUGGLE_THRESHOLD: int = Field(
+        default=40, description="mastery_score below this triggers an Insight Agent alert"
+    )
+    INSIGHT_REALERT_COOLDOWN_DAYS: int = Field(
+        default=7, description="Days to suppress a repeat Insight alert for the same student+topic"
+    )
+    INSIGHT_SCAN_CRON_HOUR: int = Field(
+        default=2, description="Local hour (0-23) the nightly Insight Agent scan runs"
+    )
+    SCHEDULED_LEARNING_CRON_HOUR: int = Field(
+        default=5, description="Local hour (0-23) the daily Scheduled-Learning feed generation runs"
+    )
+
     @model_validator(mode="after")
     def validate_storage_config(self):
         r2_enabled = all(
