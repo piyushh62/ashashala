@@ -18,6 +18,7 @@ export interface Me {
   school_id: string | null;
   grade: number | null;
   interests: string | null;
+  permissions: string[];
 }
 
 export interface TokenResponse {
@@ -275,4 +276,43 @@ export interface Notification {
 export interface NotificationListOut {
   items: Notification[];
   unread_count: number;
+}
+
+export interface PermissionOut {
+  id: string;
+  resource: string;
+  action: string;
+}
+
+export interface RoleTemplateOut {
+  id: string;
+  name: string;
+  is_system: boolean;
+  description: string | null;
+  permissions: string[];
+}
+
+export interface RoleOut {
+  id: string;
+  name: string;
+  is_custom: boolean;
+  template_id: string | null;
+  permissions: string[];
+}
+
+export interface CreationRightsOut {
+  role_id: string;
+  creatable_template_names: string[];
+}
+
+export interface AgentActionOut {
+  id: string;
+  agent_name: string;
+  action_type: string;
+  payload_json: Record<string, unknown>;
+  confidence: number | null;
+  status: "pending" | "approved" | "rejected" | "auto_applied";
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
+  created_at: string;
 }

@@ -21,6 +21,7 @@ from app.models.structure import (
     TeacherAssignment,
 )
 from app.models.user import User, UserRole
+from app.services.rbac_service import resolve_permissions
 
 # Ensure the tenant-filter session event is registered.
 import app.db.tenant_filter  # noqa: F401,E402
@@ -93,6 +94,26 @@ def require_role(*roles: UserRole):
     return _guard
 
 
+def require_permission(permission: str):
+    """Dependency factory enforcing that the current user's resolved dynamic
+    RBAC permissions (see app/services/rbac_service.py) include `permission`.
+
+    This is the replacement for `require_role` as the authorization primitive
+    — every router guard now goes through this. `require_role` itself stays
+    defined for the few remaining domain-typing call sites that compare
+    against `UserRole` directly (not access control)."""
+
+    async def _guard(
+        user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    ) -> User:
+        granted = await resolve_permissions(db, user)
+        if permission not in granted:
+            raise ForbiddenError(f"Requires permission '{permission}'")
+        return user
+
+    return _guard
+
+
 async def build_token_claims(db: AsyncSession, user: User) -> dict:
     """Assemble the role-specific claim lists embedded in the access token."""
     class_ids: list[str] = []
@@ -116,10 +137,13 @@ async def build_token_claims(db: AsyncSession, user: User) -> dict:
         )).scalars().all()
         linked_student_ids = sorted({r.student_id for r in rows})
 
+    permissions = sorted(await resolve_permissions(db, user))
+
     return {
         "class_ids": class_ids,
         "subject_ids": subject_ids,
         "linked_student_ids": linked_student_ids,
+        "permissions": permissions,
     }
 
 

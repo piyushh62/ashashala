@@ -11,7 +11,7 @@ the DB (that would mean a query on every request) — access-token validity is
 instead checked cheaply against `User.tokens_valid_after` in deps.py.
 
 Access-token payload:
-  {sub, role, school_id, class_ids, subject_ids, linked_student_ids, type, jti, exp, iat}
+  {sub, role, school_id, class_ids, subject_ids, linked_student_ids, permissions, type, jti, exp, iat}
 """
 
 from __future__ import annotations
@@ -50,6 +50,7 @@ def create_access_token(
     class_ids: list[str] | None = None,
     subject_ids: list[str] | None = None,
     linked_student_ids: list[str] | None = None,
+    permissions: list[str] | None = None,
 ) -> str:
     return _encode(
         {
@@ -59,6 +60,7 @@ def create_access_token(
             "class_ids": class_ids or [],
             "subject_ids": subject_ids or [],
             "linked_student_ids": linked_student_ids or [],
+            "permissions": permissions or [],
         },
         settings.JWT_SECRET,
         ACCESS_TTL,

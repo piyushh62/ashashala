@@ -13,11 +13,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.password import hash_password
 from app.core.exceptions import NotFoundError, ValidationError
+from app.core.permissions import ROLE_MANAGE, SCHOOL_ADMIN
 from app.db.session import get_db
-from app.deps import PageParams, page_params, require_role
+from app.deps import PageParams, page_params, require_permission
 from app.models.audit import AuditLog
 from app.models.learning import ProgressRecord
 from app.models.llm_usage import LlmUsage
+from app.models.rbac import (
+    Permission,
+    Role,
+    RoleCreationRight,
+    RolePermission,
+    RoleTemplate,
+    TemplatePermission,
+    UserRoleAssignment,
+)
 from app.models.structure import (
     ClassSection,
     Enrollment,
@@ -26,6 +36,15 @@ from app.models.structure import (
     TeacherAssignment,
 )
 from app.models.user import User, UserRole
+from app.schemas.rbac import (
+    CreationRightsOut,
+    CreationRightsUpdate,
+    PermissionOut,
+    RoleCreate,
+    RoleOut,
+    RoleTemplateOut,
+    RoleUpdate,
+)
 from app.schemas.school_admin import (
     AtRiskStudentOut,
     ClassCreate,
@@ -49,12 +68,11 @@ from app.schemas.school_admin import (
 from app.schemas.pagination import Page
 from app.services.audit_service import record_audit
 from app.services.notification_service import notify
+from app.services.rbac_service import can_create_role, ensure_catalog_seeded, ensure_school_roles
 
 router = APIRouter(prefix="/api/v1/school", tags=["School Admin"])
-_guard = require_role(UserRole.school_admin)
-
-# Roles a school admin is allowed to create.
-_CREATABLE = {UserRole.teacher, UserRole.student, UserRole.parent}
+_guard = require_permission(SCHOOL_ADMIN)
+_role_guard = require_permission(ROLE_MANAGE)
 
 
 async def _get_school_user_or_404(db: AsyncSession, school_id: str, user_id: str) -> User:
@@ -98,8 +116,8 @@ async def _require_subject_in_school(db: AsyncSession, school_id: str, subject_i
 @router.post("/users", response_model=UserCreatedResponse)
 async def create_user(body: UserCreate, request: Request,
                       admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> UserCreatedResponse:
-    if body.role not in _CREATABLE:
-        raise ValidationError("School admin can only create teacher/student/parent")
+    if not await can_create_role(db, admin, body.role):
+        raise ValidationError(f"Not permitted to create role: {body.role.value}")
     if (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none():
         raise ValidationError("Email already in use")
 
@@ -531,3 +549,197 @@ async def llm_usage(days: int = Query(default=7, ge=1, le=30),
         "daily_token_limit": DAILY_TOKEN_WARN,
         "over_quota": int(today_tokens) > DAILY_TOKEN_WARN,
     }
+
+
+# --- Role management (custom roles, permissions, creation rights) ---------
+
+
+async def _role_permissions(db: AsyncSession, role_ids: list[str]) -> dict[str, set[str]]:
+    if not role_ids:
+        return {}
+    rows = (await db.execute(
+        select(RolePermission.role_id, Permission.resource, Permission.action)
+        .join(Permission, Permission.id == RolePermission.permission_id)
+        .where(RolePermission.role_id.in_(role_ids))
+    )).all()
+    out: dict[str, set[str]] = {rid: set() for rid in role_ids}
+    for role_id, resource, action in rows:
+        out[role_id].add(f"{resource}:{action}")
+    return out
+
+
+async def _template_permissions(db: AsyncSession, template_ids: list[str]) -> dict[str, set[str]]:
+    if not template_ids:
+        return {}
+    rows = (await db.execute(
+        select(TemplatePermission.template_id, Permission.resource, Permission.action)
+        .join(Permission, Permission.id == TemplatePermission.permission_id)
+        .where(TemplatePermission.template_id.in_(template_ids))
+    )).all()
+    out: dict[str, set[str]] = {tid: set() for tid in template_ids}
+    for tid, resource, action in rows:
+        out[tid].add(f"{resource}:{action}")
+    return out
+
+
+async def _permissions_by_strings(db: AsyncSession, perm_strings: list[str]) -> list[Permission]:
+    if not perm_strings:
+        return []
+    rows = (await db.execute(select(Permission))).scalars().all()
+    by_str = {f"{p.resource}:{p.action}": p for p in rows}
+    unknown = set(perm_strings) - by_str.keys()
+    if unknown:
+        raise ValidationError(f"Unknown permission(s): {', '.join(sorted(unknown))}")
+    return [by_str[s] for s in perm_strings]
+
+
+def _role_out(role: Role, perm_strings: set[str]) -> RoleOut:
+    return RoleOut(id=role.id, name=role.name, is_custom=role.is_custom,
+                   template_id=role.template_id, permissions=sorted(perm_strings))
+
+
+async def _get_school_role_or_404(db: AsyncSession, school_id: str, role_id: str) -> Role:
+    role = (await db.execute(
+        select(Role).where(Role.id == role_id, Role.school_id == school_id)
+    )).scalar_one_or_none()
+    if role is None:
+        raise NotFoundError("Role", role_id)
+    return role
+
+
+@router.get("/permissions", response_model=list[PermissionOut])
+async def list_permissions(admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> list[PermissionOut]:
+    """The full platform permission catalog, for building custom-role forms."""
+    await ensure_catalog_seeded(db)
+    rows = (await db.execute(select(Permission).order_by(Permission.resource, Permission.action))).scalars().all()
+    return [PermissionOut.model_validate(p) for p in rows]
+
+
+@router.get("/role-templates", response_model=list[RoleTemplateOut])
+async def list_role_templates(admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> list[RoleTemplateOut]:
+    """Role templates available to grant creation-rights against."""
+    await ensure_catalog_seeded(db)
+    templates = (await db.execute(select(RoleTemplate).order_by(RoleTemplate.name))).scalars().all()
+    perms_by_template = await _template_permissions(db, [t.id for t in templates])
+    return [
+        RoleTemplateOut(id=t.id, name=t.name, is_system=t.is_system, description=t.description,
+                        permissions=sorted(perms_by_template.get(t.id, set())))
+        for t in templates
+    ]
+
+
+@router.get("/roles", response_model=list[RoleOut])
+async def list_roles(admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> list[RoleOut]:
+    await ensure_school_roles(db, admin.school_id)
+    roles = (await db.execute(
+        select(Role).where(Role.school_id == admin.school_id).order_by(Role.name)
+    )).scalars().all()
+    perms_by_role = await _role_permissions(db, [r.id for r in roles])
+    return [_role_out(r, perms_by_role.get(r.id, set())) for r in roles]
+
+
+@router.post("/roles", response_model=RoleOut)
+async def create_role(body: RoleCreate, request: Request,
+                      admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> RoleOut:
+    perms = await _permissions_by_strings(db, body.permissions)
+    role = Role(school_id=admin.school_id, name=body.name, template_id=None, is_custom=True)
+    db.add(role)
+    await db.flush()
+    for perm in perms:
+        db.add(RolePermission(role_id=role.id, permission_id=perm.id))
+    await db.flush()
+    await record_audit(db, action="ROLE_CREATE", actor=admin, target_type="role",
+                       target_id=role.id, payload={"name": body.name}, request=request)
+    return _role_out(role, {f"{p.resource}:{p.action}" for p in perms})
+
+
+@router.patch("/roles/{role_id}", response_model=RoleOut)
+async def update_role(role_id: str, body: RoleUpdate, request: Request,
+                      admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> RoleOut:
+    role = await _get_school_role_or_404(db, admin.school_id, role_id)
+    if body.name is not None:
+        role.name = body.name
+        db.add(role)
+    if body.permissions is not None:
+        perms = await _permissions_by_strings(db, body.permissions)
+        existing = (await db.execute(
+            select(RolePermission).where(RolePermission.role_id == role.id)
+        )).scalars().all()
+        for row in existing:
+            await db.delete(row)
+        await db.flush()
+        for perm in perms:
+            db.add(RolePermission(role_id=role.id, permission_id=perm.id))
+    await db.flush()
+    await record_audit(db, action="ROLE_UPDATE", actor=admin, target_type="role",
+                       target_id=role.id, request=request)
+    perms_by_role = await _role_permissions(db, [role.id])
+    return _role_out(role, perms_by_role.get(role.id, set()))
+
+
+@router.delete("/roles/{role_id}")
+async def delete_role(role_id: str, request: Request,
+                      admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> dict:
+    role = await _get_school_role_or_404(db, admin.school_id, role_id)
+    if not role.is_custom:
+        raise ValidationError("Cannot delete a built-in role")
+    in_use = (await db.execute(
+        select(func.count()).select_from(UserRoleAssignment).where(UserRoleAssignment.role_id == role.id)
+    )).scalar_one()
+    if in_use:
+        raise ValidationError("Role is assigned to users; reassign them before deleting")
+    for row in (await db.execute(
+        select(RolePermission).where(RolePermission.role_id == role.id)
+    )).scalars().all():
+        await db.delete(row)
+    for row in (await db.execute(
+        select(RoleCreationRight).where(RoleCreationRight.creator_role_id == role.id)
+    )).scalars().all():
+        await db.delete(row)
+    await db.delete(role)
+    await record_audit(db, action="ROLE_DELETE", actor=admin, target_type="role",
+                       target_id=role_id, request=request)
+    return {"status": "deleted", "id": role_id}
+
+
+@router.get("/roles/{role_id}/creation-rights", response_model=CreationRightsOut)
+async def get_creation_rights(role_id: str, admin: User = Depends(_role_guard),
+                              db: AsyncSession = Depends(get_db)) -> CreationRightsOut:
+    role = await _get_school_role_or_404(db, admin.school_id, role_id)
+    template_ids = (await db.execute(
+        select(RoleCreationRight.creatable_template_id).where(RoleCreationRight.creator_role_id == role.id)
+    )).scalars().all()
+    if not template_ids:
+        return CreationRightsOut(role_id=role.id, creatable_template_names=[])
+    names = (await db.execute(
+        select(RoleTemplate.name).where(RoleTemplate.id.in_(template_ids))
+    )).scalars().all()
+    return CreationRightsOut(role_id=role.id, creatable_template_names=sorted(names))
+
+
+@router.patch("/roles/{role_id}/creation-rights", response_model=CreationRightsOut)
+async def set_creation_rights(role_id: str, body: CreationRightsUpdate, request: Request,
+                              admin: User = Depends(_role_guard), db: AsyncSession = Depends(get_db)) -> CreationRightsOut:
+    """Full-replace which role templates `role_id` may create users into
+    (the Point-1 toggle — e.g. letting a school's Teacher role create Students)."""
+    role = await _get_school_role_or_404(db, admin.school_id, role_id)
+    templates = (await db.execute(
+        select(RoleTemplate).where(RoleTemplate.name.in_(body.creatable_template_names))
+    )).scalars().all()
+    found_names = {t.name for t in templates}
+    unknown = set(body.creatable_template_names) - found_names
+    if unknown:
+        raise ValidationError(f"Unknown role template(s): {', '.join(sorted(unknown))}")
+
+    existing = (await db.execute(
+        select(RoleCreationRight).where(RoleCreationRight.creator_role_id == role.id)
+    )).scalars().all()
+    for row in existing:
+        await db.delete(row)
+    await db.flush()
+    for template in templates:
+        db.add(RoleCreationRight(creator_role_id=role.id, creatable_template_id=template.id))
+    await db.flush()
+    await record_audit(db, action="ROLE_CREATION_RIGHTS_UPDATE", actor=admin, target_type="role",
+                       target_id=role.id, payload={"creatable": sorted(found_names)}, request=request)
+    return CreationRightsOut(role_id=role.id, creatable_template_names=sorted(found_names))

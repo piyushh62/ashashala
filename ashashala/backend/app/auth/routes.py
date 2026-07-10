@@ -32,6 +32,7 @@ from app.schemas.auth import (
     TokenResponse,
 )
 from app.services.audit_service import record_audit
+from app.services.rbac_service import resolve_permissions
 
 router = APIRouter(prefix="/api/v1/auth", tags=["Auth"])
 
@@ -52,6 +53,7 @@ async def _issue_tokens(
         class_ids=claims["class_ids"],
         subject_ids=claims["subject_ids"],
         linked_student_ids=claims["linked_student_ids"],
+        permissions=claims["permissions"],
     )
     jti = new_uuid()
     now = datetime.now(timezone.utc)
@@ -157,10 +159,12 @@ async def logout_all(
 
 
 @router.get("/me", response_model=MeResponse)
-async def me(user: User = Depends(get_current_user)) -> MeResponse:
+async def me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)) -> MeResponse:
+    permissions = sorted(await resolve_permissions(db, user))
     return MeResponse(
         id=user.id, name=user.name, email=user.email, role=user.role.value,
         school_id=user.school_id, grade=user.grade, interests=user.interests,
+        permissions=permissions,
     )
 
 

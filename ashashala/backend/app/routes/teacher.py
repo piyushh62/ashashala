@@ -2,20 +2,26 @@
 
 from __future__ import annotations
 
+import secrets
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.auth.password import hash_password
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
+from app.core.permissions import TEACHER_PORTAL
 from app.db.session import get_db
-from app.deps import PageParams, page_params, require_role
+from app.deps import PageParams, page_params, require_permission
 from app.models.document import DocStatus, Document, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import ProgressRecord, Quiz, QuizStatus
 from app.models.school import School
-from app.models.structure import ClassSection, Enrollment, Subject, TeacherAssignment
+from app.models.structure import ClassSection, Enrollment, ParentStudentLink, Subject, TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
+from app.schemas.school_admin import UserCreatedResponse, UserOut
 from app.schemas.teacher import (
     DocumentOut,
     ExamTimetableCreate,
@@ -24,7 +30,9 @@ from app.schemas.teacher import (
     FlaggedAnswerOverride,
     MaterialUrlCreate,
     MaterialYoutubeCreate,
+    ParentCreate,
     QuizApproval,
+    StudentCreate,
     TimetableCreate,
     TimetableOut,
 )
@@ -33,9 +41,10 @@ from app.services.audit_service import record_audit
 from app.services.ingestion.pipeline import ingest_document
 from app.services.notification_service import notify
 from app.services.r2_client import get_storage_client
+from app.services.rbac_service import can_create_role
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["Teacher"])
-_guard = require_role(UserRole.teacher)
+_guard = require_permission(TEACHER_PORTAL)
 
 _EXT_TO_TYPE = {"pdf": SourceType.pdf, "docx": SourceType.docx, "txt": SourceType.txt,
                 "jpg": SourceType.image, "jpeg": SourceType.image, "png": SourceType.image}
@@ -333,3 +342,57 @@ async def approve_quiz(quiz_id: str, body: QuizApproval, request: Request,
         await record_audit(db, action="QUIZ_APPROVE", actor=teacher, target_type="quiz",
                            target_id=quiz_id, request=request)
     return {"status": quiz.status.value, "id": quiz_id}
+
+
+@router.post("/students", response_model=UserCreatedResponse)
+async def create_student(body: StudentCreate, request: Request,
+                         teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> UserCreatedResponse:
+    """Teacher-initiated student creation — 403 unless the school has granted
+    this teacher's role `user:create_student` (off by default)."""
+    if not await can_create_role(db, teacher, UserRole.student):
+        raise ForbiddenError("Not permitted to create students")
+    if (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none():
+        raise ValidationError("Email already in use")
+
+    temp = body.password or secrets.token_urlsafe(10)
+    student = User(name=body.name, email=body.email, password_hash=hash_password(temp),
+                   role=UserRole.student, school_id=teacher.school_id, grade=body.grade,
+                   interests=body.interests)
+    db.add(student)
+    await db.flush()
+    await record_audit(db, action="USER_CREATE", actor=teacher, target_type="user",
+                       target_id=student.id, payload={"role": "student"}, request=request)
+    return UserCreatedResponse(user=UserOut.model_validate(student),
+                               temp_password=None if body.password else temp)
+
+
+@router.post("/parents", response_model=UserCreatedResponse)
+async def create_parent(body: ParentCreate, request: Request,
+                        teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> UserCreatedResponse:
+    """Teacher-initiated parent creation + link to a student in this school —
+    403 unless the school has granted this teacher's role `user:create_parent`."""
+    if not await can_create_role(db, teacher, UserRole.parent):
+        raise ForbiddenError("Not permitted to create parents")
+    student = (await db.execute(
+        select(User).where(User.id == body.student_id, User.school_id == teacher.school_id,
+                          User.role == UserRole.student)
+    )).scalar_one_or_none()
+    if student is None:
+        raise NotFoundError("Student", body.student_id)
+    if (await db.execute(select(User).where(User.email == body.email))).scalar_one_or_none():
+        raise ValidationError("Email already in use")
+
+    temp = body.password or secrets.token_urlsafe(10)
+    parent = User(name=body.name, email=body.email, password_hash=hash_password(temp),
+                 role=UserRole.parent, school_id=teacher.school_id)
+    db.add(parent)
+    await db.flush()
+    db.add(ParentStudentLink(parent_id=parent.id, student_id=student.id, school_id=teacher.school_id,
+                             consent_given_at=datetime.now(UTC)))
+    await db.flush()
+    await notify(db, user_id=parent.id, school_id=teacher.school_id, type="parent_linked",
+                title="Linked to a student", body=f"You've been linked to {student.name}.", link="/parent")
+    await record_audit(db, action="USER_CREATE", actor=teacher, target_type="user",
+                       target_id=parent.id, payload={"role": "parent"}, request=request)
+    return UserCreatedResponse(user=UserOut.model_validate(parent),
+                               temp_password=None if body.password else temp)

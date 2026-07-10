@@ -6,18 +6,19 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import PARENT_PORTAL
 from app.db.session import get_db
-from app.deps import PageParams, get_linked_child, page_params, require_role
+from app.deps import PageParams, get_linked_child, page_params, require_permission
 from app.models.learning import ProgressRecord, QuizAttempt
 from app.models.structure import Enrollment, ParentStudentLink
 from app.models.timetable import ExamTimetable, Timetable
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.pagination import Page
 from app.schemas.quiz import QuizAttemptOut
 from app.services.audit_service import record_audit
 
 router = APIRouter(prefix="/api/v1/parent", tags=["Parent"])
-_guard = require_role(UserRole.parent)
+_guard = require_permission(PARENT_PORTAL)
 
 
 @router.get("/children")

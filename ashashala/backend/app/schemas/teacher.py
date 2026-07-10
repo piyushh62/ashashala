@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import date, datetime, time
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.auth.password import validate_password_complexity
 from app.models.document import DocStatus, SourceType
 
 
@@ -102,3 +103,36 @@ class FlaggedAnswerOverride(BaseModel):
 class QuizApproval(BaseModel):
     approved: bool
     feedback: str | None = None
+
+
+class StudentCreate(BaseModel):
+    """Body for teacher-initiated student creation (POST /teacher/students).
+
+    Only reachable when the teacher's role has been granted `user:create_student`
+    via `RoleCreationRight` — see app/services/rbac_service.py::can_create_role.
+    """
+
+    name: str
+    email: EmailStr
+    password: str | None = Field(default=None, min_length=8)  # auto-generated if omitted
+    grade: int | None = None
+    interests: str | None = None
+
+    @field_validator("password")
+    @classmethod
+    def _check_password_complexity(cls, v: str | None) -> str | None:
+        return validate_password_complexity(v) if v is not None else v
+
+
+class ParentCreate(BaseModel):
+    """Body for teacher-initiated parent creation + link (POST /teacher/parents)."""
+
+    name: str
+    email: EmailStr
+    student_id: str
+    password: str | None = Field(default=None, min_length=8)
+
+    @field_validator("password")
+    @classmethod
+    def _check_password_complexity(cls, v: str | None) -> str | None:
+        return validate_password_complexity(v) if v is not None else v

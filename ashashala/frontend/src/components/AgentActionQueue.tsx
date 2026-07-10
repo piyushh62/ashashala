@@ -1,0 +1,125 @@
+import { useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { agentActionsApi } from "../api/endpoints";
+import type { AgentActionOut } from "../types/api";
+import { Badge, Button, Card, CardHeader, EmptyState, Skeleton } from "./ui";
+import { useToast } from "./ui/Toast";
+
+const PAGE_SIZE = 20;
+
+const STATUS_TONE: Record<AgentActionOut["status"], string> = {
+  pending: "amber",
+  approved: "green",
+  rejected: "red",
+  auto_applied: "blue",
+};
+
+export function AgentActionQueue() {
+  const toast = useToast();
+  const qc = useQueryClient();
+  const [offset, setOffset] = useState(0);
+  const q = useQuery({
+    queryKey: ["agent-actions", "pending", offset],
+    queryFn: () => agentActionsApi.list("pending", PAGE_SIZE, offset),
+  });
+  const rows = q.data?.items ?? [];
+  const total = q.data?.total ?? 0;
+  const rangeStart = total === 0 ? 0 : offset + 1;
+  const rangeEnd = offset + rows.length;
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["agent-actions"] });
+
+  return (
+    <div>
+      {q.isLoading ? (
+        <Skeleton className="h-24" />
+      ) : !rows.length ? (
+        <EmptyState title="Queue is empty" hint="No agent proposals are waiting for review." icon="🤖" />
+      ) : (
+        <div className="space-y-4">
+          {rows.map((a) => (
+            <AgentActionCard key={a.id} action={a} onResolved={invalidate} toast={toast} />
+          ))}
+          {total > 0 && (
+            <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-500">
+              <span>
+                {rangeStart}–{rangeEnd} of {total}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
+                  disabled={offset === 0}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setOffset(offset + PAGE_SIZE)}
+                  disabled={rangeEnd >= total}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AgentActionCard({
+  action,
+  onResolved,
+  toast,
+}: {
+  action: AgentActionOut;
+  onResolved: () => void;
+  toast: ReturnType<typeof useToast>;
+}) {
+  const approve = useMutation({
+    mutationFn: () => agentActionsApi.approve(action.id),
+    onSuccess: () => {
+      toast.push("Action approved.", "success");
+      onResolved();
+    },
+    onError: () => toast.push("Couldn't approve this action.", "error"),
+  });
+  const reject = useMutation({
+    mutationFn: () => agentActionsApi.reject(action.id),
+    onSuccess: () => {
+      toast.push("Action rejected.", "success");
+      onResolved();
+    },
+    onError: () => toast.push("Couldn't reject this action.", "error"),
+  });
+  const busy = approve.isPending || reject.isPending;
+
+  return (
+    <Card>
+      <CardHeader
+        title={`${action.agent_name} · ${action.action_type}`}
+        subtitle={action.confidence != null ? `Confidence ${Math.round(action.confidence * 100)}%` : undefined}
+        action={<Badge tone={STATUS_TONE[action.status]}>{action.status}</Badge>}
+      />
+      <div className="p-5 space-y-3">
+        <pre className="text-xs bg-slate-50 dark:bg-slate-800 rounded-lg p-3 overflow-x-auto text-slate-600 dark:text-slate-300">
+          {JSON.stringify(action.payload_json, null, 2)}
+        </pre>
+        {action.status === "pending" && (
+          <div className="flex gap-2 justify-end">
+            <Button variant="danger" size="sm" onClick={() => reject.mutate()} disabled={busy}>
+              Reject
+            </Button>
+            <Button size="sm" onClick={() => approve.mutate()} disabled={busy}>
+              Approve
+            </Button>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}

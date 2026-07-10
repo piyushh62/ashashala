@@ -17,6 +17,7 @@ from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.db.session import close_db
 from app.routes.admin import router as admin_router
+from app.routes.agent_actions import router as agent_actions_router
 from app.routes.health import router as health_router
 from app.routes.notifications import router as notifications_router
 from app.routes.parent import router as parent_router
@@ -113,6 +114,7 @@ def create_app() -> FastAPI:
     app.include_router(student_router)
     app.include_router(parent_router)
     app.include_router(notifications_router)
+    app.include_router(agent_actions_router)
 
     @app.get("/", tags=["Root"])
     async def root() -> dict:

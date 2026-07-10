@@ -4,6 +4,7 @@ Import every model here so `Base.metadata` is fully populated whenever this
 package is imported (Alembic autogenerate + create_all rely on this).
 """
 
+from app.models.agent_action import AgentAction, AgentActionStatus
 from app.models.audit import AuditLog
 from app.models.document import Chunk, DocStatus, Document, OcrCache, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
@@ -18,6 +19,15 @@ from app.models.learning import (
 )
 from app.models.llm_usage import LlmUsage
 from app.models.notification import Notification
+from app.models.rbac import (
+    Permission,
+    Role,
+    RoleCreationRight,
+    RolePermission,
+    RoleTemplate,
+    TemplatePermission,
+    UserRoleAssignment,
+)
 from app.models.refresh_token import RefreshToken
 from app.models.school import School
 from app.models.structure import (
@@ -31,6 +41,8 @@ from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
 
 __all__ = [
+    "AgentAction",
+    "AgentActionStatus",
     "AuditLog",
     "ChatSession",
     "Chunk",
@@ -47,16 +59,23 @@ __all__ = [
     "Notification",
     "OcrCache",
     "ParentStudentLink",
+    "Permission",
     "ProgressRecord",
     "Quiz",
     "QuizAttempt",
     "QuizStatus",
     "RefreshToken",
+    "Role",
+    "RoleCreationRight",
+    "RolePermission",
+    "RoleTemplate",
     "School",
     "SourceType",
     "Subject",
     "TeacherAssignment",
+    "TemplatePermission",
     "Timetable",
     "User",
     "UserRole",
+    "UserRoleAssignment",
 ]

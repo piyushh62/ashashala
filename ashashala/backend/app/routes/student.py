@@ -22,9 +22,10 @@ from app.agents.quiz_master import generate_quiz, strip_answers
 from app.agents.tutor import tutor_agent_stream
 from app.core.config import settings
 from app.core.exceptions import AppError, ForbiddenError, NotFoundError
+from app.core.permissions import STUDENT_PORTAL
 from app.core.ratelimit import limiter
 from app.db.session import get_db
-from app.deps import PageParams, page_params, require_role
+from app.deps import PageParams, page_params, require_permission
 from app.models.flagged_answer import FlaggedAnswer
 from app.models.learning import (
     ChatSession,
@@ -37,7 +38,7 @@ from app.models.learning import (
 )
 from app.models.structure import Enrollment, Subject, TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.schemas.pagination import Page
 from app.schemas.quiz import (
     PerQuestionFeedback,
@@ -57,7 +58,7 @@ from app.services.tts_service import synthesize_speech
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/student", tags=["Student"])
-_guard = require_role(UserRole.student)
+_guard = require_permission(STUDENT_PORTAL)
 
 
 async def _class_ids(db: AsyncSession, student: User) -> list[str]:

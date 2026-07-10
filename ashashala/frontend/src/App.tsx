@@ -19,6 +19,10 @@ import TeacherDashboard from "./routes/teacher/TeacherDashboard";
 import TeacherMaterials from "./routes/teacher/TeacherMaterials";
 import TeacherTimetable from "./routes/teacher/TeacherTimetable";
 import TeacherFlagged from "./routes/teacher/TeacherFlagged";
+import TeacherStudents from "./routes/teacher/TeacherStudents";
+import TeacherAgentActions from "./routes/teacher/TeacherAgentActions";
+import AdminRoles from "./routes/admin/AdminRoles";
+import SchoolRoles from "./routes/school/SchoolRoles";
 import StudentDashboard from "./routes/student/StudentDashboard";
 import StudentChat from "./routes/student/StudentChat";
 import StudentQuiz from "./routes/student/StudentQuiz";
@@ -41,12 +45,14 @@ const NAV: Record<Role, NavItem[]> = {
   super_admin: [
     { to: "/admin", label: "Schools", icon: "🏫" },
     { to: "/admin/dashboard", label: "Platform", icon: "📊" },
+    { to: "/admin/roles", label: "Roles", icon: "🛡️", permission: "role:manage" },
     { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
   school_admin: [
     { to: "/school", label: "Dashboard", icon: "📊" },
     { to: "/school/users", label: "Users", icon: "👥" },
     { to: "/school/structure", label: "Classes", icon: "🗂️" },
+    { to: "/school/roles", label: "Roles", icon: "🛡️", permission: "role:manage" },
     { to: "/school/audit", label: "Audit", icon: "📜" },
     { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
@@ -55,6 +61,8 @@ const NAV: Record<Role, NavItem[]> = {
     { to: "/teacher/materials", label: "Materials", icon: "📚" },
     { to: "/teacher/timetable", label: "Timetable", icon: "🗓️" },
     { to: "/teacher/flagged", label: "Flagged", icon: "🚩" },
+    { to: "/teacher/students", label: "Students", icon: "🧑‍🎓", permission: "teacher:portal" },
+    { to: "/teacher/agent-actions", label: "Agent Queue", icon: "🤖", permission: "agent_action:view" },
     { to: "/settings", label: "Settings", icon: "⚙️" },
   ],
   student: [
@@ -91,10 +99,25 @@ const SEARCH_SOURCES: Partial<Record<Role, SearchSource<any>>> = {
   },
 };
 
-function Shell({ role, title, children }: { role: Role; title: string; children: React.ReactNode }) {
+function navForUser(role: Role, permissions: string[] | undefined): NavItem[] {
+  return NAV[role].filter((n) => !n.permission || (permissions ?? []).includes(n.permission));
+}
+
+function Shell({
+  role,
+  title,
+  requirePermission,
+  children,
+}: {
+  role: Role;
+  title: string;
+  requirePermission?: string;
+  children: React.ReactNode;
+}) {
+  const user = useAuth((s) => s.user);
   return (
-    <RoleGuard allow={[role]}>
-      <AppLayout title={title} nav={NAV[role]} searchSource={SEARCH_SOURCES[role]}>
+    <RoleGuard allow={[role]} requirePermission={requirePermission}>
+      <AppLayout title={title} nav={navForUser(role, user?.permissions)} searchSource={SEARCH_SOURCES[role]}>
         {children}
       </AppLayout>
     </RoleGuard>
@@ -112,7 +135,7 @@ function SettingsRoute() {
 function SettingsShell() {
   const user = useAuth((s) => s.user)!;
   return (
-    <AppLayout title={ROLE_TITLE[user.role]} nav={NAV[user.role]}>
+    <AppLayout title={ROLE_TITLE[user.role]} nav={navForUser(user.role, user.permissions)}>
       <Settings />
     </AppLayout>
   );
@@ -143,11 +166,19 @@ export default function App() {
       {/* Super Admin */}
       <Route path="/admin" element={<Shell role="super_admin" title="Super Admin"><AdminSchools /></Shell>} />
       <Route path="/admin/dashboard" element={<Shell role="super_admin" title="Super Admin"><AdminDashboard /></Shell>} />
+      <Route
+        path="/admin/roles"
+        element={<Shell role="super_admin" title="Super Admin" requirePermission="role:manage"><AdminRoles /></Shell>}
+      />
 
       {/* School Admin */}
       <Route path="/school" element={<Shell role="school_admin" title="School Admin"><SchoolDashboard /></Shell>} />
       <Route path="/school/users" element={<Shell role="school_admin" title="School Admin"><SchoolUsers /></Shell>} />
       <Route path="/school/structure" element={<Shell role="school_admin" title="School Admin"><SchoolStructure /></Shell>} />
+      <Route
+        path="/school/roles"
+        element={<Shell role="school_admin" title="School Admin" requirePermission="role:manage"><SchoolRoles /></Shell>}
+      />
       <Route path="/school/audit" element={<Shell role="school_admin" title="School Admin"><SchoolAudit /></Shell>} />
 
       {/* Teacher */}
@@ -155,6 +186,11 @@ export default function App() {
       <Route path="/teacher/materials" element={<Shell role="teacher" title="Teacher"><TeacherMaterials /></Shell>} />
       <Route path="/teacher/timetable" element={<Shell role="teacher" title="Teacher"><TeacherTimetable /></Shell>} />
       <Route path="/teacher/flagged" element={<Shell role="teacher" title="Teacher"><TeacherFlagged /></Shell>} />
+      <Route path="/teacher/students" element={<Shell role="teacher" title="Teacher"><TeacherStudents /></Shell>} />
+      <Route
+        path="/teacher/agent-actions"
+        element={<Shell role="teacher" title="Teacher" requirePermission="agent_action:view"><TeacherAgentActions /></Shell>}
+      />
 
       {/* Student */}
       <Route path="/student" element={<Shell role="student" title="Student"><StudentDashboard /></Shell>} />

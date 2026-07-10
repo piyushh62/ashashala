@@ -2,12 +2,14 @@
 
 import { api } from "./client";
 import type {
+  AgentActionOut,
   AtRiskStudentOut,
   AuditRow,
   ChildRow,
   ClassMasteryOut,
   ClassProgressStudent,
   ClassSection,
+  CreationRightsOut,
   DocumentRow,
   EnrollmentJoinRow,
   ExamRow,
@@ -17,10 +19,13 @@ import type {
   NotificationListOut,
   Page,
   ParentLinkJoinRow,
+  PermissionOut,
   PlatformDashboard,
   QuizAttemptRow,
   QuizOut,
   QuizSubmitResponse,
+  RoleOut,
+  RoleTemplateOut,
   School,
   SchoolDashboardOut,
   StudentDashboard,
@@ -58,6 +63,13 @@ export const adminApi = {
       `/api/v1/admin/schools/${schoolId}/admins`,
       body,
     ),
+  listPermissions: () => api.get<PermissionOut[]>("/api/v1/admin/permissions"),
+  listRoleTemplates: () => api.get<RoleTemplateOut[]>("/api/v1/admin/role-templates"),
+  createRoleTemplate: (body: { name: string; description?: string; permissions: string[] }) =>
+    api.post<RoleTemplateOut>("/api/v1/admin/role-templates", body),
+  updateRoleTemplate: (id: string, body: Partial<{ description: string; permissions: string[] }>) =>
+    api.patch<RoleTemplateOut>(`/api/v1/admin/role-templates/${id}`, body),
+  deleteRoleTemplate: (id: string) => api.del<{ status: string }>(`/api/v1/admin/role-templates/${id}`),
 };
 
 export interface LlmUsageSummary {
@@ -129,6 +141,20 @@ export const schoolApi = {
     if (action) params.set("action", action);
     return api.get<Page<AuditRow>>(`/api/v1/school/audit?${params.toString()}`);
   },
+  listPermissions: () => api.get<PermissionOut[]>("/api/v1/school/permissions"),
+  listRoleTemplates: () => api.get<RoleTemplateOut[]>("/api/v1/school/role-templates"),
+  listRoles: () => api.get<RoleOut[]>("/api/v1/school/roles"),
+  createRole: (body: { name: string; permissions: string[] }) =>
+    api.post<RoleOut>("/api/v1/school/roles", body),
+  updateRole: (id: string, body: Partial<{ name: string; permissions: string[] }>) =>
+    api.patch<RoleOut>(`/api/v1/school/roles/${id}`, body),
+  deleteRole: (id: string) => api.del<{ status: string }>(`/api/v1/school/roles/${id}`),
+  getCreationRights: (roleId: string) =>
+    api.get<CreationRightsOut>(`/api/v1/school/roles/${roleId}/creation-rights`),
+  setCreationRights: (roleId: string, creatableTemplateNames: string[]) =>
+    api.patch<CreationRightsOut>(`/api/v1/school/roles/${roleId}/creation-rights`, {
+      creatable_template_names: creatableTemplateNames,
+    }),
 };
 
 export interface TeacherAssignmentRow {
@@ -165,6 +191,22 @@ export const teacherApi = {
     api.post<{ status: string }>(`/api/v1/teacher/flagged-answers/${id}/override`, body),
   approveQuiz: (id: string, approved: boolean) =>
     api.post<{ status: string }>(`/api/v1/teacher/quizzes/${id}/approve`, { approved }),
+  createStudent: (body: { name: string; email: string; grade?: number; interests?: string }) =>
+    api.post<{ user: UserRow; temp_password: string | null }>("/api/v1/teacher/students", body),
+  createParent: (body: { name: string; email: string; student_id: string }) =>
+    api.post<{ user: UserRow; temp_password: string | null }>("/api/v1/teacher/parents", body),
+};
+
+export const agentActionsApi = {
+  list: (status?: AgentActionOut["status"], limit = 50, offset = 0) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (status) params.set("status", status);
+    return api.get<Page<AgentActionOut>>(`/api/v1/agent-actions?${params.toString()}`);
+  },
+  approve: (id: string, note?: string) =>
+    api.post<AgentActionOut>(`/api/v1/agent-actions/${id}/approve`, { note }),
+  reject: (id: string, note?: string) =>
+    api.post<AgentActionOut>(`/api/v1/agent-actions/${id}/reject`, { note }),
 };
 
 export const studentApi = {

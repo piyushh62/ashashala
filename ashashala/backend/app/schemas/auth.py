@@ -41,3 +41,4 @@ class MeResponse(BaseModel):
     school_id: str | None = None
     grade: int | None = None
     interests: str | None = None
+    permissions: list[str] = []

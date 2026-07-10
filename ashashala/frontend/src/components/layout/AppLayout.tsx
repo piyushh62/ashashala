@@ -12,6 +12,7 @@ export interface NavItem {
   to: string;
   label: string;
   icon: string;
+  permission?: string;
 }
 
 const ROLE_LABEL: Record<string, string> = {
