@@ -35,6 +35,7 @@ class User(Base, UUIDPk):
     interests: Mapped[str | None] = mapped_column(String(512), default=None)  # student personalisation
     grade: Mapped[int | None] = mapped_column(Integer, default=None)          # students
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    phone_number: Mapped[str | None] = mapped_column(String(20), default=None)  # SMS/WhatsApp target
 
     # Bumped to "now" to instantly invalidate every outstanding access token
     # and refresh token issued before this timestamp (password reset, admin

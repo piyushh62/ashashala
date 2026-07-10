@@ -122,13 +122,17 @@ async def build_token_claims(db: AsyncSession, user: User) -> dict:
 
     if user.role == UserRole.teacher:
         rows = (await db.execute(
-            select(TeacherAssignment).where(TeacherAssignment.teacher_id == user.id)
+            select(TeacherAssignment).where(
+                TeacherAssignment.teacher_id == user.id, TeacherAssignment.end_date.is_(None)
+            )
         )).scalars().all()
         class_ids = sorted({r.class_id for r in rows})
         subject_ids = sorted({r.subject_id for r in rows})
     elif user.role == UserRole.student:
         rows = (await db.execute(
-            select(Enrollment).where(Enrollment.student_id == user.id)
+            select(Enrollment).where(
+                Enrollment.student_id == user.id, Enrollment.end_date.is_(None)
+            )
         )).scalars().all()
         class_ids = sorted({r.class_id for r in rows})
     elif user.role == UserRole.parent:

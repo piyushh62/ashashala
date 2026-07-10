@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import DateTime, Integer, String
+from sqlalchemy import Date, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -30,6 +30,9 @@ class TeacherAssignment(Base, UUIDPk, TenantScoped):
     teacher_id: Mapped[str] = mapped_column(String(36), index=True)
     class_id: Mapped[str] = mapped_column(String(36), index=True)
     subject_id: Mapped[str] = mapped_column(String(36), index=True)
+    # NULL = active. Non-null records when a mid-year departure/reassignment
+    # took effect; it's audit metadata, not a future-scheduled trigger.
+    end_date: Mapped[date | None] = mapped_column(Date, default=None)
 
 
 class Enrollment(Base, UUIDPk, TenantScoped):
@@ -37,6 +40,9 @@ class Enrollment(Base, UUIDPk, TenantScoped):
 
     student_id: Mapped[str] = mapped_column(String(36), index=True)
     class_id: Mapped[str] = mapped_column(String(36), index=True)
+    # NULL = active. Non-null records when a mid-year class transfer took
+    # effect; it's audit metadata, not a future-scheduled trigger.
+    end_date: Mapped[date | None] = mapped_column(Date, default=None)
 
 
 class ParentStudentLink(Base, UUIDPk, TenantScoped):

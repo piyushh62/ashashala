@@ -35,7 +35,9 @@ async def children(parent: User = Depends(_guard), db: AsyncSession = Depends(ge
 
 
 async def _child_class_ids(db: AsyncSession, student_id: str) -> list[str]:
-    rows = (await db.execute(select(Enrollment).where(Enrollment.student_id == student_id))).scalars().all()
+    rows = (await db.execute(
+        select(Enrollment).where(Enrollment.student_id == student_id, Enrollment.end_date.is_(None))
+    )).scalars().all()
     return sorted({r.class_id for r in rows})
 
 
@@ -83,7 +85,8 @@ async def child_timetable(student_id: str, request: Request,
         return []
     rows = (await db.execute(select(Timetable).where(Timetable.class_id.in_(class_ids)))).scalars().all()
     return [{"day_of_week": t.day_of_week, "period_number": t.period_number,
-             "class_id": t.class_id, "subject_id": t.subject_id, "room": t.room} for t in rows]
+             "class_id": t.class_id, "subject_id": t.subject_id, "room": t.room,
+             "topic": t.topic} for t in rows]
 
 
 @router.get("/children/{student_id}/exam-timetable")

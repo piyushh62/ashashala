@@ -18,7 +18,7 @@ from app.models.learning import (
     QuizStatus,
 )
 from app.models.llm_usage import LlmUsage
-from app.models.notification import Notification
+from app.models.notification import DispatchStatus, Notification, NotificationChannel
 from app.models.rbac import (
     Permission,
     Role,
@@ -47,6 +47,7 @@ __all__ = [
     "ChatSession",
     "Chunk",
     "ClassSection",
+    "DispatchStatus",
     "DocStatus",
     "Document",
     "Enrollment",
@@ -57,6 +58,7 @@ __all__ = [
     "Message",
     "MessageRole",
     "Notification",
+    "NotificationChannel",
     "OcrCache",
     "ParentStudentLink",
     "Permission",

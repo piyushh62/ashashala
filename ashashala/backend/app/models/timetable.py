@@ -20,6 +20,7 @@ class Timetable(Base, UUIDPk, TenantScoped):
     day_of_week: Mapped[int] = mapped_column(Integer)   # 0=Mon .. 5=Sat
     period_number: Mapped[int] = mapped_column(Integer)
     room: Mapped[str | None] = mapped_column(String(64), default=None)
+    topic: Mapped[str | None] = mapped_column(String(255), default=None)
 
 
 class ExamTimetable(Base, UUIDPk, TenantScoped):

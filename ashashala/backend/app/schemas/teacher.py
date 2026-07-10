@@ -41,6 +41,7 @@ class TimetableCreate(BaseModel):
     day_of_week: int = Field(ge=0, le=6)
     period_number: int = Field(ge=1)
     room: str | None = None
+    topic: str | None = None
 
 
 class TimetableOut(BaseModel):
@@ -51,8 +52,13 @@ class TimetableOut(BaseModel):
     day_of_week: int
     period_number: int
     room: str | None
+    topic: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class TimetableUpdate(BaseModel):
+    topic: str | None = None
 
 
 class ExamTimetableCreate(BaseModel):

@@ -52,6 +52,7 @@ from app.schemas.school_admin import (
     ClassOut,
     EnrollmentCreate,
     EnrollmentOut,
+    EnrollmentUpdate,
     IdResponse,
     ParentLinkCreate,
     ParentLinkOut,
@@ -59,6 +60,7 @@ from app.schemas.school_admin import (
     SubjectOut,
     TeacherAssignmentCreate,
     TeacherAssignmentOut,
+    TeacherAssignmentUpdate,
     TempPasswordResponse,
     UserCreate,
     UserCreatedResponse,
@@ -184,6 +186,8 @@ async def update_user(user_id: str, body: UserUpdate, request: Request,
         user.grade = body.grade
     if body.interests is not None:
         user.interests = body.interests
+    if body.phone_number is not None:
+        user.phone_number = body.phone_number
     action = "USER_DEACTIVATE" if body.is_active is False else "USER_UPDATE"
     if body.is_active is not None:
         user.is_active = body.is_active
@@ -251,12 +255,17 @@ async def assign_teacher(body: TeacherAssignmentCreate, request: Request,
 
 
 @router.get("/teacher-assignments", response_model=Page[TeacherAssignmentOut])
-async def list_teacher_assignments(page: PageParams = Depends(page_params), admin: User = Depends(_guard),
+async def list_teacher_assignments(include_ended: bool = Query(default=False),
+                                   page: PageParams = Depends(page_params), admin: User = Depends(_guard),
                                    db: AsyncSession = Depends(get_db)) -> Page[TeacherAssignmentOut]:
-    total = (await db.execute(select(func.count()).select_from(TeacherAssignment))).scalar_one()
+    stmt = select(TeacherAssignment)
+    count_stmt = select(func.count()).select_from(TeacherAssignment)
+    if not include_ended:
+        stmt = stmt.where(TeacherAssignment.end_date.is_(None))
+        count_stmt = count_stmt.where(TeacherAssignment.end_date.is_(None))
+    total = (await db.execute(count_stmt)).scalar_one()
     rows = (await db.execute(
-        select(TeacherAssignment).order_by(TeacherAssignment.created_at)
-        .limit(page.limit).offset(page.offset)
+        stmt.order_by(TeacherAssignment.created_at).limit(page.limit).offset(page.offset)
     )).scalars().all()
     if not rows:
         return Page(items=[], total=total, limit=page.limit, offset=page.offset)
@@ -274,10 +283,27 @@ async def list_teacher_assignments(page: PageParams = Depends(page_params), admi
             id=r.id, teacher_id=r.teacher_id, teacher_name=teachers.get(r.teacher_id, "Unknown"),
             class_id=r.class_id, class_name=classes.get(r.class_id, "Unknown"),
             subject_id=r.subject_id, subject_name=subjects.get(r.subject_id, "Unknown"),
+            end_date=r.end_date,
         )
         for r in rows
     ]
     return Page(items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.patch("/teacher-assignments/{assignment_id}", response_model=IdResponse)
+async def update_teacher_assignment(assignment_id: str, body: TeacherAssignmentUpdate, request: Request,
+                                    admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
+    row = (await db.execute(
+        select(TeacherAssignment).where(TeacherAssignment.id == assignment_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise NotFoundError("TeacherAssignment", assignment_id)
+    row.end_date = body.end_date
+    db.add(row)
+    await record_audit(db, action="TEACHER_ASSIGNMENT_UPDATE", actor=admin, target_type="teacher_assignment",
+                       target_id=row.id, payload={"end_date": str(body.end_date) if body.end_date else None},
+                       request=request)
+    return IdResponse(id=row.id)
 
 
 @router.delete("/teacher-assignments/{assignment_id}")
@@ -311,11 +337,17 @@ async def enroll_student(body: EnrollmentCreate, request: Request,
 
 
 @router.get("/enrollments", response_model=Page[EnrollmentOut])
-async def list_enrollments(page: PageParams = Depends(page_params), admin: User = Depends(_guard),
+async def list_enrollments(include_ended: bool = Query(default=False),
+                           page: PageParams = Depends(page_params), admin: User = Depends(_guard),
                            db: AsyncSession = Depends(get_db)) -> Page[EnrollmentOut]:
-    total = (await db.execute(select(func.count()).select_from(Enrollment))).scalar_one()
+    stmt = select(Enrollment)
+    count_stmt = select(func.count()).select_from(Enrollment)
+    if not include_ended:
+        stmt = stmt.where(Enrollment.end_date.is_(None))
+        count_stmt = count_stmt.where(Enrollment.end_date.is_(None))
+    total = (await db.execute(count_stmt)).scalar_one()
     rows = (await db.execute(
-        select(Enrollment).order_by(Enrollment.created_at).limit(page.limit).offset(page.offset)
+        stmt.order_by(Enrollment.created_at).limit(page.limit).offset(page.offset)
     )).scalars().all()
     if not rows:
         return Page(items=[], total=total, limit=page.limit, offset=page.offset)
@@ -329,10 +361,27 @@ async def list_enrollments(page: PageParams = Depends(page_params), admin: User 
         EnrollmentOut(
             id=r.id, student_id=r.student_id, student_name=students.get(r.student_id, "Unknown"),
             class_id=r.class_id, class_name=classes.get(r.class_id, "Unknown"),
+            end_date=r.end_date,
         )
         for r in rows
     ]
     return Page(items=items, total=total, limit=page.limit, offset=page.offset)
+
+
+@router.patch("/enrollments/{enrollment_id}", response_model=IdResponse)
+async def update_enrollment(enrollment_id: str, body: EnrollmentUpdate, request: Request,
+                            admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
+    row = (await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id)
+    )).scalar_one_or_none()
+    if row is None:
+        raise NotFoundError("Enrollment", enrollment_id)
+    row.end_date = body.end_date
+    db.add(row)
+    await record_audit(db, action="ENROLLMENT_UPDATE", actor=admin, target_type="enrollment",
+                       target_id=row.id, payload={"end_date": str(body.end_date) if body.end_date else None},
+                       request=request)
+    return IdResponse(id=row.id)
 
 
 @router.delete("/enrollments/{enrollment_id}")
@@ -466,6 +515,7 @@ async def mastery_by_class(admin: User = Depends(_guard), db: AsyncSession = Dep
             func.count(func.distinct(Enrollment.student_id)),
         )
         .join(ProgressRecord, ProgressRecord.student_id == Enrollment.student_id)
+        .where(Enrollment.end_date.is_(None))
         .group_by(Enrollment.class_id)
     )).all()
     if not rows:

@@ -8,11 +8,27 @@ WebSocket/SSE infra for this) — the frontend polls.
 
 from __future__ import annotations
 
-from sqlalchemy import Boolean, String, Text
+import enum
+from datetime import datetime
+
+from sqlalchemy import Boolean, DateTime, Enum as SQLEnum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
 from app.models.mixins import TenantScoped, UUIDPk
+
+
+class NotificationChannel(str, enum.Enum):
+    in_app = "in_app"
+    sms = "sms"
+    whatsapp = "whatsapp"
+    email = "email"
+
+
+class DispatchStatus(str, enum.Enum):
+    pending = "pending"
+    sent = "sent"
+    failed = "failed"
 
 
 class Notification(Base, UUIDPk, TenantScoped):
@@ -25,3 +41,17 @@ class Notification(Base, UUIDPk, TenantScoped):
     body: Mapped[str | None] = mapped_column(Text, default=None)
     link: Mapped[str | None] = mapped_column(String(255), default=None)
     is_read: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    channel: Mapped[NotificationChannel] = mapped_column(
+        SQLEnum(NotificationChannel, name="notification_channel"),
+        default=NotificationChannel.in_app,
+    )
+    # in_app rows are "sent" the instant they're persisted (delivery = being
+    # polled via GET /notifications); only sms/whatsapp start pending and get
+    # flipped by the APScheduler dispatch job (app/services/notification_dispatch.py).
+    dispatch_status: Mapped[DispatchStatus] = mapped_column(
+        SQLEnum(DispatchStatus, name="notification_dispatch_status"),
+        default=DispatchStatus.sent,
+    )
+    dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    dispatch_error: Mapped[str | None] = mapped_column(String(512), default=None)

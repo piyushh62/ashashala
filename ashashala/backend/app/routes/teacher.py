@@ -35,6 +35,7 @@ from app.schemas.teacher import (
     StudentCreate,
     TimetableCreate,
     TimetableOut,
+    TimetableUpdate,
 )
 from app.schemas.pagination import Page
 from app.services.audit_service import record_audit
@@ -52,7 +53,8 @@ _EXT_TO_TYPE = {"pdf": SourceType.pdf, "docx": SourceType.docx, "txt": SourceTyp
 
 async def _assert_assigned(db: AsyncSession, teacher: User, class_id: str, subject_id: str | None) -> None:
     stmt = select(TeacherAssignment).where(
-        TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.class_id == class_id
+        TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.class_id == class_id,
+        TeacherAssignment.end_date.is_(None),
     )
     if subject_id:
         stmt = stmt.where(TeacherAssignment.subject_id == subject_id)
@@ -160,7 +162,7 @@ async def create_timetable(body: TimetableCreate, request: Request,
     await _assert_assigned(db, teacher, body.class_id, body.subject_id)
     tt = Timetable(teacher_id=teacher.id, class_id=body.class_id, subject_id=body.subject_id,
                    day_of_week=body.day_of_week, period_number=body.period_number, room=body.room,
-                   school_id=teacher.school_id)
+                   topic=body.topic, school_id=teacher.school_id)
     db.add(tt)
     await db.flush()
     await record_audit(db, action="TIMETABLE_CREATE", actor=teacher, target_type="timetable",
@@ -175,6 +177,19 @@ async def list_timetable(teacher: User = Depends(_guard), db: AsyncSession = Dep
         .order_by(Timetable.day_of_week, Timetable.period_number)
     )).scalars().all()
     return [TimetableOut.model_validate(r) for r in rows]
+
+
+@router.patch("/timetable/{entry_id}", response_model=TimetableOut)
+async def update_timetable_entry(entry_id: str, body: TimetableUpdate, request: Request,
+                                 teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> TimetableOut:
+    entry = await db.get(Timetable, entry_id)
+    if entry is None or entry.teacher_id != teacher.id:
+        raise NotFoundError("Timetable", entry_id)
+    entry.topic = body.topic
+    db.add(entry)
+    await record_audit(db, action="TIMETABLE_UPDATE", actor=teacher, target_type="timetable",
+                       target_id=entry_id, request=request)
+    return TimetableOut.model_validate(entry)
 
 
 @router.delete("/timetable/{entry_id}")
@@ -210,7 +225,9 @@ async def list_assignments(teacher: User = Depends(_guard), db: AsyncSession = D
     Materials/Timetable pickers — avoids the frontend needing raw class/subject
     UUIDs to build a working upload/timetable form."""
     rows = (await db.execute(
-        select(TeacherAssignment).where(TeacherAssignment.teacher_id == teacher.id)
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.end_date.is_(None)
+        )
     )).scalars().all()
     class_ids = {r.class_id for r in rows}
     subject_ids = {r.subject_id for r in rows}
@@ -232,7 +249,9 @@ async def list_assignments(teacher: User = Depends(_guard), db: AsyncSession = D
 @router.get("/dashboard")
 async def teacher_dashboard(teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> dict:
     assignments = (await db.execute(
-        select(TeacherAssignment).where(TeacherAssignment.teacher_id == teacher.id)
+        select(TeacherAssignment).where(
+            TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.end_date.is_(None)
+        )
     )).scalars().all()
     materials = (await db.execute(
         select(Document).where(Document.uploaded_by_teacher_id == teacher.id)
@@ -252,7 +271,9 @@ async def class_progress(class_id: str, teacher: User = Depends(_guard),
 
     student_ids = [
         r.student_id for r in
-        (await db.execute(select(Enrollment).where(Enrollment.class_id == class_id))).scalars().all()
+        (await db.execute(
+            select(Enrollment).where(Enrollment.class_id == class_id, Enrollment.end_date.is_(None))
+        )).scalars().all()
     ]
     if not student_ids:
         return []
@@ -333,7 +354,9 @@ async def approve_quiz(quiz_id: str, body: QuizApproval, request: Request,
         quiz.created_by_teacher_id = teacher.id
         db.add(quiz)
         student_ids = (await db.execute(
-            select(Enrollment.student_id).where(Enrollment.class_id == quiz.class_id)
+            select(Enrollment.student_id).where(
+                Enrollment.class_id == quiz.class_id, Enrollment.end_date.is_(None)
+            )
         )).scalars().all()
         for student_id in student_ids:
             await notify(db, user_id=student_id, school_id=teacher.school_id, type="quiz_approved",

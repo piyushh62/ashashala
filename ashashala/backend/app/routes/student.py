@@ -62,7 +62,9 @@ _guard = require_permission(STUDENT_PORTAL)
 
 
 async def _class_ids(db: AsyncSession, student: User) -> list[str]:
-    rows = (await db.execute(select(Enrollment).where(Enrollment.student_id == student.id))).scalars().all()
+    rows = (await db.execute(
+        select(Enrollment).where(Enrollment.student_id == student.id, Enrollment.end_date.is_(None))
+    )).scalars().all()
     return sorted({r.class_id for r in rows})
 
 
@@ -149,7 +151,8 @@ async def timetable(student: User = Depends(_guard), db: AsyncSession = Depends(
         return []
     rows = (await db.execute(select(Timetable).where(Timetable.class_id.in_(class_ids)))).scalars().all()
     return [{"day_of_week": t.day_of_week, "period_number": t.period_number,
-             "class_id": t.class_id, "subject_id": t.subject_id, "room": t.room} for t in rows]
+             "class_id": t.class_id, "subject_id": t.subject_id, "room": t.room,
+             "topic": t.topic} for t in rows]
 
 
 @router.get("/exam-timetable")
@@ -514,7 +517,9 @@ async def quiz_submit(quiz_id: str, body: QuizSubmitRequest, request: Request,
 
     if flagged_count:
         teacher_ids = (await db.execute(
-            select(TeacherAssignment.teacher_id).where(TeacherAssignment.class_id == quiz.class_id)
+            select(TeacherAssignment.teacher_id).where(
+                TeacherAssignment.class_id == quiz.class_id, TeacherAssignment.end_date.is_(None)
+            )
         )).scalars().all()
         for teacher_id in set(teacher_ids):
             await notify(db, user_id=teacher_id, school_id=student.school_id, type="answer_flagged",

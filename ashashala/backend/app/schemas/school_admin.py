@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import date
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.auth.password import validate_password_complexity
@@ -27,6 +29,7 @@ class UserUpdate(BaseModel):
     is_active: bool | None = None
     grade: int | None = None
     interests: str | None = None
+    phone_number: str | None = None
 
 
 class UserOut(BaseModel):
@@ -37,6 +40,7 @@ class UserOut(BaseModel):
     school_id: str | None
     is_active: bool
     grade: int | None = None
+    phone_number: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -84,6 +88,11 @@ class TeacherAssignmentOut(BaseModel):
     class_name: str
     subject_id: str
     subject_name: str
+    end_date: date | None = None
+
+
+class TeacherAssignmentUpdate(BaseModel):
+    end_date: date | None = None
 
 
 class EnrollmentCreate(BaseModel):
@@ -97,6 +106,11 @@ class EnrollmentOut(BaseModel):
     student_name: str
     class_id: str
     class_name: str
+    end_date: date | None = None
+
+
+class EnrollmentUpdate(BaseModel):
+    end_date: date | None = None
 
 
 class ParentLinkCreate(BaseModel):

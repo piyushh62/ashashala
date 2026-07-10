@@ -122,6 +122,19 @@ class Settings(BaseSettings):
     QDRANT_TIMEOUT: int = Field(default=10, description="Qdrant query timeout")
     R2_TIMEOUT: int = Field(default=60, description="R2 upload timeout")
 
+    # --- Optional: SMS/WhatsApp providers ---
+    # Unused today — every channel is served by the log-only LogSender stub
+    # (see app/services/notification_dispatch.py). Shaped for a future real
+    # provider to drop in without further config changes.
+    TWILIO_ACCOUNT_SID: str | None = Field(default=None, description="Twilio account SID (SMS)")
+    TWILIO_AUTH_TOKEN: str | None = Field(default=None, description="Twilio auth token (SMS)")
+    TWILIO_FROM_NUMBER: str | None = Field(default=None, description="Twilio sending number (SMS)")
+    WHATSAPP_BUSINESS_TOKEN: str | None = Field(default=None, description="WhatsApp Business API token")
+    WHATSAPP_PHONE_NUMBER_ID: str | None = Field(default=None, description="WhatsApp Business phone number id")
+    NOTIFICATION_DISPATCH_INTERVAL_SECONDS: int = Field(
+        default=60, description="APScheduler poll interval for pending sms/whatsapp notifications"
+    )
+
     @model_validator(mode="after")
     def validate_storage_config(self):
         r2_enabled = all(

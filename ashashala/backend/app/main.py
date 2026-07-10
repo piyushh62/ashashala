@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.auth.routes import router as auth_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
+from app.core.scheduler import start_scheduler, stop_scheduler
 from app.db.session import close_db
 from app.routes.admin import router as admin_router
 from app.routes.agent_actions import router as agent_actions_router
@@ -59,7 +60,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Startup/shutdown lifecycle."""
     logger.info("Starting AshaShala API v%s (%s)", settings.APP_VERSION, settings.ENVIRONMENT)
     init_sentry()
+    start_scheduler()
     yield
+    stop_scheduler()
     await close_db()
     logger.info("AshaShala API shut down cleanly")
 
