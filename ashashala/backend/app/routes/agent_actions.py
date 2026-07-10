@@ -23,6 +23,7 @@ from app.models.agent_action import AgentAction, AgentActionStatus
 from app.models.user import User
 from app.schemas.agent_action import AgentActionOut, AgentActionReview
 from app.schemas.pagination import Page
+from app.services.agent_action_handlers import AGENT_ACTION_HANDLERS
 from app.services.audit_service import record_audit
 
 router = APIRouter(prefix="/api/v1/agent-actions", tags=["Agent Actions"])
@@ -33,6 +34,7 @@ _reject_guard = require_permission(AGENT_ACTION_REJECT)
 
 @router.get("", response_model=Page[AgentActionOut])
 async def list_agent_actions(status: AgentActionStatus | None = Query(default=None),
+                             agent_name: str | None = Query(default=None),
                              page: PageParams = Depends(page_params),
                              user: User = Depends(_view_guard), db: AsyncSession = Depends(get_db)) -> Page[AgentActionOut]:
     """Tenant-scoped automatically (`AgentAction` is `TenantScoped`) — a school
@@ -42,6 +44,9 @@ async def list_agent_actions(status: AgentActionStatus | None = Query(default=No
     if status is not None:
         stmt = stmt.where(AgentAction.status == status)
         count_stmt = count_stmt.where(AgentAction.status == status)
+    if agent_name is not None:
+        stmt = stmt.where(AgentAction.agent_name == agent_name)
+        count_stmt = count_stmt.where(AgentAction.agent_name == agent_name)
     total = (await db.execute(count_stmt)).scalar_one()
     rows = (await db.execute(
         stmt.order_by(AgentAction.created_at.desc()).limit(page.limit).offset(page.offset)
@@ -70,6 +75,9 @@ async def approve_agent_action(action_id: str, request: Request, body: AgentActi
     action.reviewed_by_user_id = user.id
     action.reviewed_at = datetime.now(UTC)
     db.add(action)
+    handler = AGENT_ACTION_HANDLERS.get((action.agent_name, action.action_type))
+    if handler is not None:
+        await handler(db, action, user)
     await record_audit(db, action="AGENT_ACTION_APPROVE", actor=user, target_type="agent_action",
                        target_id=action_id, payload={"note": body.note}, request=request)
     return AgentActionOut.model_validate(action)

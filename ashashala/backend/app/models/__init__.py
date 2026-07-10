@@ -6,6 +6,7 @@ package is imported (Alembic autogenerate + create_all rely on this).
 
 from app.models.agent_action import AgentAction, AgentActionStatus
 from app.models.audit import AuditLog
+from app.models.communication import MessageSenderRole, ParentMessage
 from app.models.document import Chunk, DocStatus, Document, OcrCache, SourceType
 from app.models.feed import LearningFeedItem
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
@@ -20,6 +21,7 @@ from app.models.learning import (
 )
 from app.models.llm_usage import LlmUsage
 from app.models.notification import DispatchStatus, Notification, NotificationChannel
+from app.models.notification_preference import NotificationPreference
 from app.models.rbac import (
     Permission,
     Role,
@@ -30,6 +32,7 @@ from app.models.rbac import (
     UserRoleAssignment,
 )
 from app.models.refresh_token import RefreshToken
+from app.models.report import Report, ReportStatus
 from app.models.school import School
 from app.models.structure import (
     ClassSection,
@@ -59,9 +62,12 @@ __all__ = [
     "LlmUsage",
     "Message",
     "MessageRole",
+    "MessageSenderRole",
     "Notification",
     "NotificationChannel",
+    "NotificationPreference",
     "OcrCache",
+    "ParentMessage",
     "ParentStudentLink",
     "Permission",
     "ProgressRecord",
@@ -69,6 +75,8 @@ __all__ = [
     "QuizAttempt",
     "QuizStatus",
     "RefreshToken",
+    "Report",
+    "ReportStatus",
     "Role",
     "RoleCreationRight",
     "RolePermission",

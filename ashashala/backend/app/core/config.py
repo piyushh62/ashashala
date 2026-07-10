@@ -152,6 +152,17 @@ class Settings(BaseSettings):
         default=5, description="Local hour (0-23) the daily Scheduled-Learning feed generation runs"
     )
 
+    # --- Phase 4: parent-facing (Reporting, Communication agents) ---
+    REPORT_PERIOD_DAYS: int = Field(
+        default=7, description="Length in days of each generated parent report's period"
+    )
+    REPORT_CRON_DAY_OF_WEEK: str = Field(
+        default="sun", description="APScheduler cron day_of_week the weekly report job runs"
+    )
+    REPORT_CRON_HOUR: int = Field(
+        default=3, description="Local hour (0-23) the weekly Reporting Agent job runs"
+    )
+
     @model_validator(mode="after")
     def validate_storage_config(self):
         r2_enabled = all(

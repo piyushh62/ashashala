@@ -7,11 +7,12 @@ ever needs to run correctly across multiple workers/processes.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.agents.insight import run_insight_scan
+from app.agents.reporting import generate_reports
 from app.agents.scheduled_learning import generate_daily_feed
 from app.core.config import settings
 from app.db.session import async_session_factory
@@ -43,6 +44,15 @@ async def _run_scheduled_learning_job() -> None:
             logger.info("Scheduled-learning agent created %d feed item(s)", count)
 
 
+async def _run_report_job() -> None:
+    async with async_session_factory() as db:
+        today = datetime.now(UTC).date()
+        period_start = today - timedelta(days=settings.REPORT_PERIOD_DAYS)
+        count = await generate_reports(db, period_start=period_start, period_end=today)
+        if count:
+            logger.info("Reporting agent generated %d report(s)", count)
+
+
 def start_scheduler() -> AsyncIOScheduler | None:
     """Start the background scheduler; no-ops under test/mocked settings.
 
@@ -69,6 +79,11 @@ def start_scheduler() -> AsyncIOScheduler | None:
         _run_scheduled_learning_job, "cron",
         hour=settings.SCHEDULED_LEARNING_CRON_HOUR, minute=0,
         max_instances=1, coalesce=True, id="scheduled_learning_feed",
+    )
+    scheduler.add_job(
+        _run_report_job, "cron",
+        day_of_week=settings.REPORT_CRON_DAY_OF_WEEK, hour=settings.REPORT_CRON_HOUR, minute=0,
+        max_instances=1, coalesce=True, id="weekly_report_generation",
     )
     scheduler.start()
     _scheduler = scheduler

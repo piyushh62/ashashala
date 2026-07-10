@@ -17,13 +17,17 @@ from app.core.permissions import TEACHER_PORTAL
 from app.db.session import get_db
 from app.deps import PageParams, page_params, require_permission
 from app.models.agent_action import AgentAction, AgentActionStatus
+from app.models.communication import MessageSenderRole, ParentMessage
 from app.models.document import DocStatus, Document, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
 from app.models.learning import ProgressRecord, Quiz, QuizStatus
+from app.models.report import Report, ReportStatus
 from app.models.school import School
 from app.models.structure import ClassSection, Enrollment, ParentStudentLink, Subject, TeacherAssignment
 from app.models.timetable import ExamTimetable, Timetable
 from app.models.user import User, UserRole
+from app.schemas.parent import ParentMessageOut
+from app.schemas.report import ReportOut, ReportPatch
 from app.schemas.school_admin import UserCreatedResponse, UserOut
 from app.schemas.teacher import (
     DocumentOut,
@@ -36,6 +40,7 @@ from app.schemas.teacher import (
     ParentCreate,
     QuizApproval,
     StudentCreate,
+    TeacherMessageCreate,
     TimetableAiSuggestRequest,
     TimetableCreate,
     TimetableOptionOut,
@@ -70,6 +75,22 @@ async def _assert_assigned(db: AsyncSession, teacher: User, class_id: str, subje
 async def _feature_enabled(db: AsyncSession, school_id: str, flag: str) -> bool:
     school = await db.get(School, school_id)
     return bool(school and school.features_json.get(flag, True))
+
+
+async def _assert_assigned_to_student(db: AsyncSession, teacher: User, student_id: str) -> None:
+    class_ids = (await db.execute(
+        select(Enrollment.class_id).where(Enrollment.student_id == student_id, Enrollment.end_date.is_(None))
+    )).scalars().all()
+    if not class_ids:
+        raise ForbiddenError("Not assigned to this student")
+    assigned = (await db.execute(
+        select(TeacherAssignment.id).where(
+            TeacherAssignment.teacher_id == teacher.id, TeacherAssignment.class_id.in_(class_ids),
+            TeacherAssignment.end_date.is_(None),
+        )
+    )).first()
+    if assigned is None:
+        raise ForbiddenError("Not assigned to this student")
 
 
 async def _create_and_schedule(
@@ -538,3 +559,65 @@ async def create_parent(body: ParentCreate, request: Request,
                        target_id=parent.id, payload={"role": "parent"}, request=request)
     return UserCreatedResponse(user=UserOut.model_validate(parent),
                                temp_password=None if body.password else temp)
+
+
+@router.patch("/reports/{report_id}", response_model=ReportOut)
+async def update_report_notes(report_id: str, body: ReportPatch, request: Request,
+                              teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> ReportOut:
+    """Attach a note before approving via POST /agent-actions/{id}/approve —
+    only while the report is still a draft (unsent)."""
+    report = await db.get(Report, report_id)
+    if report is None or report.school_id != teacher.school_id:
+        raise NotFoundError("Report", report_id)
+    if report.status != ReportStatus.draft:
+        raise ValidationError("Report notes can only be edited while the report is in draft")
+    report.teacher_notes = body.teacher_notes
+    db.add(report)
+    await record_audit(db, action="REPORT_NOTES_UPDATE", actor=teacher, target_type="report",
+                       target_id=report_id, request=request)
+    return ReportOut.model_validate(report)
+
+
+@router.post("/messages", response_model=list[ParentMessageOut])
+async def send_teacher_message(body: TeacherMessageCreate, request: Request,
+                               teacher: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> list[ParentMessageOut]:
+    await _assert_assigned_to_student(db, teacher, body.student_id)
+    parent_links = (await db.execute(
+        select(ParentStudentLink).where(ParentStudentLink.student_id == body.student_id)
+    )).scalars().all()
+    if not parent_links:
+        raise ValidationError("This student has no linked parent to message")
+
+    created: list[ParentMessage] = []
+    for link in parent_links:
+        msg = ParentMessage(school_id=teacher.school_id, student_id=body.student_id,
+                            parent_id=link.parent_id, teacher_id=teacher.id,
+                            sender_role=MessageSenderRole.teacher, body=body.body)
+        db.add(msg)
+        created.append(msg)
+    await db.flush()
+    for link in parent_links:
+        await notify(db, user_id=link.parent_id, school_id=teacher.school_id, type="parent_message",
+                    title="New message from teacher", body=body.body[:140], link="/parent/messages")
+    await record_audit(db, action="PARENT_MESSAGE_SEND", actor=teacher, target_type="parent_message",
+                       target_id=body.student_id, request=request)
+    return [ParentMessageOut.model_validate(m) for m in created]
+
+
+@router.get("/messages", response_model=list[ParentMessageOut])
+async def list_teacher_messages(student_id: str, teacher: User = Depends(_guard),
+                                db: AsyncSession = Depends(get_db)) -> list[ParentMessageOut]:
+    await _assert_assigned_to_student(db, teacher, student_id)
+    rows = (await db.execute(
+        select(ParentMessage).where(
+            ParentMessage.student_id == student_id, ParentMessage.teacher_id == teacher.id,
+        ).order_by(ParentMessage.created_at)
+    )).scalars().all()
+    unread = [m for m in rows if m.sender_role == MessageSenderRole.parent and m.read_at is None]
+    if unread:
+        now = datetime.now(UTC)
+        for m in unread:
+            m.read_at = now
+            db.add(m)
+        await db.flush()
+    return [ParentMessageOut.model_validate(m) for m in rows]

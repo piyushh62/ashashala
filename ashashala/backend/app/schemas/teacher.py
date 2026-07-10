@@ -164,3 +164,8 @@ class ParentCreate(BaseModel):
     @classmethod
     def _check_password_complexity(cls, v: str | None) -> str | None:
         return validate_password_complexity(v) if v is not None else v
+
+
+class TeacherMessageCreate(BaseModel):
+    student_id: str
+    body: str = Field(min_length=1, max_length=4000)

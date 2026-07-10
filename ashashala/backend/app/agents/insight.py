@@ -14,13 +14,14 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents import communication
 from app.agents.json_utils import extract_json
 from app.agents.prompts.insight_prompt import build_insight_prompt
 from app.core.config import settings
 from app.db.tenant_filter import tenant_bypass
 from app.models.agent_action import AgentAction, AgentActionStatus
 from app.models.learning import ProgressRecord
-from app.models.structure import Enrollment, TeacherAssignment
+from app.models.structure import Enrollment, ParentStudentLink, TeacherAssignment
 from app.models.user import User
 from app.services.audit_service import record_audit
 from app.services.llm_router import chat as llm_chat
@@ -126,6 +127,15 @@ async def run_insight_scan(db: AsyncSession) -> int:
                     db, user_id=teacher_id, school_id=record.school_id, type="insight_alert",
                     title="Student may need support", body=alert_text,
                     link=f"/teacher/classes/{enrollment.class_id}/progress",
+                )
+
+            if student is not None:
+                parent_links = (await db.execute(
+                    select(ParentStudentLink).where(ParentStudentLink.student_id == record.student_id)
+                )).scalars().all()
+                await communication.propose_at_risk_message(
+                    db, school_id=record.school_id, student=student, parent_links=parent_links,
+                    topic=record.topic, mastery_score=record.mastery_score, alert_text=alert_text,
                 )
 
             await record_audit(
