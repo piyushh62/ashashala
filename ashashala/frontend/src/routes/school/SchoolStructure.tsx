@@ -2,9 +2,9 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Button, Card, CardHeader, Input, Label, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, Input, Label, Select, Skeleton, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
-import { useConfirm } from "../../components/ui/Modal";
+import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 
 // Classes, subjects, and the id-based joins (teacher assignment / enrollment /
@@ -32,14 +32,18 @@ export default function SchoolStructure() {
   const [taOffset, setTaOffset] = useState(0);
   const [enrollOffset, setEnrollOffset] = useState(0);
   const [linkOffset, setLinkOffset] = useState(0);
+  const [taShowEnded, setTaShowEnded] = useState(false);
+  const [enrollShowEnded, setEnrollShowEnded] = useState(false);
+  const [endTarget, setEndTarget] = useState<{ kind: "assignment" | "enrollment"; id: string; label: string } | null>(null);
+  const [endDate, setEndDate] = useState(() => new Date().toISOString().slice(0, 10));
 
   const teacherAssignments = useQuery({
-    queryKey: ["school", "teacher-assignments", taOffset],
-    queryFn: () => schoolApi.listTeacherAssignments(PAGE_SIZE, taOffset),
+    queryKey: ["school", "teacher-assignments", taOffset, taShowEnded],
+    queryFn: () => schoolApi.listTeacherAssignments(PAGE_SIZE, taOffset, taShowEnded),
   });
   const enrollments = useQuery({
-    queryKey: ["school", "enrollments", enrollOffset],
-    queryFn: () => schoolApi.listEnrollments(PAGE_SIZE, enrollOffset),
+    queryKey: ["school", "enrollments", enrollOffset, enrollShowEnded],
+    queryFn: () => schoolApi.listEnrollments(PAGE_SIZE, enrollOffset, enrollShowEnded),
   });
   const parentLinks = useQuery({
     queryKey: ["school", "parent-links", linkOffset],
@@ -91,6 +95,17 @@ export default function SchoolStructure() {
   const mUnlink = useMutation({
     mutationFn: (id: string) => schoolApi.unlinkParent(id),
     onSuccess: () => { ok("Parent link removed."); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); },
+    onError: fail,
+  });
+
+  const mEndAssignment = useMutation({
+    mutationFn: () => schoolApi.updateTeacherAssignment(endTarget!.id, endDate),
+    onSuccess: () => { ok("Assignment end-dated."); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); setEndTarget(null); },
+    onError: fail,
+  });
+  const mEndEnrollment = useMutation({
+    mutationFn: () => schoolApi.updateEnrollment(endTarget!.id, endDate),
+    onSuccess: () => { ok("Enrollment end-dated."); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); setEndTarget(null); },
     onError: fail,
   });
 
@@ -184,7 +199,15 @@ export default function SchoolStructure() {
         </Card>
 
         <Card>
-          <CardHeader title="Assign teacher to (class, subject)" />
+          <CardHeader
+            title="Assign teacher to (class, subject)"
+            action={
+              <label className="flex items-center gap-1.5 text-xs text-slate-500 font-normal cursor-pointer">
+                <input type="checkbox" checked={taShowEnded} onChange={(e) => { setTaOffset(0); setTaShowEnded(e.target.checked); }} />
+                Show ended
+              </label>
+            }
+          />
           <Row>
             <div>
               <Label>Teacher</Label>
@@ -205,13 +228,28 @@ export default function SchoolStructure() {
             >
               {(page) => (
                 <>
-                  <Table head={["Teacher", "Class", "Subject", ""]}>
+                  <Table head={["Teacher", "Class", "Subject", "", ""]}>
                     {page.items.map((r) => (
                       <tr key={r.id} className="border-b border-slate-50">
                         <td className="px-4 py-2 font-medium text-slate-700">{r.teacher_name}</td>
                         <td className="px-4 py-2 text-slate-500">{r.class_name}</td>
                         <td className="px-4 py-2 text-slate-500">{r.subject_name}</td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="px-4 py-2">
+                          {r.end_date && <Badge tone="amber">Ends {r.end_date}</Badge>}
+                        </td>
+                        <td className="px-4 py-2 text-right whitespace-nowrap">
+                          {!r.end_date && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEndDate(new Date().toISOString().slice(0, 10));
+                                setEndTarget({ kind: "assignment", id: r.id, label: `${r.teacher_name} teaching ${r.subject_name} to ${r.class_name}` });
+                              }}
+                            >
+                              End
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -236,7 +274,15 @@ export default function SchoolStructure() {
         </Card>
 
         <Card>
-          <CardHeader title="Enroll student" />
+          <CardHeader
+            title="Enroll student"
+            action={
+              <label className="flex items-center gap-1.5 text-xs text-slate-500 font-normal cursor-pointer">
+                <input type="checkbox" checked={enrollShowEnded} onChange={(e) => { setEnrollOffset(0); setEnrollShowEnded(e.target.checked); }} />
+                Show ended
+              </label>
+            }
+          />
           <Row>
             <div>
               <Label>Student</Label>
@@ -256,12 +302,27 @@ export default function SchoolStructure() {
             >
               {(page) => (
                 <>
-                  <Table head={["Student", "Class", ""]}>
+                  <Table head={["Student", "Class", "", ""]}>
                     {page.items.map((r) => (
                       <tr key={r.id} className="border-b border-slate-50">
                         <td className="px-4 py-2 font-medium text-slate-700">{r.student_name}</td>
                         <td className="px-4 py-2 text-slate-500">{r.class_name}</td>
-                        <td className="px-4 py-2 text-right">
+                        <td className="px-4 py-2">
+                          {r.end_date && <Badge tone="amber">Ends {r.end_date}</Badge>}
+                        </td>
+                        <td className="px-4 py-2 text-right whitespace-nowrap">
+                          {!r.end_date && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEndDate(new Date().toISOString().slice(0, 10));
+                                setEndTarget({ kind: "enrollment", id: r.id, label: `${r.student_name} in ${r.class_name}` });
+                              }}
+                            >
+                              End
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -340,6 +401,30 @@ export default function SchoolStructure() {
         </Card>
       </div>
       {confirm.dialog}
+
+      <Modal
+        open={!!endTarget}
+        onOpenChange={(open) => !open && setEndTarget(null)}
+        title="Set an end date"
+        description={endTarget?.label}
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <Label>End date</Label>
+            <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEndTarget(null)}>Cancel</Button>
+            <Button
+              onClick={() => (endTarget?.kind === "assignment" ? mEndAssignment.mutate() : mEndEnrollment.mutate())}
+              disabled={!endDate || mEndAssignment.isPending || mEndEnrollment.isPending}
+            >
+              {mEndAssignment.isPending || mEndEnrollment.isPending ? "Saving…" : "Set end date"}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

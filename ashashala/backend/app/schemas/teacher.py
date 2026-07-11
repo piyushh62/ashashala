@@ -133,6 +133,51 @@ class QuizApproval(BaseModel):
     feedback: str | None = None
 
 
+class SuggestedQuizQuestionOut(BaseModel):
+    type: str
+    question: str
+    options: list[str] | None = None
+    answer_index: int | None = None
+    expected_answer: str | None = None
+    difficulty: str
+    xp: int
+    explanation: str
+
+
+class SuggestedQuizOut(BaseModel):
+    """Draft quiz returned for teacher review before approval.
+
+    Includes answers (unlike the student-facing quiz payload) so the teacher
+    can vet correctness before calling the existing quiz-approval endpoint.
+    """
+
+    quiz_id: str
+    topic: str
+    class_id: str
+    subject_id: str | None
+    questions: list[SuggestedQuizQuestionOut]
+
+
+class AssignmentCreate(BaseModel):
+    class_id: str
+    subject_id: str | None = None
+    topic: str
+    due_date: date
+
+
+class AssignmentOut(BaseModel):
+    id: str
+    topic: str
+    class_id: str
+    class_name: str
+    subject_id: str | None
+    subject_name: str | None
+    due_date: date
+    quiz_id: str | None
+    submission_count: int
+    status: str
+
+
 class StudentCreate(BaseModel):
     """Body for teacher-initiated student creation (POST /teacher/students).
 

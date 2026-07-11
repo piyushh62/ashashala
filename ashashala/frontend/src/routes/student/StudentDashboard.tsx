@@ -55,6 +55,21 @@ export default function StudentDashboard() {
         </div>
       </div>
 
+      <Link to="/student/today" className="block mb-6 group">
+        <div className="rounded-2xl px-5 py-4 bg-white border border-slate-200/70 shadow-card flex items-center justify-between gap-4 transition group-hover:border-brand-200 group-hover:shadow-soft">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 grid place-items-center text-lg shrink-0">
+              📖
+            </div>
+            <div>
+              <div className="font-semibold text-slate-800">Today's Learning</div>
+              <div className="text-sm text-slate-500">A short explainer for each class on your timetable today.</div>
+            </div>
+          </div>
+          <span className="text-brand-600 text-sm font-medium shrink-0">View →</span>
+        </div>
+      </Link>
+
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader title="Your mastery" icon="🎯" />

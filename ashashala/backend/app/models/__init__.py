@@ -5,6 +5,7 @@ package is imported (Alembic autogenerate + create_all rely on this).
 """
 
 from app.models.agent_action import AgentAction, AgentActionStatus
+from app.models.assignment import Assignment, AssignmentStatus
 from app.models.audit import AuditLog
 from app.models.communication import MessageSenderRole, ParentMessage
 from app.models.document import Chunk, DocStatus, Document, OcrCache, SourceType
@@ -34,6 +35,7 @@ from app.models.rbac import (
 from app.models.refresh_token import RefreshToken
 from app.models.report import Report, ReportStatus
 from app.models.school import School
+from app.models.staffing import TeacherAbsence
 from app.models.structure import (
     ClassSection,
     Enrollment,
@@ -47,6 +49,8 @@ from app.models.user import User, UserRole
 __all__ = [
     "AgentAction",
     "AgentActionStatus",
+    "Assignment",
+    "AssignmentStatus",
     "AuditLog",
     "ChatSession",
     "Chunk",
@@ -84,6 +88,7 @@ __all__ = [
     "School",
     "SourceType",
     "Subject",
+    "TeacherAbsence",
     "TeacherAssignment",
     "TemplatePermission",
     "Timetable",

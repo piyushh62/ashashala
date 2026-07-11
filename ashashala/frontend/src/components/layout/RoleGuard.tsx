@@ -13,12 +13,10 @@ export const HOME_FOR: Record<Role, string> = {
 };
 
 export function RoleGuard({
-  allow,
-  requirePermission,
+  permissions = [],
   children,
 }: {
-  allow: Role[];
-  requirePermission?: string;
+  permissions?: string[];
   children: ReactNode;
 }) {
   const { user, status } = useAuth();
@@ -31,8 +29,7 @@ export function RoleGuard({
     );
   }
   if (status === "anon" || !user) return <Navigate to="/login" replace />;
-  if (!allow.includes(user.role)) return <Navigate to={HOME_FOR[user.role]} replace />;
-  if (requirePermission && !user.permissions.includes(requirePermission)) {
+  if (permissions.some((p) => !user.permissions.includes(p))) {
     return <Navigate to={HOME_FOR[user.role]} replace />;
   }
   return <>{children}</>;

@@ -10,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, UploadFi
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.quiz_suggest import generate_quiz_for_topic, generate_quiz_from_material
 from app.agents.scheduling import generate_timetable_options
 from app.auth.password import hash_password
 from app.core.exceptions import ForbiddenError, NotFoundError, ValidationError
@@ -17,10 +18,11 @@ from app.core.permissions import TEACHER_PORTAL
 from app.db.session import get_db
 from app.deps import PageParams, page_params, require_permission
 from app.models.agent_action import AgentAction, AgentActionStatus
+from app.models.assignment import Assignment, AssignmentStatus
 from app.models.communication import MessageSenderRole, ParentMessage
 from app.models.document import DocStatus, Document, SourceType
 from app.models.flagged_answer import FlaggedAnswer, FlagStatus
-from app.models.learning import ProgressRecord, Quiz, QuizStatus
+from app.models.learning import ProgressRecord, Quiz, QuizAttempt, QuizStatus
 from app.models.report import Report, ReportStatus
 from app.models.school import School
 from app.models.structure import ClassSection, Enrollment, ParentStudentLink, Subject, TeacherAssignment
@@ -30,6 +32,8 @@ from app.schemas.parent import ParentMessageOut
 from app.schemas.report import ReportOut, ReportPatch
 from app.schemas.school_admin import UserCreatedResponse, UserOut
 from app.schemas.teacher import (
+    AssignmentCreate,
+    AssignmentOut,
     DocumentOut,
     ExamTimetableCreate,
     ExamTimetableOut,
@@ -40,6 +44,7 @@ from app.schemas.teacher import (
     ParentCreate,
     QuizApproval,
     StudentCreate,
+    SuggestedQuizOut,
     TeacherMessageCreate,
     TimetableAiSuggestRequest,
     TimetableCreate,
@@ -180,6 +185,27 @@ async def delete_material(doc_id: str, request: Request,
     await record_audit(db, action="MATERIAL_DELETE", actor=teacher, target_type="document",
                        target_id=doc_id, request=request)
     return {"status": "deleted", "id": doc_id}
+
+
+@router.post("/materials/{doc_id}/suggest-quiz", response_model=SuggestedQuizOut)
+async def suggest_quiz_from_material(doc_id: str, request: Request,
+                                     teacher: User = Depends(_guard),
+                                     db: AsyncSession = Depends(get_db)) -> SuggestedQuizOut:
+    """Generate a draft quiz grounded strictly in this material's content.
+    Returns the questions with answers for teacher review; call
+    POST /teacher/quizzes/{quiz_id}/approve to publish it."""
+    doc = await db.get(Document, doc_id)
+    if doc is None or doc.school_id != teacher.school_id:
+        raise NotFoundError("Document", doc_id)
+    await _assert_assigned(db, teacher, doc.class_id, doc.subject_id)
+    if doc.status != DocStatus.indexed:
+        raise ValidationError("Material is still processing — try again shortly")
+
+    quiz = await generate_quiz_from_material(db, teacher, document=doc)
+    await record_audit(db, action="QUIZ_SUGGEST", actor=teacher, target_type="quiz",
+                       target_id=quiz.id, payload={"doc_id": doc_id}, request=request)
+    return SuggestedQuizOut(quiz_id=quiz.id, topic=quiz.topic, class_id=quiz.class_id,
+                            subject_id=quiz.subject_id, questions=quiz.questions_json)
 
 
 @router.post("/timetable", response_model=TimetableOut)
@@ -408,6 +434,70 @@ async def list_assignments(teacher: User = Depends(_guard), db: AsyncSession = D
         }
         for r in rows
     ]
+
+
+async def _assignment_out(db: AsyncSession, a: Assignment) -> AssignmentOut:
+    class_section = await db.get(ClassSection, a.class_id)
+    subject = await db.get(Subject, a.subject_id) if a.subject_id else None
+    submission_count = 0
+    if a.quiz_id:
+        submission_count = (await db.execute(
+            select(func.count(func.distinct(QuizAttempt.student_id))).where(QuizAttempt.quiz_id == a.quiz_id)
+        )).scalar_one()
+    return AssignmentOut(
+        id=a.id, topic=a.topic, class_id=a.class_id,
+        class_name=class_section.name if class_section else a.class_id,
+        subject_id=a.subject_id, subject_name=subject.name if subject else None,
+        due_date=a.due_date, quiz_id=a.quiz_id, submission_count=submission_count,
+        status=a.status.value,
+    )
+
+
+@router.post("/assignment-tasks", response_model=AssignmentOut)
+async def create_assignment_task(body: AssignmentCreate, request: Request,
+                                 teacher: User = Depends(_guard),
+                                 db: AsyncSession = Depends(get_db)) -> AssignmentOut:
+    """Assignment Builder: pick a class/subject/topic + due date, auto-generate
+    a grounded quiz for it, and publish immediately (the teacher's explicit
+    intent in using this builder is treated as approval — see
+    `app.agents.quiz_suggest.generate_quiz_for_topic`)."""
+    await _assert_assigned(db, teacher, body.class_id, body.subject_id)
+
+    quiz = await generate_quiz_for_topic(
+        db, teacher, class_id=body.class_id, subject_id=body.subject_id, topic=body.topic,
+    )
+    quiz.status = QuizStatus.approved
+
+    assignment = Assignment(
+        school_id=teacher.school_id, teacher_id=teacher.id, class_id=body.class_id,
+        subject_id=body.subject_id, topic=body.topic, quiz_id=quiz.id, due_date=body.due_date,
+        status=AssignmentStatus.published,
+    )
+    db.add(assignment)
+    await db.flush()
+
+    student_ids = (await db.execute(
+        select(Enrollment.student_id).where(
+            Enrollment.class_id == body.class_id, Enrollment.end_date.is_(None)
+        )
+    )).scalars().all()
+    for student_id in student_ids:
+        await notify(db, user_id=student_id, school_id=teacher.school_id, type="assignment_created",
+                    title="New assignment", body=f"{body.topic} — due {body.due_date.isoformat()}.",
+                    link="/student/quiz")
+
+    await record_audit(db, action="ASSIGNMENT_CREATE", actor=teacher, target_type="assignment",
+                       target_id=assignment.id, payload={"topic": body.topic}, request=request)
+    return await _assignment_out(db, assignment)
+
+
+@router.get("/assignment-tasks", response_model=list[AssignmentOut])
+async def list_assignment_tasks(teacher: User = Depends(_guard),
+                                db: AsyncSession = Depends(get_db)) -> list[AssignmentOut]:
+    rows = (await db.execute(
+        select(Assignment).where(Assignment.teacher_id == teacher.id).order_by(Assignment.due_date)
+    )).scalars().all()
+    return [await _assignment_out(db, a) for a in rows]
 
 
 @router.get("/dashboard")

@@ -134,6 +134,21 @@ class TempPasswordResponse(BaseModel):
     temp_password: str
 
 
+class TeacherAbsenceCreate(BaseModel):
+    teacher_id: str
+    absence_date: date
+    reason: str | None = None
+
+
+class TeacherAbsenceOut(BaseModel):
+    id: str
+    teacher_id: str
+    teacher_name: str
+    absence_date: date
+    reason: str | None = None
+    substitute_suggestions: int
+
+
 class AtRiskStudentOut(BaseModel):
     student_id: str
     student_name: str

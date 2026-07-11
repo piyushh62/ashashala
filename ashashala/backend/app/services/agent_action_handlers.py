@@ -48,7 +48,30 @@ async def _send_at_risk_message_after_approval(db: AsyncSession, action: AgentAc
         )
 
 
+async def _notify_substitute_after_approval(db: AsyncSession, action: AgentAction, user: User) -> None:
+    """Approving a Staffing Agent proposal always notifies its top-ranked
+    candidate — the generic approve route only carries a free-text `note`, not
+    a candidate pick, so the ranking done at proposal time is the decision."""
+    candidates = action.payload_json.get("candidates") or []
+    if not candidates:
+        return
+    teacher_id = candidates[0].get("teacher_id")
+    if not teacher_id:
+        return
+    subject_name = action.payload_json.get("subject_name", "a class")
+    class_name = action.payload_json.get("class_name", "")
+    period = action.payload_json.get("period_number")
+    absence_date = action.payload_json.get("absence_date")
+    await notify(
+        db, user_id=teacher_id, school_id=action.school_id, type="substitute_request",
+        title="You've been asked to substitute",
+        body=f"Cover {subject_name} for {class_name}, period {period} on {absence_date}.",
+        link="/teacher/timetable",
+    )
+
+
 AGENT_ACTION_HANDLERS: dict[tuple[str, str], Handler] = {
     ("reporting_agent", "report_ready"): _send_report_after_approval,
     ("communication_agent", "at_risk_parent_message"): _send_at_risk_message_after_approval,
+    ("staffing_agent", "substitute_suggestion"): _notify_substitute_after_approval,
 }

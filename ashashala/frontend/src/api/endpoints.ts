@@ -3,6 +3,7 @@
 import { api } from "./client";
 import type {
   AgentActionOut,
+  AssignmentOut,
   AtRiskStudentOut,
   AuditRow,
   ChildRow,
@@ -16,6 +17,7 @@ import type {
   ExamRow,
   ExamTimetableOut,
   FlaggedAnswer,
+  LearningFeedItemOut,
   Me,
   Notification,
   NotificationListOut,
@@ -35,6 +37,8 @@ import type {
   SchoolDashboardOut,
   StudentDashboard,
   Subject,
+  SuggestedQuizOut,
+  TeacherAbsenceOut,
   TeacherAssignmentJoinRow,
   TeacherDashboardOut,
   TeacherTimetableRow,
@@ -76,6 +80,18 @@ export const adminApi = {
   updateRoleTemplate: (id: string, body: Partial<{ description: string; permissions: string[] }>) =>
     api.patch<RoleTemplateOut>(`/api/v1/admin/role-templates/${id}`, body),
   deleteRoleTemplate: (id: string) => api.del<{ status: string }>(`/api/v1/admin/role-templates/${id}`),
+  audit: (
+    filters: { schoolId?: string; action?: string; dateFrom?: string; dateTo?: string } = {},
+    limit = 50,
+    offset = 0,
+  ) => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (filters.schoolId) params.set("school_id", filters.schoolId);
+    if (filters.action) params.set("action", filters.action);
+    if (filters.dateFrom) params.set("date_from", filters.dateFrom);
+    if (filters.dateTo) params.set("date_to", filters.dateTo);
+    return api.get<Page<AuditRow>>(`/api/v1/admin/audit?${params.toString()}`);
+  },
 };
 
 export interface LlmUsageSummary {
@@ -119,15 +135,23 @@ export const schoolApi = {
   createSubject: (body: { name: string }) => api.post<Subject>("/api/v1/school/subjects", body),
   assignTeacher: (body: { teacher_id: string; class_id: string; subject_id: string }) =>
     api.post<{ id: string }>("/api/v1/school/teacher-assignments", body),
-  listTeacherAssignments: (limit = 50, offset = 0) =>
-    api.get<Page<TeacherAssignmentJoinRow>>(`/api/v1/school/teacher-assignments?limit=${limit}&offset=${offset}`),
+  listTeacherAssignments: (limit = 50, offset = 0, includeEnded = false) =>
+    api.get<Page<TeacherAssignmentJoinRow>>(
+      `/api/v1/school/teacher-assignments?limit=${limit}&offset=${offset}&include_ended=${includeEnded}`,
+    ),
   unassignTeacher: (id: string) =>
     api.del<{ status: string }>(`/api/v1/school/teacher-assignments/${id}`),
+  updateTeacherAssignment: (id: string, endDate: string | null) =>
+    api.patch<{ id: string }>(`/api/v1/school/teacher-assignments/${id}`, { end_date: endDate }),
   enroll: (body: { student_id: string; class_id: string }) =>
     api.post<{ id: string }>("/api/v1/school/enrollments", body),
-  listEnrollments: (limit = 50, offset = 0) =>
-    api.get<Page<EnrollmentJoinRow>>(`/api/v1/school/enrollments?limit=${limit}&offset=${offset}`),
+  listEnrollments: (limit = 50, offset = 0, includeEnded = false) =>
+    api.get<Page<EnrollmentJoinRow>>(
+      `/api/v1/school/enrollments?limit=${limit}&offset=${offset}&include_ended=${includeEnded}`,
+    ),
   unenrollStudent: (id: string) => api.del<{ status: string }>(`/api/v1/school/enrollments/${id}`),
+  updateEnrollment: (id: string, endDate: string | null) =>
+    api.patch<{ id: string }>(`/api/v1/school/enrollments/${id}`, { end_date: endDate }),
   linkParent: (body: { parent_id: string; student_id: string }) =>
     api.post<{ id: string }>("/api/v1/school/parent-links", body),
   listParentLinks: (limit = 50, offset = 0) =>
@@ -161,6 +185,8 @@ export const schoolApi = {
     api.patch<CreationRightsOut>(`/api/v1/school/roles/${roleId}/creation-rights`, {
       creatable_template_names: creatableTemplateNames,
     }),
+  markTeacherAbsent: (body: { teacher_id: string; absence_date: string; reason?: string }) =>
+    api.post<TeacherAbsenceOut>("/api/v1/school/teacher-absences", body),
 };
 
 export interface TeacherAssignmentRow {
@@ -182,6 +208,8 @@ export const teacherApi = {
     api.post<DocumentRow>("/api/v1/teacher/materials/url", body),
   uploadYoutube: (body: { class_id: string; subject_id?: string; url: string }) =>
     api.post<DocumentRow>("/api/v1/teacher/materials/youtube", body),
+  suggestQuizFromMaterial: (docId: string) =>
+    api.post<SuggestedQuizOut>(`/api/v1/teacher/materials/${docId}/suggest-quiz`, {}),
   createTimetable: (body: {
     class_id: string;
     subject_id: string;
@@ -224,6 +252,9 @@ export const teacherApi = {
     api.post<ParentMessageOut[]>("/api/v1/teacher/messages", body),
   listMessages: (studentId: string) =>
     api.get<ParentMessageOut[]>(`/api/v1/teacher/messages?student_id=${studentId}`),
+  listAssignmentTasks: () => api.get<AssignmentOut[]>("/api/v1/teacher/assignment-tasks"),
+  createAssignmentTask: (body: { class_id: string; subject_id?: string; topic: string; due_date: string }) =>
+    api.post<AssignmentOut>("/api/v1/teacher/assignment-tasks", body),
 };
 
 export const agentActionsApi = {
@@ -246,6 +277,7 @@ export const studentApi = {
   exams: () => api.get<ExamRow[]>("/api/v1/student/exam-timetable"),
   history: (limit = 50, offset = 0) =>
     api.get<Page<QuizAttemptRow>>(`/api/v1/student/history?limit=${limit}&offset=${offset}`),
+  today: () => api.get<LearningFeedItemOut[]>("/api/v1/student/today"),
   startQuiz: (body: { class_id: string; subject_id?: string }) =>
     api.post<QuizOut>("/api/v1/student/quiz/start", body),
   submitQuiz: (id: string, answers: unknown[]) =>

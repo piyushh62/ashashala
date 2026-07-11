@@ -42,6 +42,9 @@ export default function SchoolUsers() {
   const [tempCredential, setTempCredential] = useState<{ email: string; password: string } | null>(null);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
   const [bulkResult, setBulkResult] = useState<{ id: string; email: string; temp_password: string }[] | null>(null);
+  const [absentTarget, setAbsentTarget] = useState<UserRow | null>(null);
+  const [absenceDate, setAbsenceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [absenceReason, setAbsenceReason] = useState("");
 
   const PAGE_SIZE = 20;
   const [offset, setOffset] = useState(0);
@@ -142,6 +145,26 @@ export default function SchoolUsers() {
       if (fileInput.current) fileInput.current.value = "";
     },
     onError: () => toast.push("CSV import failed.", "error"),
+  });
+
+  const mMarkAbsent = useMutation({
+    mutationFn: () =>
+      schoolApi.markTeacherAbsent({
+        teacher_id: absentTarget!.id,
+        absence_date: absenceDate,
+        reason: absenceReason || undefined,
+      }),
+    onSuccess: (res) => {
+      toast.push(
+        res.substitute_suggestions
+          ? `Absence recorded — ${res.substitute_suggestions} substitute suggestion(s) queued for approval.`
+          : "Absence recorded — no classes scheduled that day.",
+        "success",
+      );
+      setAbsentTarget(null);
+      setAbsenceReason("");
+    },
+    onError: () => toast.push("Couldn't record the absence.", "error"),
   });
 
   const onBulkFileChosen = (file: File | null) => {
@@ -291,6 +314,33 @@ export default function SchoolUsers() {
         )}
       </Modal>
 
+      <Modal
+        open={!!absentTarget}
+        onOpenChange={(open) => !open && setAbsentTarget(null)}
+        title="Mark teacher absent"
+        description={absentTarget ? `${absentTarget.name}'s classes for that day will get substitute suggestions.` : undefined}
+        size="sm"
+      >
+        {absentTarget && (
+          <div className="space-y-3">
+            <FormField label="Absence date">
+              <Input type="date" value={absenceDate} onChange={(e) => setAbsenceDate(e.target.value)} />
+            </FormField>
+            <FormField label="Reason" optional>
+              <Input value={absenceReason} onChange={(e) => setAbsenceReason(e.target.value)} placeholder="e.g. Sick leave" />
+            </FormField>
+            <Button
+              type="button"
+              className="w-full"
+              onClick={() => mMarkAbsent.mutate()}
+              disabled={!absenceDate || mMarkAbsent.isPending}
+            >
+              {mMarkAbsent.isPending ? "Recording…" : "Record absence"}
+            </Button>
+          </div>
+        )}
+      </Modal>
+
       <Card>
         <CardHeader
           title="All users"
@@ -330,6 +380,19 @@ export default function SchoolUsers() {
                     <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
                       Edit
                     </Button>
+                    {u.role === "teacher" && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setAbsenceDate(new Date().toISOString().slice(0, 10));
+                          setAbsenceReason("");
+                          setAbsentTarget(u);
+                        }}
+                      >
+                        Mark absent
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"

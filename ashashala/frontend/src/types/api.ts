@@ -200,6 +200,7 @@ export interface AuditRow {
   target_type: string | null;
   target_id: string | null;
   status: string;
+  school_id?: string | null;
 }
 
 export interface ChildRow {
@@ -216,6 +217,7 @@ export interface TeacherAssignmentJoinRow {
   class_name: string;
   subject_id: string;
   subject_name: string;
+  end_date?: string | null;
 }
 
 export interface EnrollmentJoinRow {
@@ -224,6 +226,7 @@ export interface EnrollmentJoinRow {
   student_name: string;
   class_id: string;
   class_name: string;
+  end_date?: string | null;
 }
 
 export interface ParentLinkJoinRow {
@@ -376,4 +379,66 @@ export interface TimetableOptionOut {
   strategy: string;
   rationale: string;
   slots: { day_of_week: number; period_number: number; room: string | null }[];
+}
+
+/* ------------------------------ Scheduled-Learning feed (#1) -------------- */
+
+export interface LearningFeedQuestion {
+  question: string;
+  options: string[] | null;
+  answer: string;
+}
+
+export interface LearningFeedItemOut {
+  topic: string;
+  subject_id: string;
+  class_id: string;
+  period_number: number;
+  explainer: string;
+  questions: LearningFeedQuestion[];
+}
+
+/* ------------------------------ Quiz suggestion / Assignment Builder (#2,#3) */
+
+export interface SuggestedQuizQuestionOut {
+  type: "mcq" | "short";
+  question: string;
+  options: string[] | null;
+  answer_index: number | null;
+  expected_answer: string | null;
+  difficulty: string;
+  xp: number;
+  explanation: string;
+}
+
+export interface SuggestedQuizOut {
+  quiz_id: string;
+  topic: string;
+  class_id: string;
+  subject_id: string | null;
+  questions: SuggestedQuizQuestionOut[];
+}
+
+export interface AssignmentOut {
+  id: string;
+  topic: string;
+  class_id: string;
+  class_name: string;
+  subject_id: string | null;
+  subject_name: string | null;
+  due_date: string;
+  quiz_id: string | null;
+  submission_count: number;
+  status: string;
+}
+
+/* ------------------------------ Staffing Agent (#6) ------------------------ */
+
+export interface TeacherAbsenceOut {
+  id: string;
+  teacher_id: string;
+  teacher_name: string;
+  absence_date: string;
+  reason: string | null;
+  substitute_suggestions: number;
 }

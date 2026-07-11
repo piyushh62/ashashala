@@ -18,6 +18,7 @@ async def retrieve(
     query: str,
     lang: str = "en",
     subject_id: str | None = None,
+    doc_id: str | None = None,
     limit: int = 20,
     score_threshold: float | None = None,
 ) -> list[dict]:
@@ -25,6 +26,11 @@ async def retrieve(
     filters: dict = {"class_id": class_id}
     if subject_id:
         filters["subject_id"] = subject_id
+    if doc_id:
+        # Strict single-document grounding (e.g. "generate a quiz from this
+        # material") — chunks already carry a doc_id payload field (see
+        # store.delete_by_doc), so this is just one more equality filter.
+        filters["doc_id"] = doc_id
     return await get_qdrant_store().search(
         school_id=school_id,
         query_vector=vectors[0],

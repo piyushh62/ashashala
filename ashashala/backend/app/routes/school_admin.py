@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Query, Request, UploadFile
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.staffing import suggest_substitutes
 from app.auth.password import hash_password
 from app.core.exceptions import NotFoundError, ValidationError
 from app.core.permissions import ROLE_MANAGE, SCHOOL_ADMIN
@@ -28,6 +29,7 @@ from app.models.rbac import (
     TemplatePermission,
     UserRoleAssignment,
 )
+from app.models.staffing import TeacherAbsence
 from app.models.structure import (
     ClassSection,
     Enrollment,
@@ -58,6 +60,8 @@ from app.schemas.school_admin import (
     ParentLinkOut,
     SubjectCreate,
     SubjectOut,
+    TeacherAbsenceCreate,
+    TeacherAbsenceOut,
     TeacherAssignmentCreate,
     TeacherAssignmentOut,
     TeacherAssignmentUpdate,
@@ -318,6 +322,28 @@ async def unassign_teacher(assignment_id: str, request: Request,
     await record_audit(db, action="TEACHER_UNASSIGN", actor=admin, target_type="teacher_assignment",
                        target_id=assignment_id, request=request)
     return {"status": "deleted", "id": assignment_id}
+
+
+@router.post("/teacher-absences", response_model=TeacherAbsenceOut)
+async def mark_teacher_absent(body: TeacherAbsenceCreate, request: Request,
+                              admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> TeacherAbsenceOut:
+    """Mark a teacher absent for a date, then fire the Staffing Agent
+    (master doc §5.2) to queue substitute suggestions for admin approval."""
+    teacher = await _require_user_in_school(db, admin.school_id, body.teacher_id, UserRole.teacher)
+    absence = TeacherAbsence(teacher_id=body.teacher_id, absence_date=body.absence_date,
+                             reason=body.reason, marked_by_user_id=admin.id, school_id=admin.school_id)
+    db.add(absence)
+    await db.flush()
+
+    suggestion_count = await suggest_substitutes(
+        db, school_id=admin.school_id, teacher_id=body.teacher_id, absence_date=body.absence_date,
+    )
+    await record_audit(db, action="TEACHER_ABSENCE_MARK", actor=admin, target_type="teacher_absence",
+                       target_id=absence.id, payload={"absence_date": body.absence_date.isoformat()},
+                       request=request)
+    return TeacherAbsenceOut(id=absence.id, teacher_id=absence.teacher_id, teacher_name=teacher.name,
+                             absence_date=absence.absence_date, reason=absence.reason,
+                             substitute_suggestions=suggestion_count)
 
 
 @router.post("/enrollments", response_model=IdResponse)

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends, Query, Request
 from sqlalchemy import func, select
@@ -14,7 +14,8 @@ from app.core.exceptions import NotFoundError, ValidationError
 from app.core.permissions import PLATFORM_ADMIN
 from app.db.session import get_db
 from app.db.tenant_filter import tenant_bypass
-from app.deps import require_permission
+from app.deps import PageParams, page_params, require_permission
+from app.models.audit import AuditLog
 from app.models.document import Document
 from app.models.learning import ProgressRecord
 from app.models.llm_usage import LlmUsage
@@ -214,6 +215,45 @@ async def delete_user_data(user_id: str, request: Request, reason: str = Body(em
                        target_type="user", target_id=user_id, payload={"reason": reason, "op": "delete"},
                        request=request)
     return {"status": "deleted", "user_id": user_id, "documents_removed": len(docs)}
+
+
+@router.get("/audit")
+async def audit_viewer(school_id: str | None = Query(default=None), action: str | None = Query(default=None),
+                       date_from: date | None = Query(default=None), date_to: date | None = Query(default=None),
+                       page: PageParams = Depends(page_params), admin: User = Depends(_guard),
+                       db: AsyncSession = Depends(get_db)) -> dict:
+    """Cross-tenant audit viewer (Super Admin only) — the school-level
+    `/school/audit` route is scoped to one school; this one is not, since
+    `AuditLog` isn't `TenantScoped` (see app/models/audit.py)."""
+    stmt = select(AuditLog)
+    count_stmt = select(func.count()).select_from(AuditLog)
+    if school_id:
+        stmt = stmt.where(AuditLog.school_id == school_id)
+        count_stmt = count_stmt.where(AuditLog.school_id == school_id)
+    if action:
+        stmt = stmt.where(AuditLog.action == action)
+        count_stmt = count_stmt.where(AuditLog.action == action)
+    if date_from:
+        stmt = stmt.where(AuditLog.ts >= datetime.combine(date_from, datetime.min.time(), tzinfo=timezone.utc))
+        count_stmt = count_stmt.where(
+            AuditLog.ts >= datetime.combine(date_from, datetime.min.time(), tzinfo=timezone.utc)
+        )
+    if date_to:
+        stmt = stmt.where(AuditLog.ts <= datetime.combine(date_to, datetime.max.time(), tzinfo=timezone.utc))
+        count_stmt = count_stmt.where(
+            AuditLog.ts <= datetime.combine(date_to, datetime.max.time(), tzinfo=timezone.utc)
+        )
+    total = (await db.execute(count_stmt)).scalar_one()
+    rows = (await db.execute(
+        stmt.order_by(AuditLog.ts.desc()).limit(page.limit).offset(page.offset)
+    )).scalars().all()
+    items = [
+        {"id": r.id, "ts": r.ts.isoformat(), "action": r.action, "actor_user_id": r.actor_user_id,
+         "actor_role": r.actor_role, "school_id": r.school_id, "target_type": r.target_type,
+         "target_id": r.target_id, "status": r.status}
+        for r in rows
+    ]
+    return {"items": items, "total": total, "limit": page.limit, "offset": page.offset}
 
 
 # --- Role template management (platform-wide catalog) ---------------------

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { teacherApi } from "../../api/endpoints";
+import type { SuggestedQuizOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Select, Skeleton, Table } from "../../components/ui";
 import { FormField } from "../../components/ui/FormField";
+import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 
 type Tab = "file" | "url" | "youtube";
@@ -24,6 +26,7 @@ export default function TeacherMaterials() {
   const [urlError, setUrlError] = useState<string | undefined>();
   const [file, setFile] = useState<File | null>(null);
   const [offset, setOffset] = useState(0);
+  const [draftQuiz, setDraftQuiz] = useState<SuggestedQuizOut | null>(null);
 
   const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
   const materials = useQuery({
@@ -84,6 +87,21 @@ export default function TeacherMaterials() {
     mutationFn: () => teacherApi.uploadYoutube({ class_id: classId, subject_id: subjectId || undefined, url }),
     onSuccess: done,
     onError: fail,
+  });
+
+  const suggestQuiz = useMutation({
+    mutationFn: (docId: string) => teacherApi.suggestQuizFromMaterial(docId),
+    onSuccess: (quiz) => setDraftQuiz(quiz),
+    onError: () => toast.push("Couldn't generate a quiz — the material may still be processing.", "error"),
+  });
+
+  const approveDraft = useMutation({
+    mutationFn: (quizId: string) => teacherApi.approveQuiz(quizId, true),
+    onSuccess: () => {
+      toast.push("Quiz approved and published.", "success");
+      setDraftQuiz(null);
+    },
+    onError: () => toast.push("Couldn't approve the quiz.", "error"),
   });
 
   const submit = () => {
@@ -178,7 +196,7 @@ export default function TeacherMaterials() {
           ) : !materialRows.length ? (
             <EmptyState title="No materials yet" />
           ) : (
-            <Table head={["Name", "Type", "Status"]}>
+            <Table head={["Name", "Type", "Status", ""]}>
               {materialRows.map((m) => (
                 <tr key={m.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700 truncate max-w-xs">{m.filename}</td>
@@ -189,6 +207,16 @@ export default function TeacherMaterials() {
                     <Badge tone={m.status === "indexed" ? "green" : m.status === "failed" ? "red" : "amber"}>
                       {m.status}
                     </Badge>
+                  </td>
+                  <td className="px-4 py-2 text-right whitespace-nowrap">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={m.status !== "indexed" || suggestQuiz.isPending}
+                      onClick={() => suggestQuiz.mutate(m.id)}
+                    >
+                      {suggestQuiz.isPending && suggestQuiz.variables === m.id ? "Generating…" : "Generate quiz"}
+                    </Button>
                   </td>
                 </tr>
               ))}
@@ -221,6 +249,60 @@ export default function TeacherMaterials() {
           )}
         </div>
       </Card>
+
+      <Modal
+        open={!!draftQuiz}
+        onOpenChange={(open) => !open && setDraftQuiz(null)}
+        title={draftQuiz ? `Suggested quiz: ${draftQuiz.topic}` : ""}
+        description="Review the generated questions, then approve to publish it to the class."
+        size="lg"
+      >
+        {draftQuiz && (
+          <div className="space-y-4">
+            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+              {draftQuiz.questions.map((q, i) => (
+                <div key={i} className="rounded-xl bg-slate-50 px-4 py-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-sm font-medium text-slate-700">
+                      {i + 1}. {q.question}
+                    </p>
+                    <Badge tone="slate">{q.xp} XP</Badge>
+                  </div>
+                  {q.type === "mcq" && q.options ? (
+                    <ul className="mt-2 space-y-1">
+                      {q.options.map((o, oi) => (
+                        <li
+                          key={oi}
+                          className={
+                            "text-sm " +
+                            (oi === q.answer_index ? "text-brand-700 font-medium" : "text-slate-500")
+                          }
+                        >
+                          {String.fromCharCode(65 + oi)}. {o}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="mt-2 text-sm text-brand-700 font-medium">Expected: {q.expected_answer}</p>
+                  )}
+                  {q.explanation && <p className="mt-2 text-xs text-slate-400">{q.explanation}</p>}
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
+              <Button variant="ghost" onClick={() => setDraftQuiz(null)}>
+                Discard
+              </Button>
+              <Button
+                onClick={() => draftQuiz && approveDraft.mutate(draftQuiz.quiz_id)}
+                disabled={approveDraft.isPending}
+              >
+                {approveDraft.isPending ? "Publishing…" : "Approve & publish"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

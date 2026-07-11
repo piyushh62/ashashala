@@ -16,6 +16,10 @@ export default function AdminSchools() {
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
   const [detailsFor, setDetailsFor] = useState<School | null>(null);
+  const [adminFor, setAdminFor] = useState<School | null>(null);
+  const [adminName, setAdminName] = useState("");
+  const [adminEmail, setAdminEmail] = useState("");
+  const [tempCredential, setTempCredential] = useState<{ email: string; password: string } | null>(null);
 
   const details = useQuery({
     queryKey: ["admin", "school-dashboard", detailsFor?.id],
@@ -52,6 +56,17 @@ export default function AdminSchools() {
       qc.invalidateQueries({ queryKey: ["admin", "schools"] });
     },
     onError: () => toast.push("Couldn't delete school.", "error"),
+  });
+
+  const createAdmin = useMutation({
+    mutationFn: () => adminApi.createSchoolAdmin(adminFor!.id, { name: adminName, email: adminEmail }),
+    onSuccess: (res) => {
+      setAdminFor(null);
+      setTempCredential({ email: adminEmail, password: res.temp_password });
+      setAdminName("");
+      setAdminEmail("");
+    },
+    onError: () => toast.push("Couldn't create school admin (email may be taken).", "error"),
   });
 
   const askSuspend = (s: School) =>
@@ -126,6 +141,9 @@ export default function AdminSchools() {
                       <Button variant="ghost" onClick={() => setDetailsFor(s)}>
                         View details
                       </Button>
+                      <Button variant="ghost" onClick={() => setAdminFor(s)}>
+                        Add admin
+                      </Button>
                       <Button variant="ghost" onClick={() => askSuspend(s)}>
                         {s.is_active ? "Suspend" : "Reactivate"}
                       </Button>
@@ -156,6 +174,70 @@ export default function AdminSchools() {
             <Stat label="Students" value={details.data?.students ?? 0} />
             <Stat label="Classes" value={details.data?.classes ?? 0} />
             <Stat label="Avg mastery" value={details.data?.avg_mastery ?? 0} />
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!adminFor}
+        onOpenChange={(open) => !open && setAdminFor(null)}
+        title="Create school admin"
+        description={adminFor ? `Add a School Admin for ${adminFor.name}.` : undefined}
+        size="sm"
+      >
+        <form
+          className="space-y-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            createAdmin.mutate();
+          }}
+        >
+          <div>
+            <Label>Name</Label>
+            <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} required />
+          </div>
+          <div>
+            <Label>Email</Label>
+            <Input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
+          </div>
+          <Button type="submit" className="w-full" disabled={createAdmin.isPending}>
+            {createAdmin.isPending ? "Creating…" : "Create admin"}
+          </Button>
+        </form>
+      </Modal>
+
+      <Modal
+        open={!!tempCredential}
+        onOpenChange={(open) => !open && setTempCredential(null)}
+        title="Temporary password"
+        description="Share this password securely — it won't be shown again."
+        size="sm"
+      >
+        {tempCredential && (
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Email</div>
+              <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
+            </div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Temporary password</div>
+              <div className="flex items-center gap-2 mt-1">
+                <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
+                  {tempCredential.password}
+                </code>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigator.clipboard.writeText(tempCredential.password)}
+                >
+                  Copy
+                </Button>
+              </div>
+            </div>
+            <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
+              Done
+            </Button>
           </div>
         )}
       </Modal>
