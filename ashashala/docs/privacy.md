@@ -20,8 +20,12 @@ tenant that shouldn't see it). Parents see only children they are explicitly
 linked to, with consent recorded at link time.
 
 ## Consent
-Parent–student links capture `consent_given_at`. Schools are responsible for
-obtaining guardian consent for students under the applicable age.
+When a School Admin links a parent to a student, the admin must explicitly
+confirm ("I confirm the guardian's consent has been obtained...") before the
+link is created — the API rejects the request otherwise. Only then is
+`consent_given_at` stamped. Schools remain responsible for actually obtaining
+that guardian consent before checking the box; the platform enforces that the
+confirmation step happened, not the underlying real-world consent itself.
 
 ## Export (data portability)
 A student can export their own data as JSON via

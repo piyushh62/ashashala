@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
 import { useAuth } from "../../stores/auth";
@@ -7,6 +8,7 @@ import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from "../ui/
 import { NotificationBell } from "./NotificationBell";
 import { CommandPalette, type SearchSource } from "./CommandPalette";
 import { ThemeToggle } from "../ui/ThemeToggle";
+import { ConnectivityBanner } from "./ConnectivityBanner";
 
 export interface NavItem {
   to: string;
@@ -15,12 +17,12 @@ export interface NavItem {
   permission?: string;
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: "Super Admin",
-  school_admin: "School Admin",
-  teacher: "Teacher",
-  student: "Student",
-  parent: "Parent",
+const ROLE_LABEL_KEY: Record<string, string> = {
+  super_admin: "roleTitle.superAdmin",
+  school_admin: "roleTitle.schoolAdmin",
+  teacher: "roleTitle.teacher",
+  student: "roleTitle.student",
+  parent: "roleTitle.parent",
 };
 
 function Logo({ compact = false }: { compact?: boolean }) {
@@ -36,9 +38,10 @@ function Logo({ compact = false }: { compact?: boolean }) {
 }
 
 function NavLinks({ nav, onNavigate }: { nav: NavItem[]; onNavigate?: () => void }) {
+  const { t } = useTranslation();
   return (
     <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
-      <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-slate-600">Menu</div>
+      <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-slate-600">{t("layout.menu")}</div>
       {nav.map((n) => (
         <NavLink
           key={n.to}
@@ -82,6 +85,7 @@ function BrandHeader() {
 }
 
 function SidebarUserCard({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation();
   const user = useAuth((s) => s.user);
   return (
     <div className="m-3 p-3 rounded-2xl bg-slate-50 border border-slate-100 dark:bg-slate-800/60 dark:border-slate-700">
@@ -96,13 +100,14 @@ function SidebarUserCard({ onLogout }: { onLogout: () => void }) {
         onClick={onLogout}
         className="mt-3 w-full text-xs font-medium text-slate-500 hover:text-rose-600 bg-white border border-slate-200 rounded-lg py-1.5 transition dark:bg-slate-900 dark:border-slate-700 dark:text-slate-400"
       >
-        Log out
+        {t("layout.logout")}
       </button>
     </div>
   );
 }
 
 function UserMenu({ onLogout }: { onLogout: () => void }) {
+  const { t } = useTranslation();
   const user = useAuth((s) => s.user);
   const navigate = useNavigate();
   return (
@@ -116,12 +121,12 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
         </button>
       }
     >
-      <DropdownLabel>{ROLE_LABEL[user?.role || ""] || "Account"}</DropdownLabel>
+      <DropdownLabel>{user?.role ? t(ROLE_LABEL_KEY[user.role]) : t("layout.account")}</DropdownLabel>
       <div className="px-3 pb-2 text-xs text-slate-400 truncate">{user?.email}</div>
       <DropdownSeparator />
-      <DropdownItem onSelect={() => navigate("/settings")}>⚙️ Settings</DropdownItem>
+      <DropdownItem onSelect={() => navigate("/settings")}>⚙️ {t("nav.settings")}</DropdownItem>
       <DropdownItem danger onSelect={onLogout}>
-        Log out
+        {t("layout.logout")}
       </DropdownItem>
     </Dropdown>
   );
@@ -138,6 +143,7 @@ export function AppLayout({
   searchSource?: SearchSource<any>;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -206,7 +212,7 @@ export function AppLayout({
         <header className="md:hidden flex items-center justify-between px-4 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
           <button
             onClick={() => setDrawerOpen(true)}
-            aria-label="Open navigation"
+            aria-label={t("layout.openNav")}
             className="w-9 h-9 grid place-items-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
           >
             ☰
@@ -238,7 +244,7 @@ export function AppLayout({
               className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm text-slate-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 transition"
             >
               <span>🔎</span>
-              <span>Search…</span>
+              <span>{t("layout.search")}</span>
               <kbd className="text-[10px] font-medium text-slate-400 border border-slate-300 dark:border-slate-600 rounded px-1">
                 ⌘K
               </kbd>
@@ -253,6 +259,7 @@ export function AppLayout({
       </div>
 
       <CommandPalette nav={nav} searchSource={searchSource} open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <ConnectivityBanner />
     </div>
   );
 }

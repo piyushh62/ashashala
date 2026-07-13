@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./stores/auth";
 import { AppLayout, type NavItem } from "./components/layout/AppLayout";
@@ -41,55 +42,57 @@ import ParentReports from "./routes/parent/ParentReports";
 import ParentMessages from "./routes/parent/ParentMessages";
 import Settings from "./routes/Settings";
 
-const ROLE_TITLE: Record<Role, string> = {
-  super_admin: "Super Admin",
-  school_admin: "School Admin",
-  teacher: "Teacher",
-  student: "Student",
-  parent: "Parent",
+const ROLE_TITLE_KEY: Record<Role, string> = {
+  super_admin: "roleTitle.superAdmin",
+  school_admin: "roleTitle.schoolAdmin",
+  teacher: "roleTitle.teacher",
+  student: "roleTitle.student",
+  parent: "roleTitle.parent",
 };
 
+// NavItem.label holds an i18next translation key here (resolved in navForUser),
+// not display text — keeps this table language-agnostic.
 const NAV: Record<Role, NavItem[]> = {
   super_admin: [
-    { to: "/admin", label: "Schools", icon: "🏫" },
-    { to: "/admin/dashboard", label: "Platform", icon: "📊" },
-    { to: "/admin/roles", label: "Roles", icon: "🛡️", permission: "role:manage" },
-    { to: "/admin/audit", label: "Audit", icon: "📜" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
+    { to: "/admin", label: "nav.schools", icon: "🏫" },
+    { to: "/admin/dashboard", label: "nav.platform", icon: "📊" },
+    { to: "/admin/roles", label: "nav.roles", icon: "🛡️", permission: "role:manage" },
+    { to: "/admin/audit", label: "nav.audit", icon: "📜" },
+    { to: "/settings", label: "nav.settings", icon: "⚙️" },
   ],
   school_admin: [
-    { to: "/school", label: "Dashboard", icon: "📊" },
-    { to: "/school/users", label: "Users", icon: "👥" },
-    { to: "/school/structure", label: "Classes", icon: "🗂️" },
-    { to: "/school/roles", label: "Roles", icon: "🛡️", permission: "role:manage" },
-    { to: "/school/agent-actions", label: "Agent Queue", icon: "🤖", permission: "agent_action:view" },
-    { to: "/school/audit", label: "Audit", icon: "📜" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
+    { to: "/school", label: "nav.dashboard", icon: "📊" },
+    { to: "/school/users", label: "nav.users", icon: "👥" },
+    { to: "/school/structure", label: "nav.classes", icon: "🗂️" },
+    { to: "/school/roles", label: "nav.roles", icon: "🛡️", permission: "role:manage" },
+    { to: "/school/agent-actions", label: "nav.agentQueue", icon: "🤖", permission: "agent_action:view" },
+    { to: "/school/audit", label: "nav.audit", icon: "📜" },
+    { to: "/settings", label: "nav.settings", icon: "⚙️" },
   ],
   teacher: [
-    { to: "/teacher", label: "Dashboard", icon: "📊" },
-    { to: "/teacher/materials", label: "Materials", icon: "📚" },
-    { to: "/teacher/assignments", label: "Assignments", icon: "📋" },
-    { to: "/teacher/timetable", label: "Timetable", icon: "🗓️" },
-    { to: "/teacher/exam-timetable", label: "Exams", icon: "📝" },
-    { to: "/teacher/flagged", label: "Flagged", icon: "🚩" },
-    { to: "/teacher/students", label: "Students", icon: "🧑‍🎓", permission: "teacher:portal" },
-    { to: "/teacher/messages", label: "Messages", icon: "💬" },
-    { to: "/teacher/agent-actions", label: "Agent Queue", icon: "🤖", permission: "agent_action:view" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
+    { to: "/teacher", label: "nav.dashboard", icon: "📊" },
+    { to: "/teacher/materials", label: "nav.materials", icon: "📚" },
+    { to: "/teacher/assignments", label: "nav.assignments", icon: "📋" },
+    { to: "/teacher/timetable", label: "nav.timetable", icon: "🗓️" },
+    { to: "/teacher/exam-timetable", label: "nav.exams", icon: "📝" },
+    { to: "/teacher/flagged", label: "nav.flagged", icon: "🚩" },
+    { to: "/teacher/students", label: "nav.students", icon: "🧑‍🎓", permission: "teacher:portal" },
+    { to: "/teacher/messages", label: "nav.messages", icon: "💬" },
+    { to: "/teacher/agent-actions", label: "nav.agentQueue", icon: "🤖", permission: "agent_action:view" },
+    { to: "/settings", label: "nav.settings", icon: "⚙️" },
   ],
   student: [
-    { to: "/student", label: "Dashboard", icon: "📊" },
-    { to: "/student/today", label: "Today", icon: "📖" },
-    { to: "/student/chat", label: "Tutor", icon: "💬" },
-    { to: "/student/quiz", label: "Quiz", icon: "🧠" },
-    { to: "/student/history", label: "History", icon: "📜" },
-    { to: "/student/exams", label: "Exams", icon: "📝" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
+    { to: "/student", label: "nav.dashboard", icon: "📊" },
+    { to: "/student/today", label: "nav.today", icon: "📖" },
+    { to: "/student/chat", label: "nav.tutor", icon: "💬" },
+    { to: "/student/quiz", label: "nav.quiz", icon: "🧠" },
+    { to: "/student/history", label: "nav.history", icon: "📜" },
+    { to: "/student/exams", label: "nav.exams", icon: "📝" },
+    { to: "/settings", label: "nav.settings", icon: "⚙️" },
   ],
   parent: [
-    { to: "/parent", label: "Children", icon: "👨‍👩‍👧" },
-    { to: "/settings", label: "Settings", icon: "⚙️" },
+    { to: "/parent", label: "nav.children", icon: "👨‍👩‍👧" },
+    { to: "/settings", label: "nav.settings", icon: "⚙️" },
   ],
 };
 
@@ -114,25 +117,26 @@ const SEARCH_SOURCES: Partial<Record<Role, SearchSource<any>>> = {
   },
 };
 
-function navForUser(role: Role, permissions: string[] | undefined): NavItem[] {
-  return NAV[role].filter((n) => !n.permission || (permissions ?? []).includes(n.permission));
+function navForUser(role: Role, permissions: string[] | undefined, t: (key: string) => string): NavItem[] {
+  return NAV[role]
+    .filter((n) => !n.permission || (permissions ?? []).includes(n.permission))
+    .map((n) => ({ ...n, label: t(n.label) }));
 }
 
 function Shell({
   role,
-  title,
   permissions,
   children,
 }: {
   role: Role;
-  title: string;
   permissions: string[];
   children: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const user = useAuth((s) => s.user);
   return (
     <RoleGuard permissions={permissions}>
-      <AppLayout title={title} nav={navForUser(role, user?.permissions)} searchSource={SEARCH_SOURCES[role]}>
+      <AppLayout title={t(ROLE_TITLE_KEY[role])} nav={navForUser(role, user?.permissions, t)} searchSource={SEARCH_SOURCES[role]}>
         {children}
       </AppLayout>
     </RoleGuard>
@@ -148,9 +152,10 @@ function SettingsRoute() {
 }
 
 function SettingsShell() {
+  const { t } = useTranslation();
   const user = useAuth((s) => s.user)!;
   return (
-    <AppLayout title={ROLE_TITLE[user.role]} nav={navForUser(user.role, user.permissions)}>
+    <AppLayout title={t(ROLE_TITLE_KEY[user.role])} nav={navForUser(user.role, user.permissions, t)}>
       <Settings />
     </AppLayout>
   );
@@ -179,56 +184,56 @@ export default function App() {
       <Route path="/login" element={<Login />} />
 
       {/* Super Admin */}
-      <Route path="/admin" element={<Shell role="super_admin" title="Super Admin" permissions={["platform:admin"]}><AdminSchools /></Shell>} />
-      <Route path="/admin/dashboard" element={<Shell role="super_admin" title="Super Admin" permissions={["platform:admin"]}><AdminDashboard /></Shell>} />
+      <Route path="/admin" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminSchools /></Shell>} />
+      <Route path="/admin/dashboard" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminDashboard /></Shell>} />
       <Route
         path="/admin/roles"
-        element={<Shell role="super_admin" title="Super Admin" permissions={["platform:admin", "role:manage"]}><AdminRoles /></Shell>}
+        element={<Shell role="super_admin" permissions={["platform:admin", "role:manage"]}><AdminRoles /></Shell>}
       />
-      <Route path="/admin/audit" element={<Shell role="super_admin" title="Super Admin" permissions={["platform:admin"]}><AdminAudit /></Shell>} />
+      <Route path="/admin/audit" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminAudit /></Shell>} />
 
       {/* School Admin */}
-      <Route path="/school" element={<Shell role="school_admin" title="School Admin" permissions={["school:admin"]}><SchoolDashboard /></Shell>} />
-      <Route path="/school/users" element={<Shell role="school_admin" title="School Admin" permissions={["school:admin"]}><SchoolUsers /></Shell>} />
-      <Route path="/school/structure" element={<Shell role="school_admin" title="School Admin" permissions={["school:admin"]}><SchoolStructure /></Shell>} />
+      <Route path="/school" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolDashboard /></Shell>} />
+      <Route path="/school/users" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolUsers /></Shell>} />
+      <Route path="/school/structure" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolStructure /></Shell>} />
       <Route
         path="/school/roles"
-        element={<Shell role="school_admin" title="School Admin" permissions={["school:admin", "role:manage"]}><SchoolRoles /></Shell>}
+        element={<Shell role="school_admin" permissions={["school:admin", "role:manage"]}><SchoolRoles /></Shell>}
       />
       <Route
         path="/school/agent-actions"
-        element={<Shell role="school_admin" title="School Admin" permissions={["school:admin", "agent_action:view"]}><SchoolAgentActions /></Shell>}
+        element={<Shell role="school_admin" permissions={["school:admin", "agent_action:view"]}><SchoolAgentActions /></Shell>}
       />
-      <Route path="/school/audit" element={<Shell role="school_admin" title="School Admin" permissions={["school:admin"]}><SchoolAudit /></Shell>} />
+      <Route path="/school/audit" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolAudit /></Shell>} />
 
       {/* Teacher */}
-      <Route path="/teacher" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherDashboard /></Shell>} />
-      <Route path="/teacher/materials" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherMaterials /></Shell>} />
-      <Route path="/teacher/assignments" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherAssignments /></Shell>} />
-      <Route path="/teacher/timetable" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherTimetable /></Shell>} />
-      <Route path="/teacher/exam-timetable" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherExamTimetable /></Shell>} />
-      <Route path="/teacher/flagged" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherFlagged /></Shell>} />
-      <Route path="/teacher/students" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherStudents /></Shell>} />
-      <Route path="/teacher/messages" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherMessages /></Shell>} />
-      <Route path="/teacher/class-progress/:classId" element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal"]}><TeacherClassProgress /></Shell>} />
+      <Route path="/teacher" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherDashboard /></Shell>} />
+      <Route path="/teacher/materials" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherMaterials /></Shell>} />
+      <Route path="/teacher/assignments" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherAssignments /></Shell>} />
+      <Route path="/teacher/timetable" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherTimetable /></Shell>} />
+      <Route path="/teacher/exam-timetable" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherExamTimetable /></Shell>} />
+      <Route path="/teacher/flagged" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherFlagged /></Shell>} />
+      <Route path="/teacher/students" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherStudents /></Shell>} />
+      <Route path="/teacher/messages" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherMessages /></Shell>} />
+      <Route path="/teacher/class-progress/:classId" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherClassProgress /></Shell>} />
       <Route
         path="/teacher/agent-actions"
-        element={<Shell role="teacher" title="Teacher" permissions={["teacher:portal", "agent_action:view"]}><TeacherAgentActions /></Shell>}
+        element={<Shell role="teacher" permissions={["teacher:portal", "agent_action:view"]}><TeacherAgentActions /></Shell>}
       />
 
       {/* Student */}
-      <Route path="/student" element={<Shell role="student" title="Student" permissions={["student:portal"]}><StudentDashboard /></Shell>} />
-      <Route path="/student/today" element={<Shell role="student" title="Student" permissions={["student:portal"]}><StudentToday /></Shell>} />
-      <Route path="/student/chat" element={<Shell role="student" title="Student" permissions={["student:portal"]}><StudentChat /></Shell>} />
-      <Route path="/student/quiz" element={<Shell role="student" title="Student" permissions={["student:portal"]}><StudentQuiz /></Shell>} />
-      <Route path="/student/history" element={<Shell role="student" title="Student" permissions={["student:portal"]}><StudentHistory /></Shell>} />
-      <Route path="/student/exams" element={<Shell role="student" title="Student" permissions={["student:portal"]}><StudentExams /></Shell>} />
+      <Route path="/student" element={<Shell role="student" permissions={["student:portal"]}><StudentDashboard /></Shell>} />
+      <Route path="/student/today" element={<Shell role="student" permissions={["student:portal"]}><StudentToday /></Shell>} />
+      <Route path="/student/chat" element={<Shell role="student" permissions={["student:portal"]}><StudentChat /></Shell>} />
+      <Route path="/student/quiz" element={<Shell role="student" permissions={["student:portal"]}><StudentQuiz /></Shell>} />
+      <Route path="/student/history" element={<Shell role="student" permissions={["student:portal"]}><StudentHistory /></Shell>} />
+      <Route path="/student/exams" element={<Shell role="student" permissions={["student:portal"]}><StudentExams /></Shell>} />
 
       {/* Parent */}
-      <Route path="/parent" element={<Shell role="parent" title="Parent" permissions={["parent:portal"]}><ParentChildren /></Shell>} />
-      <Route path="/parent/child/:id" element={<Shell role="parent" title="Parent" permissions={["parent:portal"]}><ParentChild /></Shell>} />
-      <Route path="/parent/child/:id/reports" element={<Shell role="parent" title="Parent" permissions={["parent:portal"]}><ParentReports /></Shell>} />
-      <Route path="/parent/child/:id/messages" element={<Shell role="parent" title="Parent" permissions={["parent:portal"]}><ParentMessages /></Shell>} />
+      <Route path="/parent" element={<Shell role="parent" permissions={["parent:portal"]}><ParentChildren /></Shell>} />
+      <Route path="/parent/child/:id" element={<Shell role="parent" permissions={["parent:portal"]}><ParentChild /></Shell>} />
+      <Route path="/parent/child/:id/reports" element={<Shell role="parent" permissions={["parent:portal"]}><ParentReports /></Shell>} />
+      <Route path="/parent/child/:id/messages" element={<Shell role="parent" permissions={["parent:portal"]}><ParentMessages /></Shell>} />
 
       {/* Shared */}
       <Route path="/settings" element={<SettingsRoute />} />

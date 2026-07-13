@@ -55,6 +55,7 @@ export default function SchoolStructure() {
   const [assign, setAssign] = useState({ teacher_id: "", class_id: "", subject_id: "" });
   const [enroll, setEnroll] = useState({ student_id: "", class_id: "" });
   const [link, setLink] = useState({ parent_id: "", student_id: "" });
+  const [linkConsent, setLinkConsent] = useState(false);
 
   const mCls = useMutation({
     mutationFn: () => schoolApi.createClass({ name: cls.name, grade_level: Number(cls.grade) }),
@@ -77,8 +78,8 @@ export default function SchoolStructure() {
     onError: fail,
   });
   const mLink = useMutation({
-    mutationFn: () => schoolApi.linkParent(link),
-    onSuccess: () => { ok("Parent linked (consent recorded)."); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); setLink({ parent_id: "", student_id: "" }); },
+    mutationFn: () => schoolApi.linkParent({ ...link, consent_confirmed: linkConsent }),
+    onSuccess: () => { ok("Parent linked (consent recorded)."); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); setLink({ parent_id: "", student_id: "" }); setLinkConsent(false); },
     onError: fail,
   });
 
@@ -359,8 +360,19 @@ export default function SchoolStructure() {
               <UserPicker users={students.data?.items} loading={students.isLoading} placeholder="Select a student"
                 value={link.student_id} onChange={(v) => setLink({ ...link, student_id: v })} />
             </div>
-            <Button onClick={() => mLink.mutate()} disabled={!link.parent_id || !link.student_id}>Link</Button>
           </Row>
+          <div className="px-5 pb-4 flex items-center justify-between gap-3 flex-wrap">
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                className="rounded border-slate-300"
+                checked={linkConsent}
+                onChange={(e) => setLinkConsent(e.target.checked)}
+              />
+              I confirm the guardian's consent has been obtained for linking this student's account.
+            </label>
+            <Button onClick={() => mLink.mutate()} disabled={!link.parent_id || !link.student_id || !linkConsent}>Link</Button>
+          </div>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={parentLinks}

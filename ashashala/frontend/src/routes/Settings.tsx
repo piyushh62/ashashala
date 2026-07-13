@@ -1,23 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authApi, parentApi } from "../api/endpoints";
 import { useAuth } from "../stores/auth";
 import { PageTitle } from "../components/layout/AppLayout";
-import { Avatar, Badge, Button, Card, CardHeader, Input, Skeleton } from "../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from "../components/ui";
 import { FormField } from "../components/ui/FormField";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { useTheme } from "../stores/theme";
+import { useLocale } from "../stores/locale";
+import { SUPPORTED_LOCALES, type Locale } from "../i18n";
 import { useToast } from "../components/ui/Toast";
 import type { NotificationPreferenceOut } from "../types/api";
 
-const ROLE_LABEL: Record<string, string> = {
-  super_admin: "Super Admin",
-  school_admin: "School Admin",
-  teacher: "Teacher",
-  student: "Student",
-  parent: "Parent",
+const ROLE_LABEL_KEY: Record<string, string> = {
+  super_admin: "roleTitle.superAdmin",
+  school_admin: "roleTitle.schoolAdmin",
+  teacher: "roleTitle.teacher",
+  student: "roleTitle.student",
+  parent: "roleTitle.parent",
+};
+
+const LOCALE_LABEL: Record<Locale, string> = {
+  en: "English",
+  hi: "हिन्दी",
+  gu: "ગુજરાતી",
 };
 
 const passwordSchema = z
@@ -33,9 +42,12 @@ const passwordSchema = z
 type PasswordForm = z.infer<typeof passwordSchema>;
 
 export default function Settings() {
+  const { t } = useTranslation();
   const user = useAuth((s) => s.user)!;
   const toast = useToast();
   const themeMode = useTheme((s) => s.mode);
+  const locale = useLocale((s) => s.locale);
+  const setLocale = useLocale((s) => s.setLocale);
 
   const {
     register,
@@ -55,11 +67,11 @@ export default function Settings() {
 
   return (
     <div>
-      <PageTitle subtitle="Manage your profile and account security.">Settings</PageTitle>
+      <PageTitle subtitle={t("settings.subtitle")}>{t("settings.title")}</PageTitle>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Profile" subtitle="Your account details." />
+          <CardHeader title={t("settings.profileTitle")} subtitle={t("settings.profileSubtitle")} />
           <div className="p-5 space-y-5">
             <div className="flex items-center gap-4">
               <Avatar name={user.name} size={56} />
@@ -69,49 +81,60 @@ export default function Settings() {
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge tone="brand">{ROLE_LABEL[user.role] || user.role}</Badge>
+              <Badge tone="brand">{ROLE_LABEL_KEY[user.role] ? t(ROLE_LABEL_KEY[user.role]) : user.role}</Badge>
               {user.grade != null && <Badge tone="slate">Grade {user.grade}</Badge>}
             </div>
             {user.interests && (
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">Interests</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">{t("settings.interests")}</div>
                 <p className="text-sm text-slate-600">{user.interests}</p>
               </div>
             )}
-            <p className="text-xs text-slate-400">
-              Profile details are managed by your school administrator and can't be edited here.
-            </p>
+            <p className="text-xs text-slate-400">{t("settings.profileLocked")}</p>
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="Change password" subtitle="Update the password used to sign in." />
+          <CardHeader title={t("settings.passwordTitle")} subtitle={t("settings.passwordSubtitle")} />
           <form
             className="p-5 space-y-4"
             onSubmit={handleSubmit((values) => changePassword.mutateAsync(values))}
           >
-            <FormField label="New password" error={errors.newPassword?.message}>
+            <FormField label={t("settings.newPassword")} error={errors.newPassword?.message}>
               <Input type="password" invalid={!!errors.newPassword} {...register("newPassword")} />
             </FormField>
-            <FormField label="Confirm new password" error={errors.confirmPassword?.message}>
+            <FormField label={t("settings.confirmPassword")} error={errors.confirmPassword?.message}>
               <Input type="password" invalid={!!errors.confirmPassword} {...register("confirmPassword")} />
             </FormField>
             <Button type="submit" disabled={isSubmitting || changePassword.isPending}>
-              {changePassword.isPending ? "Updating…" : "Update password"}
+              {changePassword.isPending ? t("settings.updating") : t("settings.updatePassword")}
             </Button>
           </form>
         </Card>
 
         <Card>
-          <CardHeader title="Appearance" subtitle="Choose how AshaShala looks on this device." />
+          <CardHeader title={t("settings.appearanceTitle")} subtitle={t("settings.appearanceSubtitle")} />
           <div className="p-5 flex items-center justify-between">
             <div>
-              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">Theme</div>
+              <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{t("settings.theme")}</div>
               <div className="text-xs text-slate-400 mt-0.5">
-                Currently {themeMode === "dark" ? "dark" : "light"} mode
+                {themeMode === "dark" ? t("settings.currentlyDark") : t("settings.currentlyLight")}
               </div>
             </div>
             <ThemeToggle className="border border-slate-200 dark:border-slate-700" />
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title={t("settings.languageTitle")} subtitle={t("settings.languageSubtitle")} />
+          <div className="p-5">
+            <Select value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
+              {SUPPORTED_LOCALES.map((l) => (
+                <option key={l} value={l}>
+                  {LOCALE_LABEL[l]}
+                </option>
+              ))}
+            </Select>
           </div>
         </Card>
 
@@ -121,17 +144,18 @@ export default function Settings() {
   );
 }
 
-const PREF_LABELS: { key: keyof NotificationPreferenceOut; label: string; hint: string }[] = [
-  { key: "in_app_enabled", label: "In-app", hint: "Notifications inside AshaShala." },
-  { key: "sms_enabled", label: "SMS", hint: "Text messages for important updates." },
-  { key: "whatsapp_enabled", label: "WhatsApp", hint: "WhatsApp messages, where available." },
-  { key: "email_enabled", label: "Email", hint: "Email summaries and alerts." },
-];
-
 function NotificationPreferencesCard() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["parent", "notification-preferences"], queryFn: parentApi.notificationPreferences });
+
+  const PREF_LABELS: { key: keyof NotificationPreferenceOut; label: string; hint: string }[] = [
+    { key: "in_app_enabled", label: t("settings.notifInApp"), hint: t("settings.notifInAppHint") },
+    { key: "sms_enabled", label: t("settings.notifSms"), hint: t("settings.notifSmsHint") },
+    { key: "whatsapp_enabled", label: t("settings.notifWhatsapp"), hint: t("settings.notifWhatsappHint") },
+    { key: "email_enabled", label: t("settings.notifEmail"), hint: t("settings.notifEmailHint") },
+  ];
 
   const update = useMutation({
     mutationFn: (body: Partial<NotificationPreferenceOut>) => parentApi.updateNotificationPreferences(body),
@@ -141,7 +165,7 @@ function NotificationPreferencesCard() {
 
   return (
     <Card>
-      <CardHeader title="Notification preferences" subtitle="Choose how you'd like to hear from AshaShala." />
+      <CardHeader title={t("settings.notifPrefTitle")} subtitle={t("settings.notifPrefSubtitle")} />
       <div className="p-5 space-y-4">
         {q.isLoading ? (
           <Skeleton className="h-24" />

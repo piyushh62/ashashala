@@ -116,6 +116,7 @@ class EnrollmentUpdate(BaseModel):
 class ParentLinkCreate(BaseModel):
     parent_id: str
     student_id: str
+    consent_confirmed: bool = False
 
 
 class ParentLinkOut(BaseModel):

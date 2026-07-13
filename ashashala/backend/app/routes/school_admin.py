@@ -427,6 +427,8 @@ async def unenroll_student(enrollment_id: str, request: Request,
 @router.post("/parent-links", response_model=IdResponse)
 async def link_parent(body: ParentLinkCreate, request: Request,
                       admin: User = Depends(_guard), db: AsyncSession = Depends(get_db)) -> IdResponse:
+    if not body.consent_confirmed:
+        raise ValidationError("Guardian consent must be confirmed before linking a parent to a student")
     await _require_user_in_school(db, admin.school_id, body.parent_id, UserRole.parent)
     student = await _require_user_in_school(db, admin.school_id, body.student_id, UserRole.student)
     link = ParentStudentLink(parent_id=body.parent_id, student_id=body.student_id,

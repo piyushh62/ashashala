@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
+import { useTranslation } from "react-i18next";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "../stores/auth";
@@ -16,6 +17,7 @@ const loginSchema = z.object({
 type LoginForm = z.infer<typeof loginSchema>;
 
 export default function Login() {
+  const { t } = useTranslation();
   const { login } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
@@ -32,7 +34,7 @@ export default function Login() {
       const role = useAuth.getState().user!.role;
       navigate(HOME_FOR[role], { replace: true });
     } catch {
-      toast.push("Invalid email or password.", "error");
+      toast.push(t("login.invalidCredentials"), "error");
     }
   };
 
@@ -50,25 +52,22 @@ export default function Login() {
         </div>
         <div className="relative">
           <h1 className="text-4xl font-bold leading-tight">
-            A patient AI tutor
+            {t("login.heroHeading1")}
             <br />
-            for every student.
+            {t("login.heroHeading2")}
           </h1>
-          <p className="mt-4 text-white/80 max-w-md">
-            Cited answers, example-first teaching, and native Gujarati &amp; Hindi — with the tools
-            to run a whole school.
-          </p>
+          <p className="mt-4 text-white/80 max-w-md">{t("login.heroSubtitle")}</p>
           <div className="mt-8 flex flex-wrap gap-2">
-            {["📚 Cited answers", "🗣️ Voice in Gujarati", "🧠 Adaptive quizzes", "🔒 Tenant-isolated"].map(
-              (t) => (
-                <span key={t} className="text-sm bg-white/10 rounded-full px-3 py-1 backdrop-blur">
-                  {t}
+            {[t("login.pillCited"), t("login.pillVoice"), t("login.pillQuiz"), t("login.pillTenant")].map(
+              (pill) => (
+                <span key={pill} className="text-sm bg-white/10 rounded-full px-3 py-1 backdrop-blur">
+                  {pill}
                 </span>
               ),
             )}
           </div>
         </div>
-        <div className="relative text-white/60 text-sm">Free, open-source, self-hostable.</div>
+        <div className="relative text-white/60 text-sm">{t("login.footer")}</div>
       </div>
 
       {/* Form */}
@@ -80,11 +79,11 @@ export default function Login() {
             </div>
             <span className="text-lg font-bold text-brand-700">AshaShala</span>
           </div>
-          <h2 className="text-xl font-bold text-slate-800">Welcome back</h2>
-          <p className="text-sm text-slate-500 mb-6">Sign in to continue.</p>
+          <h2 className="text-xl font-bold text-slate-800">{t("login.welcomeBack")}</h2>
+          <p className="text-sm text-slate-500 mb-6">{t("login.signInToContinue")}</p>
 
           <form onSubmit={handleSubmit(submit)} className="space-y-4">
-            <FormField label="Email" error={errors.email?.message}>
+            <FormField label={t("login.email")} error={errors.email?.message}>
               <Input
                 type="email"
                 autoComplete="username"
@@ -93,7 +92,7 @@ export default function Login() {
                 {...register("email")}
               />
             </FormField>
-            <FormField label="Password" error={errors.password?.message}>
+            <FormField label={t("login.password")} error={errors.password?.message}>
               <Input
                 type="password"
                 autoComplete="current-password"
@@ -103,7 +102,7 @@ export default function Login() {
               />
             </FormField>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in…" : "Sign in →"}
+              {isSubmitting ? t("login.signingIn") : t("login.signIn")}
             </Button>
           </form>
         </Card>

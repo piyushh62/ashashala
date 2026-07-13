@@ -6,6 +6,7 @@ import App from "./App";
 import { queryClient } from "./api/queryClient";
 import { ToastProvider } from "./components/ui/Toast";
 import { TooltipProvider } from "./components/ui/Tooltip";
+import "./i18n";
 import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(

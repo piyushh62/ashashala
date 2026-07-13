@@ -152,7 +152,7 @@ export const schoolApi = {
   unenrollStudent: (id: string) => api.del<{ status: string }>(`/api/v1/school/enrollments/${id}`),
   updateEnrollment: (id: string, endDate: string | null) =>
     api.patch<{ id: string }>(`/api/v1/school/enrollments/${id}`, { end_date: endDate }),
-  linkParent: (body: { parent_id: string; student_id: string }) =>
+  linkParent: (body: { parent_id: string; student_id: string; consent_confirmed: boolean }) =>
     api.post<{ id: string }>("/api/v1/school/parent-links", body),
   listParentLinks: (limit = 50, offset = 0) =>
     api.get<Page<ParentLinkJoinRow>>(`/api/v1/school/parent-links?limit=${limit}&offset=${offset}`),

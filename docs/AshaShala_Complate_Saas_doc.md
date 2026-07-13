@@ -62,7 +62,7 @@ A SaaS education platform where:
 | Timetable | ⚠️ Manual only | Plain CRUD, zero AI involvement |
 | Safety layer | ✅ | Keyword block + subject guard + optional NeMo-Guard jailbreak classifier — solid |
 | Notifications | ⚠️ In-app only | No SMS/WhatsApp/email channel field on `Notification` model |
-| i18n (frontend UI) | ❌ | No locale files found — UI is English-only even though backend chat is multilingual |
+| i18n (frontend UI) | 🟡 Chrome only | `react-i18next` wired with en/hi/gu locale files; nav, layout chrome, Login, Settings translated + language switcher in Settings. ~50 remaining route/component files still hardcoded English |
 | Audit log | ✅ | Exists, immutable pattern |
 | Feature flags | ✅ | `School.features_json` — reusable for optional modules (Fee, etc.) |
 | Frontend pages per role | ⚠️ Fixed | Admin (2), School Admin (4), Teacher (4), Student (4), Parent (2) — hardcoded React routes, not permission-driven |
@@ -204,7 +204,7 @@ Many parents, especially in rural/low-income school contexts (which AshaShala ex
 | Parent consent tracking | ✅ `consent_given_at` exists | Good — extend to cover new data uses (e.g. WhatsApp opt-in) |
 | Data export (right to access) | ✅ `/student/data-export` exists | Extend same pattern to parent/teacher data |
 | Data deletion (right to be forgotten) | ✅ Super Admin route exists | Verify cascades correctly across new tables as schema grows |
-| India-specific: DPDP Act 2023 (children's data) | ⚠️ Not explicitly addressed | Needs explicit parental-consent-first flow for under-18 data — check against DPDP Act's "Data Fiduciary" obligations for children |
+| India-specific: DPDP Act 2023 (children's data) | ✅ School Admin must explicitly confirm guardian consent before a parent-student link is created (`POST /school/parent-links` rejects `consent_confirmed: false`) | Formal legal review of the full DPDP "Data Fiduciary" obligation set (breach notification, grievance officer, etc.) beyond this consent gate is still outstanding |
 | Content safety (student chat) | ✅ Solid — keyword block + subject guard + optional jailbreak classifier | Keep as-is |
 | Agent action audit | ✅ Pattern exists, needs extension (§5.3) | — |
 | Rate limiting / abuse prevention | ⚠️ `slowapi` dependency exists but usage not confirmed everywhere | Verify applied to all public-facing endpoints (esp. chat, voice) |
@@ -221,7 +221,7 @@ Many parents, especially in rural/low-income school contexts (which AshaShala ex
 | **Testing/QA** | `pytest` configured (good foundation) — but agent behavior (LLM outputs) needs eval harnesses, not just unit tests, since correctness isn't deterministic |
 | **Monitoring/Observability** | `structlog`, `sentry-sdk` present in dependencies — confirm actually wired for the new proactive agents (silent background failures are the top risk of going agentic) |
 | **Cost governance dashboard** | `LLMUsage` model exists (good) — extend to per-school budget alerts before scaling past pilot |
-| **Disaster recovery** | Not yet addressed — even at pilot scale, a backup/restore runbook for Postgres + Qdrant is cheap insurance |
+| **Disaster recovery** | ✅ Backup/restore runbook exists (`docs/runbook.md`) covering Postgres PITR, Qdrant snapshot restore, and R2 off-site sync — the runbook's own "restore drill checklist" is written but not yet executed against real infra; that's a one-time, credentialed pre-launch task, not a doc gap |
 
 ---
 
@@ -247,12 +247,12 @@ Many parents, especially in rural/low-income school contexts (which AshaShala ex
 | 8 | Generalized `AgentAction` approval queue | 🟠 High | Small–Medium |
 | 9 | Multi-channel notifications (SMS/WhatsApp) | 🟠 High (India context) | Medium |
 | 10 | Insight/Intervention Agent (at-risk alerts) | 🟡 Medium | Small (data already exists) |
-| 11 | Frontend i18n (UI localization) | 🟡 Medium | Medium |
+| 11 | Frontend i18n (UI localization) | 🟡 Foundation + chrome shipped (en/hi/gu, nav/layout/Login/Settings); remaining ~50 route files still English | Medium |
 | 12 | Mid-year transfer history (`Enrollment`/`TeacherAssignment` end dates) | 🟡 Medium | Small |
 | 13 | Fee/Admissions/HR/Library modules (feature-flagged, optional) | 🟢 Low (deferred) | Large |
-| 14 | DPDP Act explicit compliance review | 🟡 Medium | Small (review + doc) |
-| 15 | Offline/low-bandwidth support | 🟢 Low (post-pilot) | Large |
-| 16 | Disaster recovery runbook | 🟢 Low (cheap insurance) | Small |
+| 14 | DPDP Act explicit compliance review | ✅ Consent-confirmation gate shipped; full legal review still pending | Small (review + doc) |
+| 15 | Offline/low-bandwidth support | 🟡 First cut shipped (installable app shell + connectivity banner); full offline mutation sync still deferred | Large |
+| 16 | Disaster recovery runbook | ✅ Shipped (`docs/runbook.md`); live restore drill still pending | Small |
 
 ---
 
@@ -271,7 +271,7 @@ Scheduling Agent (#5) → Insight Agent (#10, fastest since data exists) → Sch
 Reporting Agent + Communication Agent (#7)
 
 **Phase 5 (deferred until pilot grows past ~10 users / multiple schools):**
-i18n (#11), Fee/Admissions/HR modules (#13), DPDP formal review (#14), offline support (#15), DR runbook (#16), Celery migration if APScheduler hits limits
+Fee/Admissions/HR modules (#13), Celery migration if APScheduler hits limits. Started early, ahead of schedule: DPDP consent gate + DR runbook status correction (#14, #16 — legal review and live restore drill still pending), i18n foundation + chrome translation (#11 — remaining route files still pending), offline app-shell + connectivity banner (#15 — full offline mutation sync still deferred)
 
 ---
 
