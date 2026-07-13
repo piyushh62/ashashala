@@ -63,7 +63,6 @@ frontend/.vite/
 # Docker
 .docker/
 
-
 # Secrets (never commit)
 *.pem
 *.key
