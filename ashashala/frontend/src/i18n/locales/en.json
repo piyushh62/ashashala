@@ -771,5 +771,56 @@
       "noPeriodsScheduled": "No periods scheduled",
       "period": "Period"
     }
+  },
+  "parent": {
+    "back": "← Back",
+    "children": {
+      "subtitle": "Read-only view of your linked children.",
+      "title": "My Children",
+      "noLinkedChildren": "No linked children",
+      "noLinkedChildrenHint": "Ask the school to link your account.",
+      "gradeLabel": "Grade {{grade}}",
+      "viewDashboard": "View dashboard →"
+    },
+    "child": {
+      "allChildren": "← All children",
+      "reports": "📄 Reports",
+      "messages": "💬 Messages",
+      "subtitle": "Read-only progress overview.",
+      "defaultName": "Child",
+      "mastery": "Mastery",
+      "timetable": "Timetable",
+      "noPeriods": "No periods",
+      "quizScoreTrend": "Quiz score trend",
+      "trendHint": "Not enough quiz attempts yet to show a trend.",
+      "upcomingExams": "Upcoming exams",
+      "noExamsScheduled": "No exams scheduled."
+    },
+    "messages": {
+      "subtitle": "Message your child's teachers directly.",
+      "title": "Messages",
+      "pickTeacher": "Pick a teacher",
+      "noTeachersFound": "No teachers found",
+      "noTeachersFoundHint": "Your child isn't assigned to any class yet.",
+      "selectTeacher": "Select a teacher",
+      "conversation": "Conversation",
+      "noMessagesYet": "No messages yet — start the conversation below.",
+      "messagePlaceholder": "Write a message…",
+      "send": "Send",
+      "sending": "Sending…",
+      "sendFailed": "Couldn't send message."
+    },
+    "reports": {
+      "subtitle": "Sent progress reports for this child.",
+      "title": "Reports",
+      "noReportsSentYet": "No reports sent yet",
+      "noReportsSentYetHint": "Your child's teacher will publish reports here once ready.",
+      "sentOn": "Sent {{date}}",
+      "downloading": "Downloading…",
+      "downloadPdf": "⬇ PDF",
+      "downloadFailed": "Couldn't download the report PDF.",
+      "masterySnapshot": "Mastery snapshot",
+      "teacherNotes": "Teacher notes"
+    }
   }
 }

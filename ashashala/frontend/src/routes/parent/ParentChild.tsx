@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { parentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
@@ -15,6 +16,7 @@ const tooltipStyle = {
 };
 
 export default function ParentChild() {
+  const { t } = useTranslation();
   const { id = "" } = useParams();
   const dash = useQuery({ queryKey: ["parent", "child", id], queryFn: () => parentApi.childDashboard(id) });
   const tt = useQuery({ queryKey: ["parent", "child", id, "tt"], queryFn: () => parentApi.childTimetable(id) });
@@ -33,49 +35,49 @@ export default function ParentChild() {
     <div>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Link to="/parent" className="text-sm text-brand-600 hover:underline">
-          ← All children
+          {t("parent.child.allChildren")}
         </Link>
         <div className="flex gap-2">
           <Link
             to={`/parent/child/${id}/reports`}
             className="text-sm font-medium rounded-xl px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition"
           >
-            📄 Reports
+            {t("parent.child.reports")}
           </Link>
           <Link
             to={`/parent/child/${id}/messages`}
             className="text-sm font-medium rounded-xl px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300 transition"
           >
-            💬 Messages
+            {t("parent.child.messages")}
           </Link>
         </div>
       </div>
-      <PageTitle subtitle="Read-only progress overview.">
-        {dash.data?.student.name ?? "Child"}
+      <PageTitle subtitle={t("parent.child.subtitle")}>
+        {dash.data?.student.name ?? t("parent.child.defaultName")}
       </PageTitle>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader title="Mastery" />
+          <CardHeader title={t("parent.child.mastery")} />
           <div className="p-4">
             {dash.isLoading ? <Skeleton className="h-64" /> : <MasteryRadar data={dash.data?.mastery ?? []} />}
           </div>
         </Card>
         <Card>
-          <CardHeader title="Timetable" />
+          <CardHeader title={t("parent.child.timetable")} />
           <div className="p-4">
-            {tt.isLoading ? <Skeleton className="h-40" /> : tt.data?.length ? <TimetableGrid rows={tt.data} /> : <EmptyState title="No periods" />}
+            {tt.isLoading ? <Skeleton className="h-40" /> : tt.data?.length ? <TimetableGrid rows={tt.data} /> : <EmptyState title={t("parent.child.noPeriods")} />}
           </div>
         </Card>
       </div>
 
       <Card className="mt-6">
-        <CardHeader title="Quiz score trend" icon="📈" />
+        <CardHeader title={t("parent.child.quizScoreTrend")} icon="📈" />
         <div className="p-5">
           {hist.isLoading ? (
             <Skeleton className="h-40" />
           ) : trend.length < 2 ? (
-            <p className="text-sm text-slate-400 text-center py-6">Not enough quiz attempts yet to show a trend.</p>
+            <p className="text-sm text-slate-400 text-center py-6">{t("parent.child.trendHint")}</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={trend} margin={{ left: -12 }}>
@@ -91,12 +93,12 @@ export default function ParentChild() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader title="Upcoming exams" icon="📝" />
+        <CardHeader title={t("parent.child.upcomingExams")} icon="📝" />
         <div className="p-5">
           {examTt.isLoading ? (
             <Skeleton className="h-16" />
           ) : !examTt.data?.length ? (
-            <p className="text-sm text-slate-400">No exams scheduled.</p>
+            <p className="text-sm text-slate-400">{t("parent.child.noExamsScheduled")}</p>
           ) : (
             <ul className="space-y-2.5">
               {examTt.data.map((e, i) => (

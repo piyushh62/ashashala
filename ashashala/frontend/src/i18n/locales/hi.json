@@ -771,5 +771,56 @@
       "noPeriodsScheduled": "कोई पीरियड निर्धारित नहीं",
       "period": "पीरियड"
     }
+  },
+  "parent": {
+    "back": "← वापस",
+    "children": {
+      "subtitle": "आपके जुड़े हुए बच्चों का केवल-पठन दृश्य।",
+      "title": "मेरे बच्चे",
+      "noLinkedChildren": "कोई बच्चा जुड़ा नहीं है",
+      "noLinkedChildrenHint": "अपना खाता जोड़ने के लिए स्कूल से पूछें।",
+      "gradeLabel": "कक्षा {{grade}}",
+      "viewDashboard": "डैशबोर्ड देखें →"
+    },
+    "child": {
+      "allChildren": "← सभी बच्चे",
+      "reports": "📄 रिपोर्ट",
+      "messages": "💬 संदेश",
+      "subtitle": "केवल-पठन प्रगति अवलोकन।",
+      "defaultName": "बच्चा",
+      "mastery": "दक्षता",
+      "timetable": "समय-सारणी",
+      "noPeriods": "कोई पीरियड नहीं",
+      "quizScoreTrend": "क्विज़ स्कोर रुझान",
+      "trendHint": "रुझान दिखाने के लिए अभी पर्याप्त क्विज़ प्रयास नहीं हैं।",
+      "upcomingExams": "आगामी परीक्षाएँ",
+      "noExamsScheduled": "कोई परीक्षा निर्धारित नहीं।"
+    },
+    "messages": {
+      "subtitle": "अपने बच्चे के शिक्षकों को सीधे संदेश भेजें।",
+      "title": "संदेश",
+      "pickTeacher": "एक शिक्षक चुनें",
+      "noTeachersFound": "कोई शिक्षक नहीं मिला",
+      "noTeachersFoundHint": "आपका बच्चा अभी किसी कक्षा में नहीं है।",
+      "selectTeacher": "एक शिक्षक चुनें",
+      "conversation": "बातचीत",
+      "noMessagesYet": "अभी तक कोई संदेश नहीं — नीचे बातचीत शुरू करें।",
+      "messagePlaceholder": "एक संदेश लिखें…",
+      "send": "भेजें",
+      "sending": "भेजा जा रहा है…",
+      "sendFailed": "संदेश भेजा नहीं जा सका।"
+    },
+    "reports": {
+      "subtitle": "इस बच्चे के लिए भेजी गई प्रगति रिपोर्ट।",
+      "title": "रिपोर्ट",
+      "noReportsSentYet": "अभी तक कोई रिपोर्ट नहीं भेजी गई",
+      "noReportsSentYetHint": "तैयार होने पर आपके बच्चे के शिक्षक यहाँ रिपोर्ट प्रकाशित करेंगे।",
+      "sentOn": "{{date}} को भेजी गई",
+      "downloading": "डाउनलोड हो रहा है…",
+      "downloadPdf": "⬇ PDF",
+      "downloadFailed": "रिपोर्ट PDF डाउनलोड नहीं हो सकी।",
+      "masterySnapshot": "दक्षता स्नैपशॉट",
+      "teacherNotes": "शिक्षक की टिप्पणियाँ"
+    }
   }
 }

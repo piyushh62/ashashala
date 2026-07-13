@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { parentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Button, Card, CardHeader, EmptyState, Select, Skeleton, Textarea } from "../../components/ui";
 import { useToast } from "../../components/ui/Toast";
 
 export default function ParentMessages() {
+  const { t } = useTranslation();
   const { id = "" } = useParams();
   const toast = useToast();
   const qc = useQueryClient();
@@ -27,29 +29,29 @@ export default function ParentMessages() {
       setBody("");
       qc.invalidateQueries({ queryKey: ["parent", "messages", id, teacherId] });
     },
-    onError: () => toast.push("Couldn't send message.", "error"),
+    onError: () => toast.push(t("parent.messages.sendFailed"), "error"),
   });
 
   return (
     <div>
       <Link to={`/parent/child/${id}`} className="text-sm text-brand-600 hover:underline">
-        ← Back
+        {t("parent.back")}
       </Link>
-      <PageTitle subtitle="Message your child's teachers directly.">Messages</PageTitle>
+      <PageTitle subtitle={t("parent.messages.subtitle")}>{t("parent.messages.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Pick a teacher" />
+        <CardHeader title={t("parent.messages.pickTeacher")} />
         {!teachers.isLoading && !teachers.data?.length ? (
           <div className="p-5">
-            <EmptyState title="No teachers found" hint="Your child isn't assigned to any class yet." />
+            <EmptyState title={t("parent.messages.noTeachersFound")} hint={t("parent.messages.noTeachersFoundHint")} />
           </div>
         ) : (
           <div className="p-5">
             <Select value={teacherId} onChange={(e) => setTeacherId(e.target.value)}>
-              <option value="">{teachers.isLoading ? "Loading…" : "Select a teacher"}</option>
-              {(teachers.data ?? []).map((t) => (
-                <option key={`${t.teacher_id}-${t.subject_id}`} value={t.teacher_id}>
-                  {t.teacher_name} · {t.subject_name}
+              <option value="">{teachers.isLoading ? t("common.loading") : t("parent.messages.selectTeacher")}</option>
+              {(teachers.data ?? []).map((tch) => (
+                <option key={`${tch.teacher_id}-${tch.subject_id}`} value={tch.teacher_id}>
+                  {tch.teacher_name} · {tch.subject_name}
                 </option>
               ))}
             </Select>
@@ -59,12 +61,12 @@ export default function ParentMessages() {
 
       {teacherId && (
         <Card>
-          <CardHeader title="Conversation" />
+          <CardHeader title={t("parent.messages.conversation")} />
           <div className="p-5 space-y-4">
             {thread.isLoading ? (
               <Skeleton className="h-32" />
             ) : !thread.data?.length ? (
-              <p className="text-sm text-slate-400 text-center py-4">No messages yet — start the conversation below.</p>
+              <p className="text-sm text-slate-400 text-center py-4">{t("parent.messages.noMessagesYet")}</p>
             ) : (
               <div className="space-y-2.5 max-h-96 overflow-y-auto">
                 {thread.data.map((m) => (
@@ -94,12 +96,12 @@ export default function ParentMessages() {
               <Textarea
                 className="flex-1"
                 rows={2}
-                placeholder="Write a message…"
+                placeholder={t("parent.messages.messagePlaceholder")}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
               />
               <Button type="submit" disabled={!body.trim() || send.isPending}>
-                {send.isPending ? "Sending…" : "Send"}
+                {send.isPending ? t("parent.messages.sending") : t("parent.messages.send")}
               </Button>
             </form>
           </div>

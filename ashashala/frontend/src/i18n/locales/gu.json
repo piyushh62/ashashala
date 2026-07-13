@@ -771,5 +771,56 @@
       "noPeriodsScheduled": "કોઈ પિરિયડ નિર્ધારિત નથી",
       "period": "પિરિયડ"
     }
+  },
+  "parent": {
+    "back": "← પાછા",
+    "children": {
+      "subtitle": "તમારા જોડાયેલા બાળકોનું ફક્ત-જોવા માટેનું દૃશ્ય.",
+      "title": "મારા બાળકો",
+      "noLinkedChildren": "કોઈ બાળક જોડાયેલ નથી",
+      "noLinkedChildrenHint": "તમારું ખાતું જોડવા માટે શાળાને પૂછો.",
+      "gradeLabel": "ધોરણ {{grade}}",
+      "viewDashboard": "ડેશબોર્ડ જુઓ →"
+    },
+    "child": {
+      "allChildren": "← બધા બાળકો",
+      "reports": "📄 રિપોર્ટ્સ",
+      "messages": "💬 સંદેશા",
+      "subtitle": "ફક્ત-જોવા માટેની પ્રગતિ ઝાંખી.",
+      "defaultName": "બાળક",
+      "mastery": "નિપુણતા",
+      "timetable": "સમયપત્રક",
+      "noPeriods": "કોઈ પિરિયડ નથી",
+      "quizScoreTrend": "ક્વિઝ સ્કોર વલણ",
+      "trendHint": "વલણ બતાવવા માટે હજુ પૂરતા ક્વિઝ પ્રયાસો નથી.",
+      "upcomingExams": "આગામી પરીક્ષાઓ",
+      "noExamsScheduled": "કોઈ પરીક્ષા નિર્ધારિત નથી."
+    },
+    "messages": {
+      "subtitle": "તમારા બાળકના શિક્ષકોને સીધો સંદેશ મોકલો.",
+      "title": "સંદેશા",
+      "pickTeacher": "એક શિક્ષક પસંદ કરો",
+      "noTeachersFound": "કોઈ શિક્ષક મળ્યા નથી",
+      "noTeachersFoundHint": "તમારું બાળક હજુ કોઈ વર્ગમાં સોંપાયેલ નથી.",
+      "selectTeacher": "એક શિક્ષક પસંદ કરો",
+      "conversation": "વાતચીત",
+      "noMessagesYet": "હજુ સુધી કોઈ સંદેશ નથી — નીચે વાતચીત શરૂ કરો.",
+      "messagePlaceholder": "એક સંદેશ લખો…",
+      "send": "મોકલો",
+      "sending": "મોકલાઈ રહ્યું છે…",
+      "sendFailed": "સંદેશ મોકલી શકાયો નથી."
+    },
+    "reports": {
+      "subtitle": "આ બાળક માટે મોકલેલા પ્રગતિ રિપોર્ટ્સ.",
+      "title": "રિપોર્ટ્સ",
+      "noReportsSentYet": "હજુ સુધી કોઈ રિપોર્ટ મોકલાયો નથી",
+      "noReportsSentYetHint": "તૈયાર થતાં તમારા બાળકના શિક્ષક અહીં રિપોર્ટ પ્રકાશિત કરશે.",
+      "sentOn": "{{date}} ના રોજ મોકલાયું",
+      "downloading": "ડાઉનલોડ થઈ રહ્યું છે…",
+      "downloadPdf": "⬇ PDF",
+      "downloadFailed": "રિપોર્ટ PDF ડાઉનલોડ થઈ શક્યો નથી.",
+      "masterySnapshot": "નિપુણતા સ્નેપશોટ",
+      "teacherNotes": "શિક્ષકની નોંધો"
+    }
   }
 }

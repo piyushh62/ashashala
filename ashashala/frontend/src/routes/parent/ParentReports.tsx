@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { parentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, Skeleton } from "../../components/ui";
@@ -8,6 +9,7 @@ import { DataBoundary } from "../../components/ui/DataBoundary";
 import { useToast } from "../../components/ui/Toast";
 
 export default function ParentReports() {
+  const { t } = useTranslation();
   const { id = "" } = useParams();
   const toast = useToast();
   const reports = useQuery({ queryKey: ["parent", "child", id, "reports"], queryFn: () => parentApi.childReports(id) });
@@ -17,21 +19,21 @@ export default function ParentReports() {
     mutationFn: (reportId: string) => parentApi.downloadReportPdf(id, reportId),
     onMutate: (reportId) => setDownloadingId(reportId),
     onSettled: () => setDownloadingId(null),
-    onError: () => toast.push("Couldn't download the report PDF.", "error"),
+    onError: () => toast.push(t("parent.reports.downloadFailed"), "error"),
   });
 
   return (
     <div>
       <Link to={`/parent/child/${id}`} className="text-sm text-brand-600 hover:underline">
-        ← Back
+        {t("parent.back")}
       </Link>
-      <PageTitle subtitle="Sent progress reports for this child.">Reports</PageTitle>
+      <PageTitle subtitle={t("parent.reports.subtitle")}>{t("parent.reports.title")}</PageTitle>
 
       <DataBoundary
         query={reports}
         isEmpty={(d) => d.length === 0}
-        emptyTitle="No reports sent yet"
-        emptyHint="Your child's teacher will publish reports here once ready."
+        emptyTitle={t("parent.reports.noReportsSentYet")}
+        emptyHint={t("parent.reports.noReportsSentYetHint")}
         loadingFallback={<Skeleton className="h-32" />}
       >
         {(rows) => (
@@ -42,7 +44,7 @@ export default function ParentReports() {
                 <Card key={r.id}>
                   <CardHeader
                     title={`${r.period_start} → ${r.period_end}`}
-                    subtitle={r.sent_at ? `Sent ${new Date(r.sent_at).toLocaleDateString()}` : undefined}
+                    subtitle={r.sent_at ? t("parent.reports.sentOn", { date: new Date(r.sent_at).toLocaleDateString() }) : undefined}
                     action={
                       <div className="flex items-center gap-2">
                         <Badge tone="green">{r.status}</Badge>
@@ -52,7 +54,7 @@ export default function ParentReports() {
                           onClick={() => download.mutate(r.id)}
                           disabled={downloadingId === r.id}
                         >
-                          {downloadingId === r.id ? "Downloading…" : "⬇ PDF"}
+                          {downloadingId === r.id ? t("parent.reports.downloading") : t("parent.reports.downloadPdf")}
                         </Button>
                       </div>
                     }
@@ -62,7 +64,7 @@ export default function ParentReports() {
                     {r.mastery_snapshot_json.length > 0 && (
                       <div>
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
-                          Mastery snapshot
+                          {t("parent.reports.masterySnapshot")}
                         </div>
                         <div className="space-y-2">
                           {r.mastery_snapshot_json.map((m) => (
@@ -82,7 +84,7 @@ export default function ParentReports() {
                     {r.teacher_notes && (
                       <div>
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-1">
-                          Teacher notes
+                          {t("parent.reports.teacherNotes")}
                         </div>
                         <p className="text-sm text-slate-600">{r.teacher_notes}</p>
                       </div>
