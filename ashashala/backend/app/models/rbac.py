@@ -86,7 +86,7 @@ class UserRoleAssignment(Base):
 
     __tablename__ = "user_roles"
 
-    user_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), primary_key=True)
     role_id: Mapped[str] = mapped_column(String(36), ForeignKey("roles.id"), primary_key=True)
     school_id: Mapped[str | None] = mapped_column(String(36), index=True, default=None)
 

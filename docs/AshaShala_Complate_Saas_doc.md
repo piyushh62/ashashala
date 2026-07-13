@@ -237,18 +237,18 @@ Many parents, especially in rural/low-income school contexts (which AshaShala ex
 
 | # | Gap | Priority | Effort |
 |---|---|---|---|
-| 1 | Hardcoded role enum → dynamic role/permission schema | 🔴 Critical | Medium |
-| 2 | Role-creation-rights as data, not hardcoded set | 🔴 Critical | Small (once #1 done) |
-| 3 | Permission-driven sidebar/dashboard | 🟠 High | Medium |
-| 4 | Scheduler (APScheduler at pilot scale) | 🟠 High | Small |
-| 5 | Scheduling Agent (AI timetable) | 🟠 High | Medium |
-| 6 | Scheduled-Learning Agent (timetable-driven topics + micro-quiz) | 🟠 High | Medium |
-| 7 | Reporting + Communication Agents (parent report) | 🟠 High | Medium |
-| 8 | Generalized `AgentAction` approval queue | 🟠 High | Small–Medium |
-| 9 | Multi-channel notifications (SMS/WhatsApp) | 🟠 High (India context) | Medium |
-| 10 | Insight/Intervention Agent (at-risk alerts) | 🟡 Medium | Small (data already exists) |
+| 1 | Hardcoded role enum → dynamic role/permission schema | 🟡 Dynamic schema built (`app/models/rbac.py`: `RoleTemplate`, `Permission`, `Role`, `RolePermission`, `UserRoleAssignment`, `RoleCreationRight`, full CRUD) but `User.role` column is still the fixed `UserRole` enum — not yet migrated onto the dynamic tables | Medium (migration remains) |
+| 2 | Role-creation-rights as data, not hardcoded set | ✅ Done — `role_creation_rights` DB table + CRUD routes (`school_admin.py`); `DEFAULT_CREATION_RIGHTS` in `core/permissions.py` is only a bootstrap seed | — |
+| 3 | Permission-driven sidebar/dashboard | ✅ Done — `navForUser()` filters the nav by live `permissions[]` from the API; routes gated by explicit permission strings. (Nav item list itself is still a hardcoded array, filtered rather than server-generated) | — |
+| 4 | Scheduler (APScheduler at pilot scale) | ✅ Done — `app/core/scheduler.py`, `AsyncIOScheduler` with 4 jobs, started in `main.py` | — |
+| 5 | Scheduling Agent (AI timetable) | ✅ Done — `app/agents/scheduling.py`, teacher-triggered slot proposals validated against the real free-slot grid, queued via `AgentAction` | — |
+| 6 | Scheduled-Learning Agent (timetable-driven topics + micro-quiz) | ✅ Done — `app/agents/scheduled_learning.py`, daily cron job pushes feed items proactively | — |
+| 7 | Reporting + Communication Agents (parent report) | ✅ Done — `app/agents/reporting.py` weekly cron job calls `communication.send_report_message()`, delivered via each parent's enabled channels | — |
+| 8 | Generalized `AgentAction` approval queue | ✅ Done — `app/models/agent_action.py` + `routes/agent_actions.py` (list/approve/reject) | — |
+| 9 | Multi-channel notifications (SMS/WhatsApp) | 🟡 Infrastructure done (`NotificationChannel` enum, pluggable `_SENDERS` dispatch in `notification_dispatch.py`) but senders are `LogSender` stubs — no real Twilio/WhatsApp Business API integration yet | Small (swap in real provider — documented as a one-file change) |
+| 10 | Insight/Intervention Agent (at-risk alerts) | ✅ Done — `app/agents/insight.py`, daily cron job creates alerts and drafts a parent message via the communication agent, held pending teacher approval | — |
 | 11 | Frontend i18n (UI localization) | 🟡 Foundation + chrome shipped (en/hi/gu, nav/layout/Login/Settings); remaining ~50 route files still English | Medium |
-| 12 | Mid-year transfer history (`Enrollment`/`TeacherAssignment` end dates) | 🟡 Medium | Small |
+| 12 | Mid-year transfer history (`Enrollment`/`TeacherAssignment` end dates) | ✅ Done — both models have `end_date: Date \| None` (NULL = active, non-null = transfer/reassignment date) | — |
 | 13 | Fee/Admissions/HR/Library modules (feature-flagged, optional) | 🟢 Low (deferred) | Large |
 | 14 | DPDP Act explicit compliance review | ✅ Consent-confirmation gate shipped; full legal review still pending | Small (review + doc) |
 | 15 | Offline/low-bandwidth support | 🟡 First cut shipped (installable app shell + connectivity banner); full offline mutation sync still deferred | Large |
@@ -258,26 +258,35 @@ Many parents, especially in rural/low-income school contexts (which AshaShala ex
 
 ## Part 12 — Phased Roadmap (pilot-aware: 5–10 users, free-tier APIs)
 
-**Phase 1 (now → 3–4 weeks): Foundation**
-Dynamic RBAC schema (#1, #2) → Permission-driven sidebar (#3) → Generalized `AgentAction` queue (#8)
+**Phase 1 — Foundation: ✅ done**
+Dynamic RBAC schema tables (#1 — schema built, `User.role` migration still open) → Permission-driven sidebar filtering (#3, done) → Generalized `AgentAction` queue (#8, done)
 
-**Phase 2 (next 2–3 weeks): Infrastructure**
-APScheduler (#4) → SMS/WhatsApp notification channel (#9) → `Timetable.topic` field + history fields (#12)
+**Phase 2 — Infrastructure: ✅ done**
+APScheduler (#4, done) → Notification channel model + pluggable dispatch (#9 — real SMS/WhatsApp provider still stubbed) → `Enrollment`/`TeacherAssignment` history fields (#12, done)
 
-**Phase 3 (next 4–6 weeks): First proactive agents**
-Scheduling Agent (#5) → Insight Agent (#10, fastest since data exists) → Scheduled-Learning Agent (#6)
+**Phase 3 — First proactive agents: ✅ done**
+Scheduling Agent (#5, done) → Insight Agent (#10, done) → Scheduled-Learning Agent (#6, done)
 
-**Phase 4 (next 4 weeks): Parent-facing**
-Reporting Agent + Communication Agent (#7)
+**Phase 4 — Parent-facing: ✅ done**
+Reporting Agent + Communication Agent (#7, done)
 
 **Phase 5 (deferred until pilot grows past ~10 users / multiple schools):**
 Fee/Admissions/HR modules (#13), Celery migration if APScheduler hits limits. Started early, ahead of schedule: DPDP consent gate + DR runbook status correction (#14, #16 — legal review and live restore drill still pending), i18n foundation + chrome translation (#11 — remaining route files still pending), offline app-shell + connectivity banner (#15 — full offline mutation sync still deferred)
+
+**Phase 6 (remaining open items, not yet scheduled):**
+`User.role` migration onto the dynamic RBAC schema (#1 completion), real SMS/WhatsApp provider integration (#9 completion — currently a one-file `LogSender` swap)
 
 ---
 
 ## Part 13 — Immediate Next Step
 
-Recommended build order for the **very next PR**: start with **#1 + #2 (dynamic RBAC schema)** — everything else (dashboards, agents, approval queue) depends on roles/permissions being data instead of code. Doing this first, while you're still at 5–10 pilot users, avoids a painful migration later.
+Phases 1–4 and the Phase 5 quick wins (DR/DPDP status, i18n foundation, offline first cut) are done. Two genuine gaps remain from the original roadmap, plus the deferred Phase 5 modules:
+
+- **#1 completion**: migrate `User.role` off the fixed `UserRole` enum onto the already-built dynamic RBAC schema (`rbac.py`) — the schema and creation-rights CRUD exist, but the base user table hasn't been cut over. This is the one item that's genuinely "critical infra debt" left over from the original plan.
+- **#9 completion**: wire a real SMS/WhatsApp provider (e.g. Twilio, Meta WhatsApp Business API) into `notification_dispatch.py`'s `_SENDERS` map, replacing the `LogSender` stub — documented as a one-file change, gated mainly on which provider/credentials the user wants.
+- **Phase 5 remainder**: Fee/Admissions/HR modules (#13, large, deferred until pilot scale grows), plus finishing the deferred parts of #11/#14/#15/#16 (i18n across remaining routes, DPDP legal review, offline mutation sync, DR restore drill).
+
+Recommended next PR: **#1 (User.role migration)** — it's the last piece of "critical" infra debt, and every day it's left undone increases migration risk as more schools/data onboard.
 
 ---
 

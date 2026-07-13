@@ -74,7 +74,12 @@ from app.schemas.school_admin import (
 from app.schemas.pagination import Page
 from app.services.audit_service import record_audit
 from app.services.notification_service import notify
-from app.services.rbac_service import can_create_role, ensure_catalog_seeded, ensure_school_roles
+from app.services.rbac_service import (
+    can_create_role,
+    ensure_catalog_seeded,
+    ensure_school_roles,
+    ensure_user_role_assignment,
+)
 
 router = APIRouter(prefix="/api/v1/school", tags=["School Admin"])
 _guard = require_permission(SCHOOL_ADMIN)
@@ -132,6 +137,7 @@ async def create_user(body: UserCreate, request: Request,
                 role=body.role, school_id=admin.school_id, grade=body.grade, interests=body.interests)
     db.add(user)
     await db.flush()
+    await ensure_user_role_assignment(db, user)
     await record_audit(db, action="USER_CREATE", actor=admin, target_type="user",
                        target_id=user.id, payload={"role": body.role.value}, request=request)
     return UserCreatedResponse(user=UserOut.model_validate(user),
@@ -158,6 +164,7 @@ async def bulk_import_students(request: Request, file: UploadFile,
                     role=UserRole.student, school_id=admin.school_id, grade=grade)
         db.add(user)
         await db.flush()
+        await ensure_user_role_assignment(db, user)
         created.append({"id": user.id, "email": email, "temp_password": temp})
     await record_audit(db, action="USER_CREATE", actor=admin, target_type="user_bulk",
                        target_id=None, payload={"count": len(created)}, request=request)

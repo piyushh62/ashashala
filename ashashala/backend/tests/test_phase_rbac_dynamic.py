@@ -3,6 +3,7 @@ matrix, school role/creation-rights management, and the generalized Agent
 Action approval queue."""
 
 import pytest
+from sqlalchemy import select
 
 from app.core.permissions import (
     PARENT_PORTAL,
@@ -13,6 +14,7 @@ from app.core.permissions import (
     TEACHER_PORTAL,
 )
 from app.db.tenant_filter import tenant_bypass
+from app.models.rbac import UserRoleAssignment
 from app.models.user import UserRole
 from app.services.rbac_service import propose_agent_action
 from tests.conftest import login, make_school, make_user
@@ -215,3 +217,54 @@ async def test_agent_action_scoped_to_own_school(client, db):
 
     approve_resp = await client.post(f"/api/v1/agent-actions/{action.id}/approve", headers=headers)
     assert approve_resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_new_user_has_role_assignment_immediately_after_creation_no_login_needed(client, db):
+    """RBAC hardening (Phase 6): role provisioning is eager at creation time,
+    not only lazy at first login — a `user_roles` row must exist right after
+    `POST /school/users` returns, before the new user ever logs in."""
+    school = await make_school(db)
+    await make_user(db, role=UserRole.school_admin, school_id=school.id, email="adm8@x.test")
+    headers = await login(client, "adm8@x.test")
+
+    resp = await client.post("/api/v1/school/users", headers=headers,
+                             json={"name": "New Teacher", "email": "newteach8@x.test", "role": "teacher"})
+    assert resp.status_code == 200, resp.text
+    new_user_id = resp.json()["user"]["id"]
+
+    with tenant_bypass():
+        assignment = (await db.execute(
+            select(UserRoleAssignment).where(UserRoleAssignment.user_id == new_user_id)
+        )).scalars().first()
+    assert assignment is not None, "expected an eager user_roles row before any login"
+
+
+@pytest.mark.asyncio
+async def test_bulk_imported_students_have_role_assignment_immediately(client, db):
+    school = await make_school(db)
+    await make_user(db, role=UserRole.school_admin, school_id=school.id, email="adm9@x.test")
+    headers = await login(client, "adm9@x.test")
+
+    csv_body = b"name,email,grade\nBulk Student,bulkstud9@x.test,5\n"
+    resp = await client.post(
+        "/api/v1/school/users/bulk", headers=headers,
+        files={"file": ("students.csv", csv_body, "text/csv")},
+    )
+    assert resp.status_code == 200, resp.text
+    created = resp.json()["created"]
+    assert len(created) == 1
+
+    with tenant_bypass():
+        assignment = (await db.execute(
+            select(UserRoleAssignment).where(UserRoleAssignment.user_id == created[0]["id"])
+        )).scalars().first()
+    assert assignment is not None
+
+
+@pytest.mark.asyncio
+async def test_require_role_removed_from_deps(db):
+    """`require_role` was confirmed dead code (zero call sites) and removed
+    as part of the Phase 6 RBAC hardening cleanup."""
+    import app.deps as deps
+    assert not hasattr(deps, "require_role")

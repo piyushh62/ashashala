@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, Input, Label, Select, Skeleton, Table } from "../../components/ui";
@@ -11,6 +12,7 @@ import { useToast } from "../../components/ui/Toast";
 // parent link) — all pickers are populated by name from the school's real
 // classes/subjects/users, so nobody has to type a UUID by hand.
 export default function SchoolStructure() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -18,7 +20,7 @@ export default function SchoolStructure() {
     toast.push(m, "success");
     qc.invalidateQueries({ queryKey: ["school"] });
   };
-  const fail = () => toast.push("Request failed.", "error");
+  const fail = () => toast.push(t("common.requestFailed"), "error");
 
   const classes = useQuery({ queryKey: ["school", "classes"], queryFn: schoolApi.listClasses });
   const subjects = useQuery({ queryKey: ["school", "subjects"], queryFn: schoolApi.listSubjects });
@@ -59,54 +61,54 @@ export default function SchoolStructure() {
 
   const mCls = useMutation({
     mutationFn: () => schoolApi.createClass({ name: cls.name, grade_level: Number(cls.grade) }),
-    onSuccess: (r) => { ok(`Class created: ${r.name}`); qc.invalidateQueries({ queryKey: ["school", "classes"] }); },
+    onSuccess: (r) => { ok(t("school.structure.classCreated", { name: r.name })); qc.invalidateQueries({ queryKey: ["school", "classes"] }); },
     onError: fail,
   });
   const mSubj = useMutation({
     mutationFn: () => schoolApi.createSubject({ name: subj }),
-    onSuccess: (r) => { ok(`Subject created: ${r.name}`); qc.invalidateQueries({ queryKey: ["school", "subjects"] }); },
+    onSuccess: (r) => { ok(t("school.structure.subjectCreated", { name: r.name })); qc.invalidateQueries({ queryKey: ["school", "subjects"] }); },
     onError: fail,
   });
   const mAssign = useMutation({
     mutationFn: () => schoolApi.assignTeacher(assign),
-    onSuccess: () => { ok("Teacher assigned."); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); setAssign({ teacher_id: "", class_id: "", subject_id: "" }); },
+    onSuccess: () => { ok(t("school.structure.teacherAssigned")); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); setAssign({ teacher_id: "", class_id: "", subject_id: "" }); },
     onError: fail,
   });
   const mEnroll = useMutation({
     mutationFn: () => schoolApi.enroll(enroll),
-    onSuccess: () => { ok("Student enrolled."); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); setEnroll({ student_id: "", class_id: "" }); },
+    onSuccess: () => { ok(t("school.structure.studentEnrolled")); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); setEnroll({ student_id: "", class_id: "" }); },
     onError: fail,
   });
   const mLink = useMutation({
     mutationFn: () => schoolApi.linkParent({ ...link, consent_confirmed: linkConsent }),
-    onSuccess: () => { ok("Parent linked (consent recorded)."); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); setLink({ parent_id: "", student_id: "" }); setLinkConsent(false); },
+    onSuccess: () => { ok(t("school.structure.parentLinked")); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); setLink({ parent_id: "", student_id: "" }); setLinkConsent(false); },
     onError: fail,
   });
 
   const mUnassign = useMutation({
     mutationFn: (id: string) => schoolApi.unassignTeacher(id),
-    onSuccess: () => { ok("Assignment removed."); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); },
+    onSuccess: () => { ok(t("school.structure.assignmentRemoved")); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); },
     onError: fail,
   });
   const mUnenroll = useMutation({
     mutationFn: (id: string) => schoolApi.unenrollStudent(id),
-    onSuccess: () => { ok("Enrollment removed."); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); },
+    onSuccess: () => { ok(t("school.structure.enrollmentRemoved")); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); },
     onError: fail,
   });
   const mUnlink = useMutation({
     mutationFn: (id: string) => schoolApi.unlinkParent(id),
-    onSuccess: () => { ok("Parent link removed."); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); },
+    onSuccess: () => { ok(t("school.structure.parentLinkRemoved")); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); },
     onError: fail,
   });
 
   const mEndAssignment = useMutation({
     mutationFn: () => schoolApi.updateTeacherAssignment(endTarget!.id, endDate),
-    onSuccess: () => { ok("Assignment end-dated."); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); setEndTarget(null); },
+    onSuccess: () => { ok(t("school.structure.assignmentEndDated")); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); setEndTarget(null); },
     onError: fail,
   });
   const mEndEnrollment = useMutation({
     mutationFn: () => schoolApi.updateEnrollment(endTarget!.id, endDate),
-    onSuccess: () => { ok("Enrollment end-dated."); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); setEndTarget(null); },
+    onSuccess: () => { ok(t("school.structure.enrollmentEndDated")); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); setEndTarget(null); },
     onError: fail,
   });
 
@@ -129,13 +131,13 @@ export default function SchoolStructure() {
     const rangeEnd = offset + count;
     return (
       <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-500">
-        <span>{rangeStart}–{rangeEnd} of {total}</span>
+        <span>{t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}</span>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" onClick={() => onOffsetChange(Math.max(0, offset - limit))} disabled={offset === 0}>
-            Previous
+            {t("common.previous")}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => onOffsetChange(offset + limit)} disabled={rangeEnd >= total}>
-            Next
+            {t("common.next")}
           </Button>
         </div>
       </div>
@@ -144,16 +146,16 @@ export default function SchoolStructure() {
 
   const ClassPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{classes.isLoading ? "Loading…" : "Select a class"}</option>
+      <option value="">{classes.isLoading ? t("common.loading") : t("school.structure.selectAClass")}</option>
       {classes.data?.map((c) => (
-        <option key={c.id} value={c.id}>{c.name} (Grade {c.grade_level})</option>
+        <option key={c.id} value={c.id}>{t("school.structure.classGradeOption", { name: c.name, grade: c.grade_level })}</option>
       ))}
     </Select>
   );
 
   const SubjectPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{subjects.isLoading ? "Loading…" : "Select a subject"}</option>
+      <option value="">{subjects.isLoading ? t("common.loading") : t("school.structure.selectASubject")}</option>
       {subjects.data?.map((s) => (
         <option key={s.id} value={s.id}>{s.name}</option>
       ))}
@@ -170,73 +172,73 @@ export default function SchoolStructure() {
     placeholder: string;
   }) => (
     <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{loading ? "Loading…" : placeholder}</option>
+      <option value="">{loading ? t("common.loading") : placeholder}</option>
       {users?.map((u) => (
-        <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+        <option key={u.id} value={u.id}>{t("school.structure.userEmailOption", { name: u.name, email: u.email })}</option>
       ))}
     </Select>
   );
 
   return (
     <div>
-      <PageTitle subtitle="Set up classes, subjects and the people in them.">Classes & Structure</PageTitle>
+      <PageTitle subtitle={t("school.structure.subtitle")}>{t("school.structure.title")}</PageTitle>
 
       <div className="grid gap-6">
         <Card>
-          <CardHeader title="Create class" />
+          <CardHeader title={t("school.structure.createClass")} />
           <Row>
-            <div><Label>Name</Label><Input value={cls.name} onChange={(e) => setCls({ ...cls, name: e.target.value })} /></div>
-            <div><Label>Grade</Label><Input type="number" value={cls.grade} onChange={(e) => setCls({ ...cls, grade: e.target.value })} /></div>
-            <Button onClick={() => mCls.mutate()} disabled={!cls.name}>Create class</Button>
+            <div><Label>{t("school.structure.name")}</Label><Input value={cls.name} onChange={(e) => setCls({ ...cls, name: e.target.value })} /></div>
+            <div><Label>{t("school.structure.grade")}</Label><Input type="number" value={cls.grade} onChange={(e) => setCls({ ...cls, grade: e.target.value })} /></div>
+            <Button onClick={() => mCls.mutate()} disabled={!cls.name}>{t("school.structure.createClass")}</Button>
           </Row>
         </Card>
 
         <Card>
-          <CardHeader title="Create subject" />
+          <CardHeader title={t("school.structure.createSubject")} />
           <Row>
-            <div className="md:col-span-2"><Label>Name</Label><Input value={subj} onChange={(e) => setSubj(e.target.value)} /></div>
-            <Button onClick={() => mSubj.mutate()} disabled={!subj}>Create subject</Button>
+            <div className="md:col-span-2"><Label>{t("school.structure.name")}</Label><Input value={subj} onChange={(e) => setSubj(e.target.value)} /></div>
+            <Button onClick={() => mSubj.mutate()} disabled={!subj}>{t("school.structure.createSubject")}</Button>
           </Row>
         </Card>
 
         <Card>
           <CardHeader
-            title="Assign teacher to (class, subject)"
+            title={t("school.structure.assignTeacherTitle")}
             action={
               <label className="flex items-center gap-1.5 text-xs text-slate-500 font-normal cursor-pointer">
                 <input type="checkbox" checked={taShowEnded} onChange={(e) => { setTaOffset(0); setTaShowEnded(e.target.checked); }} />
-                Show ended
+                {t("school.structure.showEnded")}
               </label>
             }
           />
           <Row>
             <div>
-              <Label>Teacher</Label>
-              <UserPicker users={teachers.data?.items} loading={teachers.isLoading} placeholder="Select a teacher"
+              <Label>{t("school.structure.teacher")}</Label>
+              <UserPicker users={teachers.data?.items} loading={teachers.isLoading} placeholder={t("school.structure.selectATeacher")}
                 value={assign.teacher_id} onChange={(v) => setAssign({ ...assign, teacher_id: v })} />
             </div>
-            <div><Label>Class</Label><ClassPicker value={assign.class_id} onChange={(v) => setAssign({ ...assign, class_id: v })} /></div>
-            <div><Label>Subject</Label><SubjectPicker value={assign.subject_id} onChange={(v) => setAssign({ ...assign, subject_id: v })} /></div>
-            <Button onClick={() => mAssign.mutate()} disabled={!assign.teacher_id || !assign.class_id || !assign.subject_id}>Assign</Button>
+            <div><Label>{t("school.structure.class")}</Label><ClassPicker value={assign.class_id} onChange={(v) => setAssign({ ...assign, class_id: v })} /></div>
+            <div><Label>{t("school.structure.subject")}</Label><SubjectPicker value={assign.subject_id} onChange={(v) => setAssign({ ...assign, subject_id: v })} /></div>
+            <Button onClick={() => mAssign.mutate()} disabled={!assign.teacher_id || !assign.class_id || !assign.subject_id}>{t("school.structure.assign")}</Button>
           </Row>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={teacherAssignments}
               isEmpty={(d) => d.items.length === 0}
-              emptyTitle="No assignments yet"
-              emptyHint="Assign a teacher to a class and subject above."
+              emptyTitle={t("school.structure.noAssignments")}
+              emptyHint={t("school.structure.noAssignmentsHint")}
               loadingFallback={<Skeleton className="h-20 m-3" />}
             >
               {(page) => (
                 <>
-                  <Table head={["Teacher", "Class", "Subject", "", ""]}>
+                  <Table head={[t("school.structure.teacher"), t("school.structure.class"), t("school.structure.subject"), "", ""]}>
                     {page.items.map((r) => (
                       <tr key={r.id} className="border-b border-slate-50">
                         <td className="px-4 py-2 font-medium text-slate-700">{r.teacher_name}</td>
                         <td className="px-4 py-2 text-slate-500">{r.class_name}</td>
                         <td className="px-4 py-2 text-slate-500">{r.subject_name}</td>
                         <td className="px-4 py-2">
-                          {r.end_date && <Badge tone="amber">Ends {r.end_date}</Badge>}
+                          {r.end_date && <Badge tone="amber">{t("school.structure.endsOn", { date: r.end_date })}</Badge>}
                         </td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
                           {!r.end_date && (
@@ -248,20 +250,20 @@ export default function SchoolStructure() {
                                 setEndTarget({ kind: "assignment", id: r.id, label: `${r.teacher_name} teaching ${r.subject_name} to ${r.class_name}` });
                               }}
                             >
-                              End
+                              {t("school.structure.end")}
                             </Button>
                           )}
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => confirm.ask({
-                              title: "Remove this assignment?",
-                              description: `${r.teacher_name} will no longer teach ${r.subject_name} to ${r.class_name}.`,
-                              confirmLabel: "Remove",
+                              title: t("school.structure.removeAssignmentTitle"),
+                              description: t("school.structure.removeAssignmentDesc", { teacher: r.teacher_name, subject: r.subject_name, class: r.class_name }),
+                              confirmLabel: t("school.structure.remove"),
                               onConfirm: () => mUnassign.mutateAsync(r.id),
                             })}
                           >
-                            Remove
+                            {t("school.structure.remove")}
                           </Button>
                         </td>
                       </tr>
@@ -276,40 +278,40 @@ export default function SchoolStructure() {
 
         <Card>
           <CardHeader
-            title="Enroll student"
+            title={t("school.structure.enrollStudentTitle")}
             action={
               <label className="flex items-center gap-1.5 text-xs text-slate-500 font-normal cursor-pointer">
                 <input type="checkbox" checked={enrollShowEnded} onChange={(e) => { setEnrollOffset(0); setEnrollShowEnded(e.target.checked); }} />
-                Show ended
+                {t("school.structure.showEnded")}
               </label>
             }
           />
           <Row>
             <div>
-              <Label>Student</Label>
-              <UserPicker users={students.data?.items} loading={students.isLoading} placeholder="Select a student"
+              <Label>{t("school.structure.student")}</Label>
+              <UserPicker users={students.data?.items} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
                 value={enroll.student_id} onChange={(v) => setEnroll({ ...enroll, student_id: v })} />
             </div>
-            <div><Label>Class</Label><ClassPicker value={enroll.class_id} onChange={(v) => setEnroll({ ...enroll, class_id: v })} /></div>
-            <Button onClick={() => mEnroll.mutate()} disabled={!enroll.student_id || !enroll.class_id}>Enroll</Button>
+            <div><Label>{t("school.structure.class")}</Label><ClassPicker value={enroll.class_id} onChange={(v) => setEnroll({ ...enroll, class_id: v })} /></div>
+            <Button onClick={() => mEnroll.mutate()} disabled={!enroll.student_id || !enroll.class_id}>{t("school.structure.enroll")}</Button>
           </Row>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={enrollments}
               isEmpty={(d) => d.items.length === 0}
-              emptyTitle="No enrollments yet"
-              emptyHint="Enroll a student into a class above."
+              emptyTitle={t("school.structure.noEnrollments")}
+              emptyHint={t("school.structure.noEnrollmentsHint")}
               loadingFallback={<Skeleton className="h-20 m-3" />}
             >
               {(page) => (
                 <>
-                  <Table head={["Student", "Class", "", ""]}>
+                  <Table head={[t("school.structure.student"), t("school.structure.class"), "", ""]}>
                     {page.items.map((r) => (
                       <tr key={r.id} className="border-b border-slate-50">
                         <td className="px-4 py-2 font-medium text-slate-700">{r.student_name}</td>
                         <td className="px-4 py-2 text-slate-500">{r.class_name}</td>
                         <td className="px-4 py-2">
-                          {r.end_date && <Badge tone="amber">Ends {r.end_date}</Badge>}
+                          {r.end_date && <Badge tone="amber">{t("school.structure.endsOn", { date: r.end_date })}</Badge>}
                         </td>
                         <td className="px-4 py-2 text-right whitespace-nowrap">
                           {!r.end_date && (
@@ -321,20 +323,20 @@ export default function SchoolStructure() {
                                 setEndTarget({ kind: "enrollment", id: r.id, label: `${r.student_name} in ${r.class_name}` });
                               }}
                             >
-                              End
+                              {t("school.structure.end")}
                             </Button>
                           )}
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => confirm.ask({
-                              title: "Remove this enrollment?",
-                              description: `${r.student_name} will no longer be enrolled in ${r.class_name}.`,
-                              confirmLabel: "Remove",
+                              title: t("school.structure.removeEnrollmentTitle"),
+                              description: t("school.structure.removeEnrollmentDesc", { student: r.student_name, class: r.class_name }),
+                              confirmLabel: t("school.structure.remove"),
                               onConfirm: () => mUnenroll.mutateAsync(r.id),
                             })}
                           >
-                            Remove
+                            {t("school.structure.remove")}
                           </Button>
                         </td>
                       </tr>
@@ -348,16 +350,16 @@ export default function SchoolStructure() {
         </Card>
 
         <Card>
-          <CardHeader title="Link parent to student" />
+          <CardHeader title={t("school.structure.linkParentTitle")} />
           <Row>
             <div>
-              <Label>Parent</Label>
-              <UserPicker users={parents.data?.items} loading={parents.isLoading} placeholder="Select a parent"
+              <Label>{t("school.structure.parent")}</Label>
+              <UserPicker users={parents.data?.items} loading={parents.isLoading} placeholder={t("school.structure.selectAParent")}
                 value={link.parent_id} onChange={(v) => setLink({ ...link, parent_id: v })} />
             </div>
             <div>
-              <Label>Student</Label>
-              <UserPicker users={students.data?.items} loading={students.isLoading} placeholder="Select a student"
+              <Label>{t("school.structure.student")}</Label>
+              <UserPicker users={students.data?.items} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
                 value={link.student_id} onChange={(v) => setLink({ ...link, student_id: v })} />
             </div>
           </Row>
@@ -369,21 +371,21 @@ export default function SchoolStructure() {
                 checked={linkConsent}
                 onChange={(e) => setLinkConsent(e.target.checked)}
               />
-              I confirm the guardian's consent has been obtained for linking this student's account.
+              {t("school.structure.consentLabel")}
             </label>
-            <Button onClick={() => mLink.mutate()} disabled={!link.parent_id || !link.student_id || !linkConsent}>Link</Button>
+            <Button onClick={() => mLink.mutate()} disabled={!link.parent_id || !link.student_id || !linkConsent}>{t("school.structure.link")}</Button>
           </div>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={parentLinks}
               isEmpty={(d) => d.items.length === 0}
-              emptyTitle="No parent links yet"
-              emptyHint="Link a parent to a student above."
+              emptyTitle={t("school.structure.noParentLinks")}
+              emptyHint={t("school.structure.noParentLinksHint")}
               loadingFallback={<Skeleton className="h-20 m-3" />}
             >
               {(page) => (
                 <>
-                  <Table head={["Parent", "Student", ""]}>
+                  <Table head={[t("school.structure.parent"), t("school.structure.student"), ""]}>
                     {page.items.map((r) => (
                       <tr key={r.id} className="border-b border-slate-50">
                         <td className="px-4 py-2 font-medium text-slate-700">{r.parent_name}</td>
@@ -393,13 +395,13 @@ export default function SchoolStructure() {
                             variant="ghost"
                             size="sm"
                             onClick={() => confirm.ask({
-                              title: "Remove this link?",
-                              description: `${r.parent_name} will no longer be linked to ${r.student_name}.`,
-                              confirmLabel: "Remove",
+                              title: t("school.structure.removeLinkTitle"),
+                              description: t("school.structure.removeLinkDesc", { parent: r.parent_name, student: r.student_name }),
+                              confirmLabel: t("school.structure.remove"),
                               onConfirm: () => mUnlink.mutateAsync(r.id),
                             })}
                           >
-                            Remove
+                            {t("school.structure.remove")}
                           </Button>
                         </td>
                       </tr>
@@ -417,22 +419,22 @@ export default function SchoolStructure() {
       <Modal
         open={!!endTarget}
         onOpenChange={(open) => !open && setEndTarget(null)}
-        title="Set an end date"
+        title={t("school.structure.setEndDateTitle")}
         description={endTarget?.label}
         size="sm"
       >
         <div className="space-y-4">
           <div>
-            <Label>End date</Label>
+            <Label>{t("school.structure.endDate")}</Label>
             <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setEndTarget(null)}>Cancel</Button>
+            <Button variant="ghost" onClick={() => setEndTarget(null)}>{t("common.cancel")}</Button>
             <Button
               onClick={() => (endTarget?.kind === "assignment" ? mEndAssignment.mutate() : mEndEnrollment.mutate())}
               disabled={!endDate || mEndAssignment.isPending || mEndEnrollment.isPending}
             >
-              {mEndAssignment.isPending || mEndEnrollment.isPending ? "Saving…" : "Set end date"}
+              {mEndAssignment.isPending || mEndEnrollment.isPending ? t("school.structure.saving") : t("school.structure.setEndDate")}
             </Button>
           </div>
         </div>

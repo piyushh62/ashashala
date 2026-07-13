@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { schoolApi } from "../../api/endpoints";
 import type { RoleOut } from "../../types/api";
@@ -11,7 +12,7 @@ import { FormField } from "../../components/ui/FormField";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 
-const createSchema = z.object({ name: z.string().min(1, "Name is required") });
+const createSchema = z.object({ name: z.string().min(1) });
 type CreateForm = z.infer<typeof createSchema>;
 
 function Pills({
@@ -47,6 +48,7 @@ function Pills({
 }
 
 export default function SchoolRoles() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -72,12 +74,12 @@ export default function SchoolRoles() {
   const create = useMutation({
     mutationFn: (values: CreateForm) => schoolApi.createRole({ name: values.name, permissions: createPerms }),
     onSuccess: () => {
-      toast.push("Role created.", "success");
+      toast.push(t("school.roles.roleCreated"), "success");
       reset();
       setCreatePerms([]);
       invalidateRoles();
     },
-    onError: () => toast.push("Couldn't create role (name may be taken).", "error"),
+    onError: () => toast.push(t("school.roles.createRoleFailed"), "error"),
   });
 
   const openEdit = (r: RoleOut) => {
@@ -87,20 +89,20 @@ export default function SchoolRoles() {
   const update = useMutation({
     mutationFn: () => schoolApi.updateRole(editing!.id, { permissions: editPerms }),
     onSuccess: () => {
-      toast.push("Role updated.", "success");
+      toast.push(t("school.roles.roleUpdated"), "success");
       setEditing(null);
       invalidateRoles();
     },
-    onError: () => toast.push("Couldn't update role.", "error"),
+    onError: () => toast.push(t("school.roles.updateRoleFailed"), "error"),
   });
 
   const del = useMutation({
     mutationFn: (id: string) => schoolApi.deleteRole(id),
     onSuccess: () => {
-      toast.push("Role deleted.", "success");
+      toast.push(t("school.roles.roleDeleted"), "success");
       invalidateRoles();
     },
-    onError: () => toast.push("Couldn't delete this role (it may be built-in or still assigned to users).", "error"),
+    onError: () => toast.push(t("school.roles.deleteRoleFailed"), "error"),
   });
 
   const openRights = async (r: RoleOut) => {
@@ -111,45 +113,45 @@ export default function SchoolRoles() {
   const saveRights = useMutation({
     mutationFn: () => schoolApi.setCreationRights(rightsFor!.id, rightsSelected),
     onSuccess: () => {
-      toast.push("Creation rights updated.", "success");
+      toast.push(t("school.roles.creationRightsUpdated"), "success");
       setRightsFor(null);
     },
-    onError: () => toast.push("Couldn't update creation rights.", "error"),
+    onError: () => toast.push(t("school.roles.creationRightsUpdateFailed"), "error"),
   });
 
   const toggle = (list: string[], setList: (v: string[]) => void, v: string) =>
     setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
   const perms = (permissions.data ?? []).map((p) => `${p.resource}:${p.action}`);
-  const templateNames = (templates.data ?? []).map((t) => t.name);
+  const templateNames = (templates.data ?? []).map((tpl) => tpl.name);
 
   return (
     <div>
-      <PageTitle subtitle="Custom roles and who can create teachers, students, and parents.">Roles</PageTitle>
+      <PageTitle subtitle={t("school.roles.subtitle")}>{t("school.roles.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="New custom role" />
+        <CardHeader title={t("school.roles.newCustomRole")} />
         <form className="p-5 space-y-4" onSubmit={handleSubmit((v) => create.mutateAsync(v))}>
-          <FormField label="Name" error={errors.name?.message}>
+          <FormField label={t("school.roles.name")} error={errors.name ? t("common.nameRequired") : undefined}>
             <Input invalid={!!errors.name} {...register("name")} className="max-w-sm" />
           </FormField>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Permissions</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{t("school.roles.permissions")}</div>
             {permissions.isLoading ? <Skeleton className="h-16" /> : <Pills options={perms} selected={createPerms} onToggle={(v) => toggle(createPerms, setCreatePerms, v)} />}
           </div>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating…" : "Create role"}
+            {isSubmitting ? t("school.roles.creating") : t("school.roles.createRole")}
           </Button>
         </form>
       </Card>
 
       <Card>
-        <CardHeader title="All roles" subtitle="Toggle which roles can create teachers, students, or parents." />
+        <CardHeader title={t("school.roles.allRoles")} subtitle={t("school.roles.allRolesSubtitle")} />
         <div className="p-2">
           {roles.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !roles.data?.length ? (
-            <EmptyState title="No roles yet" />
+            <EmptyState title={t("school.roles.noRoles")} />
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {roles.data.map((r) => (
@@ -157,7 +159,7 @@ export default function SchoolRoles() {
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-slate-700 dark:text-slate-200">{r.name}</span>
-                      {!r.is_custom && <Badge tone="brand">built-in</Badge>}
+                      {!r.is_custom && <Badge tone="brand">{t("school.roles.builtIn")}</Badge>}
                     </div>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {r.permissions.map((p) => (
@@ -167,26 +169,26 @@ export default function SchoolRoles() {
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <Button variant="ghost" size="sm" onClick={() => openRights(r)}>
-                      Creation rights
+                      {t("school.roles.creationRights")}
                     </Button>
                     {r.is_custom && (
                       <>
                         <Button variant="ghost" size="sm" onClick={() => openEdit(r)}>
-                          Edit
+                          {t("school.roles.edit")}
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() =>
                             confirm.ask({
-                              title: "Delete this role?",
-                              description: `${r.name} will be removed. This fails if any user still holds it.`,
-                              confirmLabel: "Delete",
+                              title: t("school.roles.deleteRoleTitle"),
+                              description: t("school.roles.deleteRoleDesc", { name: r.name }),
+                              confirmLabel: t("school.roles.delete"),
                               onConfirm: () => del.mutateAsync(r.id),
                             })
                           }
                         >
-                          Delete
+                          {t("school.roles.delete")}
                         </Button>
                       </>
                     )}
@@ -198,12 +200,12 @@ export default function SchoolRoles() {
         </div>
       </Card>
 
-      <Modal open={!!editing} onOpenChange={(open) => !open && setEditing(null)} title="Edit permissions" size="md">
+      <Modal open={!!editing} onOpenChange={(open) => !open && setEditing(null)} title={t("school.roles.editPermissions")} size="md">
         {editing && (
           <div className="space-y-4">
             <Pills options={perms} selected={editPerms} onToggle={(v) => toggle(editPerms, setEditPerms, v)} />
             <Button className="w-full" onClick={() => update.mutate()} disabled={update.isPending}>
-              {update.isPending ? "Saving…" : "Save changes"}
+              {update.isPending ? t("school.roles.saving") : t("school.roles.saveChanges")}
             </Button>
           </div>
         )}
@@ -212,15 +214,15 @@ export default function SchoolRoles() {
       <Modal
         open={!!rightsFor}
         onOpenChange={(open) => !open && setRightsFor(null)}
-        title="Creation rights"
-        description={rightsFor ? `Which user types can "${rightsFor.name}" create?` : undefined}
+        title={t("school.roles.creationRights")}
+        description={rightsFor ? t("school.roles.creationRightsQuestion", { name: rightsFor.name }) : undefined}
         size="sm"
       >
         {rightsFor && (
           <div className="space-y-4">
             <Pills options={templateNames} selected={rightsSelected} onToggle={(v) => toggle(rightsSelected, setRightsSelected, v)} />
             <Button className="w-full" onClick={() => saveRights.mutate()} disabled={saveRights.isPending}>
-              {saveRights.isPending ? "Saving…" : "Save"}
+              {saveRights.isPending ? t("school.roles.saving") : t("school.roles.save")}
             </Button>
           </div>
         )}

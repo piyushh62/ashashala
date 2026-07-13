@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Skeleton, Table } from "../../components/ui";
@@ -7,6 +8,7 @@ import { Badge, Button, Card, CardHeader, EmptyState, Input, Skeleton, Table } f
 const PAGE_SIZE = 20;
 
 export default function SchoolAudit() {
+  const { t } = useTranslation();
   const [action, setAction] = useState("");
   const [offset, setOffset] = useState(0);
   const q = useQuery({
@@ -20,13 +22,13 @@ export default function SchoolAudit() {
 
   return (
     <div>
-      <PageTitle subtitle="Every state-changing action and sensitive read.">Audit Log</PageTitle>
+      <PageTitle subtitle={t("school.audit.subtitle")}>{t("school.audit.title")}</PageTitle>
       <Card>
         <CardHeader
-          title="Recent activity"
+          title={t("school.audit.recentActivity")}
           action={
             <Input
-              placeholder="Filter by action e.g. USER_CREATE"
+              placeholder={t("school.audit.filterPlaceholder")}
               value={action}
               onChange={(e) => {
                 setAction(e.target.value.toUpperCase());
@@ -40,9 +42,17 @@ export default function SchoolAudit() {
           {q.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !rows.length ? (
-            <EmptyState title="No audit entries" />
+            <EmptyState title={t("school.audit.noEntries")} />
           ) : (
-            <Table head={["Time", "Action", "Actor", "Target", "Status"]}>
+            <Table
+              head={[
+                t("school.audit.colTime"),
+                t("school.audit.colAction"),
+                t("school.audit.colActor"),
+                t("school.audit.colTarget"),
+                t("school.audit.colStatus"),
+              ]}
+            >
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 text-slate-400 text-xs">{new Date(r.ts).toLocaleString()}</td>
@@ -62,9 +72,7 @@ export default function SchoolAudit() {
           )}
           {total > 0 && (
             <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
-              <span>
-                {rangeStart}–{rangeEnd} of {total}
-              </span>
+              <span>{t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}</span>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
@@ -72,7 +80,7 @@ export default function SchoolAudit() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -80,7 +88,7 @@ export default function SchoolAudit() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>

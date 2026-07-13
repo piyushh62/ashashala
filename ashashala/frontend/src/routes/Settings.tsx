@@ -59,10 +59,10 @@ export default function Settings() {
   const changePassword = useMutation({
     mutationFn: (values: PasswordForm) => authApi.passwordReset(user.email, values.newPassword),
     onSuccess: () => {
-      toast.push("Password updated.", "success");
+      toast.push(t("settings.passwordUpdated"), "success");
       reset();
     },
-    onError: () => toast.push("Couldn't update password. Try again.", "error"),
+    onError: () => toast.push(t("settings.passwordUpdateFailed"), "error"),
   });
 
   return (
@@ -82,7 +82,7 @@ export default function Settings() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Badge tone="brand">{ROLE_LABEL_KEY[user.role] ? t(ROLE_LABEL_KEY[user.role]) : user.role}</Badge>
-              {user.grade != null && <Badge tone="slate">Grade {user.grade}</Badge>}
+              {user.grade != null && <Badge tone="slate">{t("settings.grade", { grade: user.grade })}</Badge>}
             </div>
             {user.interests && (
               <div>
@@ -160,7 +160,7 @@ function NotificationPreferencesCard() {
   const update = useMutation({
     mutationFn: (body: Partial<NotificationPreferenceOut>) => parentApi.updateNotificationPreferences(body),
     onSuccess: (data) => qc.setQueryData(["parent", "notification-preferences"], data),
-    onError: () => toast.push("Couldn't update notification preferences.", "error"),
+    onError: () => toast.push(t("settings.notifPrefUpdateFailed"), "error"),
   });
 
   return (

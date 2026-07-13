@@ -36,7 +36,7 @@ from app.schemas.rbac import PermissionOut, RoleTemplateCreate, RoleTemplateOut,
 from app.services.audit_service import record_audit
 from app.services.r2_client import get_storage_client
 from app.services.rag.store import get_qdrant_store
-from app.services.rbac_service import ensure_catalog_seeded, ensure_school_roles
+from app.services.rbac_service import ensure_catalog_seeded, ensure_school_roles, ensure_user_role_assignment
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Super Admin"])
 _guard = require_permission(PLATFORM_ADMIN)
@@ -104,6 +104,7 @@ async def create_school_admin(school_id: str, body: SchoolAdminCreate, request: 
                 role=UserRole.school_admin, school_id=school_id)
     db.add(user)
     await db.flush()
+    await ensure_user_role_assignment(db, user)
     await record_audit(db, action="USER_CREATE", actor=admin, school_id=school_id,
                        target_type="user", target_id=user.id, request=request)
     return TempPasswordResponse(user_id=user.id, email=body.email, temp_password=temp_password)

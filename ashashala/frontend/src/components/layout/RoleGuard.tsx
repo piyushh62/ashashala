@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "../../stores/auth";
 import type { Role } from "../../types/api";
 import { Spinner } from "../ui";
@@ -19,12 +20,13 @@ export function RoleGuard({
   permissions?: string[];
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   const { user, status } = useAuth();
 
   if (status === "loading") {
     return (
       <div className="h-screen grid place-items-center">
-        <Spinner label="Loading…" />
+        <Spinner label={t("common.loading")} />
       </div>
     );
   }

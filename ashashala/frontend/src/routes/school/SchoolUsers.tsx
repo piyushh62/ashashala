@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { schoolApi } from "../../api/endpoints";
 import type { Role, UserRow } from "../../types/api";
@@ -12,6 +13,13 @@ import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 
 const ROLES: Role[] = ["teacher", "student", "parent"];
+const ROLE_TITLE_KEY: Record<Role, string> = {
+  super_admin: "roleTitle.superAdmin",
+  school_admin: "roleTitle.schoolAdmin",
+  teacher: "roleTitle.teacher",
+  student: "roleTitle.student",
+  parent: "roleTitle.parent",
+};
 
 const createUserSchema = z
   .object({
@@ -33,7 +41,16 @@ const editUserSchema = z.object({
 });
 type EditUserForm = z.infer<typeof editUserSchema>;
 
+const VALIDATION_MESSAGE_KEYS: Record<string, string> = {
+  "Name is required": "common.nameRequired",
+  "Email is required": "common.emailRequired",
+  "Enter a valid email address": "common.invalidEmail",
+  "Grade is required for students": "school.users.gradeRequiredForStudents",
+};
+
 export default function SchoolUsers() {
+  const { t } = useTranslation();
+  const errMsg = (raw?: string) => (raw ? t(VALIDATION_MESSAGE_KEYS[raw] ?? raw) : undefined);
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -88,12 +105,12 @@ export default function SchoolUsers() {
       if (res.temp_password) {
         setTempCredential({ email: values.email, password: res.temp_password });
       } else {
-        toast.push("User created.", "success");
+        toast.push(t("school.users.userCreated"), "success");
       }
       reset();
       invalidateUsers();
     },
-    onError: () => toast.push("Couldn't create user (email may be taken).", "error"),
+    onError: () => toast.push(t("school.users.createUserFailed"), "error"),
   });
 
   const {
@@ -115,26 +132,26 @@ export default function SchoolUsers() {
         grade: values.grade ? Number(values.grade) : undefined,
       }),
     onSuccess: () => {
-      toast.push("User updated.", "success");
+      toast.push(t("school.users.userUpdated"), "success");
       setEditingUser(null);
       invalidateUsers();
     },
-    onError: () => toast.push("Couldn't update user.", "error"),
+    onError: () => toast.push(t("school.users.updateUserFailed"), "error"),
   });
 
   const mToggleActive = useMutation({
     mutationFn: (u: UserRow) => schoolApi.updateUser(u.id, { is_active: !u.is_active }),
     onSuccess: (_res, u) => {
-      toast.push(u.is_active ? "User deactivated." : "User reactivated.", "success");
+      toast.push(u.is_active ? t("school.users.userDeactivated") : t("school.users.userReactivated"), "success");
       invalidateUsers();
     },
-    onError: () => toast.push("Couldn't update status.", "error"),
+    onError: () => toast.push(t("school.users.updateStatusFailed"), "error"),
   });
 
   const mReset = useMutation({
     mutationFn: (u: UserRow) => schoolApi.resetUserPassword(u.id),
     onSuccess: (res, u) => setTempCredential({ email: u.email, password: res.temp_password }),
-    onError: () => toast.push("Couldn't reset password.", "error"),
+    onError: () => toast.push(t("school.users.passwordResetFailed"), "error"),
   });
 
   const mBulk = useMutation({
@@ -144,7 +161,7 @@ export default function SchoolUsers() {
       invalidateUsers();
       if (fileInput.current) fileInput.current.value = "";
     },
-    onError: () => toast.push("CSV import failed.", "error"),
+    onError: () => toast.push(t("school.users.csvImportFailed"), "error"),
   });
 
   const mMarkAbsent = useMutation({
@@ -157,14 +174,14 @@ export default function SchoolUsers() {
     onSuccess: (res) => {
       toast.push(
         res.substitute_suggestions
-          ? `Absence recorded — ${res.substitute_suggestions} substitute suggestion(s) queued for approval.`
-          : "Absence recorded — no classes scheduled that day.",
+          ? t("school.users.absenceRecordedWithSubs", { count: res.substitute_suggestions })
+          : t("school.users.absenceRecordedNoClasses"),
         "success",
       );
       setAbsentTarget(null);
       setAbsenceReason("");
     },
-    onError: () => toast.push("Couldn't record the absence.", "error"),
+    onError: () => toast.push(t("school.users.absenceRecordFailed"), "error"),
   });
 
   const onBulkFileChosen = (file: File | null) => {
@@ -176,42 +193,42 @@ export default function SchoolUsers() {
 
   return (
     <div>
-      <PageTitle subtitle="Invite teachers, students and parents.">Users</PageTitle>
+      <PageTitle subtitle={t("school.users.subtitle")}>{t("school.users.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Add a user" />
+        <CardHeader title={t("school.users.addUser")} />
         <form
           className="p-5 grid md:grid-cols-5 gap-3 items-start"
           onSubmit={handleSubmit((values) => create.mutateAsync(values))}
         >
-          <FormField label="Name" error={errors.name?.message}>
+          <FormField label={t("school.users.name")} error={errMsg(errors.name?.message)}>
             <Input invalid={!!errors.name} {...register("name")} />
           </FormField>
-          <FormField label="Email" error={errors.email?.message}>
+          <FormField label={t("school.users.email")} error={errMsg(errors.email?.message)}>
             <Input type="email" invalid={!!errors.email} {...register("email")} />
           </FormField>
-          <FormField label="Role">
+          <FormField label={t("school.users.role")}>
             <Select {...register("role")}>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {t(ROLE_TITLE_KEY[r])}
                 </option>
               ))}
             </Select>
           </FormField>
-          <FormField label="Grade" error={errors.grade?.message} optional={selectedRole !== "student"}>
+          <FormField label={t("school.users.grade")} error={errMsg(errors.grade?.message)} optional={selectedRole !== "student"}>
             <Input type="number" invalid={!!errors.grade} disabled={selectedRole !== "student"} {...register("grade")} />
           </FormField>
           <Button type="submit" disabled={isSubmitting} className="mt-6">
-            {isSubmitting ? "Adding…" : "Add"}
+            {isSubmitting ? t("school.users.adding") : t("school.users.add")}
           </Button>
         </form>
       </Card>
 
       <Card className="mb-6">
         <CardHeader
-          title="Bulk import students"
-          subtitle="Upload a CSV with columns: name, email, grade. Passwords are auto-generated per row."
+          title={t("school.users.bulkImportTitle")}
+          subtitle={t("school.users.bulkImportSubtitle")}
         />
         <div className="p-5 flex items-center gap-3">
           <input
@@ -221,25 +238,25 @@ export default function SchoolUsers() {
             onChange={(e) => onBulkFileChosen(e.target.files?.[0] ?? null)}
             disabled={mBulk.isPending}
           />
-          {mBulk.isPending && <span className="text-sm text-slate-400">Importing…</span>}
+          {mBulk.isPending && <span className="text-sm text-slate-400">{t("school.users.importing")}</span>}
         </div>
       </Card>
 
       <Modal
         open={!!tempCredential}
         onOpenChange={(open) => !open && setTempCredential(null)}
-        title="Temporary password"
-        description="Share this password securely — it won't be shown again."
+        title={t("school.users.tempPasswordTitle")}
+        description={t("school.users.tempPasswordDesc")}
         size="sm"
       >
         {tempCredential && (
           <div className="space-y-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Email</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("school.users.email")}</div>
               <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Temporary password</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("school.users.tempPasswordLabel")}</div>
               <div className="flex items-center gap-2 mt-1">
                 <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
                   {tempCredential.password}
@@ -250,12 +267,12 @@ export default function SchoolUsers() {
                   size="sm"
                   onClick={() => navigator.clipboard.writeText(tempCredential.password)}
                 >
-                  Copy
+                  {t("school.users.copy")}
                 </Button>
               </div>
             </div>
             <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
-              Done
+              {t("school.users.done")}
             </Button>
           </div>
         )}
@@ -264,17 +281,17 @@ export default function SchoolUsers() {
       <Modal
         open={!!bulkResult}
         onOpenChange={(open) => !open && setBulkResult(null)}
-        title="Import complete"
-        description={bulkResult ? `${bulkResult.length} user(s) created.` : undefined}
+        title={t("school.users.importCompleteTitle")}
+        description={bulkResult ? t("school.users.importCompleteDesc", { count: bulkResult.length }) : undefined}
         size="md"
       >
         {bulkResult && (
           <div className="space-y-3">
             {bulkResult.length === 0 ? (
-              <EmptyState title="No rows imported" hint="Check that your CSV has name, email and grade columns and no duplicate emails." />
+              <EmptyState title={t("school.users.noRowsImported")} hint={t("school.users.noRowsImportedHint")} />
             ) : (
               <div className="max-h-72 overflow-y-auto">
-                <Table head={["Email", "Temp password"]}>
+                <Table head={[t("school.users.email"), t("school.users.colTempPassword")]}>
                   {bulkResult.map((r) => (
                     <tr key={r.id} className="border-b border-slate-50">
                       <td className="px-4 py-2 text-slate-700">{r.email}</td>
@@ -285,7 +302,7 @@ export default function SchoolUsers() {
               </div>
             )}
             <Button type="button" className="w-full" onClick={() => setBulkResult(null)}>
-              Done
+              {t("school.users.done")}
             </Button>
           </div>
         )}
@@ -294,21 +311,21 @@ export default function SchoolUsers() {
       <Modal
         open={!!editingUser}
         onOpenChange={(open) => !open && setEditingUser(null)}
-        title="Edit user"
+        title={t("school.users.editUserTitle")}
         size="sm"
       >
         {editingUser && (
           <form className="space-y-3" onSubmit={handleEditSubmit((values) => mUpdate.mutateAsync(values))}>
-            <FormField label="Name" error={editErrors.name?.message}>
+            <FormField label={t("school.users.name")} error={errMsg(editErrors.name?.message)}>
               <Input invalid={!!editErrors.name} {...registerEdit("name")} />
             </FormField>
             {editingUser.role === "student" && (
-              <FormField label="Grade" error={editErrors.grade?.message}>
+              <FormField label={t("school.users.grade")} error={errMsg(editErrors.grade?.message)}>
                 <Input type="number" invalid={!!editErrors.grade} {...registerEdit("grade")} />
               </FormField>
             )}
             <Button type="submit" className="w-full" disabled={isEditSubmitting}>
-              {isEditSubmitting ? "Saving…" : "Save changes"}
+              {isEditSubmitting ? t("common.saving") : t("common.saveChanges")}
             </Button>
           </form>
         )}
@@ -317,17 +334,17 @@ export default function SchoolUsers() {
       <Modal
         open={!!absentTarget}
         onOpenChange={(open) => !open && setAbsentTarget(null)}
-        title="Mark teacher absent"
-        description={absentTarget ? `${absentTarget.name}'s classes for that day will get substitute suggestions.` : undefined}
+        title={t("school.users.markAbsentTitle")}
+        description={absentTarget ? t("school.users.markAbsentDesc", { name: absentTarget.name }) : undefined}
         size="sm"
       >
         {absentTarget && (
           <div className="space-y-3">
-            <FormField label="Absence date">
+            <FormField label={t("school.users.absenceDate")}>
               <Input type="date" value={absenceDate} onChange={(e) => setAbsenceDate(e.target.value)} />
             </FormField>
-            <FormField label="Reason" optional>
-              <Input value={absenceReason} onChange={(e) => setAbsenceReason(e.target.value)} placeholder="e.g. Sick leave" />
+            <FormField label={t("school.users.reason")} optional>
+              <Input value={absenceReason} onChange={(e) => setAbsenceReason(e.target.value)} placeholder={t("school.users.reasonPlaceholder")} />
             </FormField>
             <Button
               type="button"
@@ -335,7 +352,7 @@ export default function SchoolUsers() {
               onClick={() => mMarkAbsent.mutate()}
               disabled={!absenceDate || mMarkAbsent.isPending}
             >
-              {mMarkAbsent.isPending ? "Recording…" : "Record absence"}
+              {mMarkAbsent.isPending ? t("school.users.recording") : t("school.users.recordAbsence")}
             </Button>
           </div>
         )}
@@ -343,17 +360,17 @@ export default function SchoolUsers() {
 
       <Card>
         <CardHeader
-          title="All users"
+          title={t("school.users.allUsers")}
           action={
             <select
               className="text-sm border border-slate-300 rounded-lg px-2 py-1"
               value={filter}
               onChange={(e) => changeFilter(e.target.value as Role | "")}
             >
-              <option value="">All roles</option>
+              <option value="">{t("school.users.allRolesOption")}</option>
               {ROLES.map((r) => (
                 <option key={r} value={r}>
-                  {r}
+                  {t(ROLE_TITLE_KEY[r])}
                 </option>
               ))}
             </select>
@@ -363,22 +380,22 @@ export default function SchoolUsers() {
           {users.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !userRows.length ? (
-            <EmptyState title="No users found" />
+            <EmptyState title={t("school.users.noUsersFound")} />
           ) : (
-            <Table head={["Name", "Email", "Role", "Status", ""]}>
+            <Table head={[t("school.users.name"), t("school.users.email"), t("school.users.role"), t("school.users.status"), ""]}>
               {userRows.map((u) => (
                 <tr key={u.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700">{u.name}</td>
                   <td className="px-4 py-2 text-slate-500">{u.email}</td>
                   <td className="px-4 py-2">
-                    <Badge>{u.role}</Badge>
+                    <Badge>{t(ROLE_TITLE_KEY[u.role])}</Badge>
                   </td>
                   <td className="px-4 py-2">
-                    <Badge tone={u.is_active ? "green" : "red"}>{u.is_active ? "active" : "inactive"}</Badge>
+                    <Badge tone={u.is_active ? "green" : "red"}>{u.is_active ? t("school.users.active") : t("school.users.inactive")}</Badge>
                   </td>
                   <td className="px-4 py-2 text-right whitespace-nowrap">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(u)}>
-                      Edit
+                      {t("school.users.edit")}
                     </Button>
                     {u.role === "teacher" && (
                       <Button
@@ -390,35 +407,35 @@ export default function SchoolUsers() {
                           setAbsentTarget(u);
                         }}
                       >
-                        Mark absent
+                        {t("school.users.markAbsent")}
                       </Button>
                     )}
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => confirm.ask({
-                        title: "Reset this user's password?",
-                        description: `${u.name}'s current password will stop working immediately.`,
-                        confirmLabel: "Reset password",
+                        title: t("school.users.resetPasswordTitle"),
+                        description: t("school.users.resetPasswordDesc", { name: u.name }),
+                        confirmLabel: t("school.users.resetPassword"),
                         onConfirm: () => mReset.mutateAsync(u),
                       })}
                     >
-                      Reset password
+                      {t("school.users.resetPassword")}
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => confirm.ask({
-                        title: u.is_active ? "Deactivate this user?" : "Reactivate this user?",
+                        title: u.is_active ? t("school.users.deactivateTitle") : t("school.users.reactivateTitle"),
                         description: u.is_active
-                          ? `${u.name} will no longer be able to log in.`
-                          : `${u.name} will be able to log in again.`,
+                          ? t("school.users.deactivateDesc", { name: u.name })
+                          : t("school.users.reactivateDesc", { name: u.name }),
                         tone: u.is_active ? "danger" : "primary",
-                        confirmLabel: u.is_active ? "Deactivate" : "Reactivate",
+                        confirmLabel: u.is_active ? t("school.users.deactivate") : t("school.users.reactivate"),
                         onConfirm: () => mToggleActive.mutateAsync(u),
                       })}
                     >
-                      {u.is_active ? "Deactivate" : "Reactivate"}
+                      {u.is_active ? t("school.users.deactivate") : t("school.users.reactivate")}
                     </Button>
                   </td>
                 </tr>
@@ -428,7 +445,7 @@ export default function SchoolUsers() {
           {total > 0 && (
             <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
               <span>
-                {rangeStart}–{rangeEnd} of {total}
+                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -437,7 +454,7 @@ export default function SchoolUsers() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -445,7 +462,7 @@ export default function SchoolUsers() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>

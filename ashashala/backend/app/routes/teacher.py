@@ -57,7 +57,7 @@ from app.services.audit_service import record_audit
 from app.services.ingestion.pipeline import ingest_document
 from app.services.notification_service import notify
 from app.services.r2_client import get_storage_client
-from app.services.rbac_service import can_create_role, propose_agent_action
+from app.services.rbac_service import can_create_role, ensure_user_role_assignment, propose_agent_action
 
 router = APIRouter(prefix="/api/v1/teacher", tags=["Teacher"])
 _guard = require_permission(TEACHER_PORTAL)
@@ -637,6 +637,7 @@ async def create_student(body: StudentCreate, request: Request,
                    interests=body.interests)
     db.add(student)
     await db.flush()
+    await ensure_user_role_assignment(db, student)
     await record_audit(db, action="USER_CREATE", actor=teacher, target_type="user",
                        target_id=student.id, payload={"role": "student"}, request=request)
     return UserCreatedResponse(user=UserOut.model_validate(student),
@@ -664,6 +665,7 @@ async def create_parent(body: ParentCreate, request: Request,
                  role=UserRole.parent, school_id=teacher.school_id)
     db.add(parent)
     await db.flush()
+    await ensure_user_role_assignment(db, parent)
     db.add(ParentStudentLink(parent_id=parent.id, student_id=student.id, school_id=teacher.school_id,
                              consent_given_at=datetime.now(UTC)))
     await db.flush()

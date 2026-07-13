@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Command } from "cmdk";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import type { NavItem } from "./AppLayout";
 
 export interface SearchSource<T> {
@@ -24,6 +25,7 @@ export function CommandPalette({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
 
@@ -51,7 +53,7 @@ export function CommandPalette({
     <Command.Dialog
       open={open}
       onOpenChange={onOpenChange}
-      label="Global search"
+      label={t("common.globalSearch")}
       shouldFilter
       className="fixed z-50 left-1/2 top-24 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/70 dark:border-slate-700 shadow-soft overflow-hidden data-[state=open]:animate-pop-in"
       overlayClassName="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 data-[state=open]:animate-fade-in"
@@ -61,7 +63,7 @@ export function CommandPalette({
         <Command.Input
           value={query}
           onValueChange={setQuery}
-          placeholder="Search…"
+          placeholder={t("common.searchPlaceholder")}
           className="flex-1 bg-transparent py-3 text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
         />
         <kbd className="hidden sm:block text-[10px] font-medium text-slate-400 border border-slate-200 dark:border-slate-700 rounded px-1.5 py-0.5">
@@ -69,9 +71,9 @@ export function CommandPalette({
         </kbd>
       </div>
       <Command.List className="max-h-80 overflow-y-auto p-2">
-        <Command.Empty className="py-8 text-center text-sm text-slate-400">No results found.</Command.Empty>
+        <Command.Empty className="py-8 text-center text-sm text-slate-400">{t("common.noResultsFound")}</Command.Empty>
 
-        <Command.Group heading="Navigate" className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-slate-400">
+        <Command.Group heading={t("common.navigate")} className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wide [&_[cmdk-group-heading]]:text-slate-400">
           {nav.map((n) => (
             <Command.Item
               key={n.to}

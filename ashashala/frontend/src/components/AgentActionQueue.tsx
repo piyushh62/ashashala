@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { agentActionsApi } from "../api/endpoints";
 import type { AgentActionOut } from "../types/api";
 import { Badge, Button, Card, CardHeader, EmptyState, Skeleton } from "./ui";
@@ -15,6 +16,7 @@ const STATUS_TONE: Record<AgentActionOut["status"], string> = {
 };
 
 export function AgentActionQueue() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -37,7 +39,7 @@ export function AgentActionQueue() {
       {q.isLoading ? (
         <Skeleton className="h-24" />
       ) : !rows.length ? (
-        <EmptyState title="Queue is empty" hint="No agent proposals are waiting for review." icon="🤖" />
+        <EmptyState title={t("agentQueue.queueEmpty")} hint={t("agentQueue.queueEmptyHint")} icon="🤖" />
       ) : (
         <div className="space-y-4">
           {rows.map((a) => (
@@ -46,7 +48,7 @@ export function AgentActionQueue() {
           {total > 0 && (
             <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-500">
               <span>
-                {rangeStart}–{rangeEnd} of {total}
+                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -55,7 +57,7 @@ export function AgentActionQueue() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -63,7 +65,7 @@ export function AgentActionQueue() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -83,21 +85,22 @@ function AgentActionCard({
   onResolved: () => void;
   toast: ReturnType<typeof useToast>;
 }) {
+  const { t } = useTranslation();
   const approve = useMutation({
     mutationFn: () => agentActionsApi.approve(action.id),
     onSuccess: () => {
-      toast.push("Action approved.", "success");
+      toast.push(t("agentQueue.actionApproved"), "success");
       onResolved();
     },
-    onError: () => toast.push("Couldn't approve this action.", "error"),
+    onError: () => toast.push(t("agentQueue.actionApproveFailed"), "error"),
   });
   const reject = useMutation({
     mutationFn: () => agentActionsApi.reject(action.id),
     onSuccess: () => {
-      toast.push("Action rejected.", "success");
+      toast.push(t("agentQueue.actionRejected"), "success");
       onResolved();
     },
-    onError: () => toast.push("Couldn't reject this action.", "error"),
+    onError: () => toast.push(t("agentQueue.actionRejectFailed"), "error"),
   });
   const busy = approve.isPending || reject.isPending;
 
@@ -105,7 +108,7 @@ function AgentActionCard({
     <Card>
       <CardHeader
         title={`${action.agent_name} · ${action.action_type}`}
-        subtitle={action.confidence != null ? `Confidence ${Math.round(action.confidence * 100)}%` : undefined}
+        subtitle={action.confidence != null ? t("agentQueue.confidence", { percent: Math.round(action.confidence * 100) }) : undefined}
         action={<Badge tone={STATUS_TONE[action.status]}>{action.status}</Badge>}
       />
       <div className="p-5 space-y-3">
@@ -115,10 +118,10 @@ function AgentActionCard({
         {action.status === "pending" && (
           <div className="flex gap-2 justify-end">
             <Button variant="danger" size="sm" onClick={() => reject.mutate()} disabled={busy}>
-              Reject
+              {t("agentQueue.reject")}
             </Button>
             <Button size="sm" onClick={() => approve.mutate()} disabled={busy}>
-              Approve
+              {t("agentQueue.approve")}
             </Button>
           </div>
         )}

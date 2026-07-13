@@ -190,7 +190,7 @@ export function AppLayout({
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 md:hidden data-[state=open]:animate-fade-in" />
           <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85%] bg-white dark:bg-slate-900 border-r border-slate-200/70 dark:border-slate-800 flex flex-col md:hidden focus:outline-none data-[state=open]:animate-slide-up">
-            <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+            <Dialog.Title className="sr-only">{t("layout.navigation")}</Dialog.Title>
             <div className="flex items-center justify-between px-5 py-5">
               <div className="flex items-center gap-3">
                 <Logo />

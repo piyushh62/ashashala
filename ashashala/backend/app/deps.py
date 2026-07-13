@@ -80,28 +80,12 @@ def page_params(
     return PageParams(limit=limit, offset=offset)
 
 
-def require_role(*roles: UserRole):
-    """Dependency factory enforcing that the current user has one of `roles`."""
-    allowed = set(roles)
-
-    async def _guard(user: User = Depends(get_current_user)) -> User:
-        if user.role not in allowed:
-            raise ForbiddenError(
-                f"Requires role in {[r.value for r in allowed]}, got {user.role.value}"
-            )
-        return user
-
-    return _guard
-
-
 def require_permission(permission: str):
     """Dependency factory enforcing that the current user's resolved dynamic
     RBAC permissions (see app/services/rbac_service.py) include `permission`.
 
-    This is the replacement for `require_role` as the authorization primitive
-    — every router guard now goes through this. `require_role` itself stays
-    defined for the few remaining domain-typing call sites that compare
-    against `UserRole` directly (not access control)."""
+    This is the authorization primitive — every router guard goes through
+    this rather than comparing `User.role` directly."""
 
     async def _guard(
         user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)

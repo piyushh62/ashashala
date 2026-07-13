@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { useTranslation } from "react-i18next";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Card, CardHeader, EmptyState, Skeleton, StatTile, Table } from "../../components/ui";
@@ -13,6 +14,7 @@ const tooltipStyle = {
 };
 
 export default function SchoolDashboard() {
+  const { t } = useTranslation();
   const q = useQuery({ queryKey: ["school", "dashboard"], queryFn: schoolApi.dashboard });
   const usage = useQuery({ queryKey: ["school", "llm-usage"], queryFn: () => schoolApi.llmUsage(7) });
   const atRisk = useQuery({ queryKey: ["school", "at-risk"], queryFn: () => schoolApi.atRisk(10) });
@@ -30,34 +32,38 @@ export default function SchoolDashboard() {
 
   const d = q.data;
   const tiles = [
-    { label: "Teachers", value: d?.teachers ?? 0, icon: "🧑‍🏫", tone: "brand" as const },
-    { label: "Students", value: d?.students ?? 0, icon: "🎓", tone: "green" as const },
-    { label: "Classes", value: d?.classes ?? 0, icon: "🗂️", tone: "slate" as const },
-    { label: "Avg mastery", value: `${d?.avg_mastery ?? 0}`, icon: "📈", tone: "amber" as const },
+    { label: t("school.dashboard.teachers"), value: d?.teachers ?? 0, icon: "🧑‍🏫", tone: "brand" as const },
+    { label: t("school.dashboard.students"), value: d?.students ?? 0, icon: "🎓", tone: "green" as const },
+    { label: t("school.dashboard.classes"), value: d?.classes ?? 0, icon: "🗂️", tone: "slate" as const },
+    { label: t("school.dashboard.avgMastery"), value: `${d?.avg_mastery ?? 0}`, icon: "📈", tone: "amber" as const },
   ];
 
   return (
     <div>
-      <PageTitle subtitle="Your school at a glance.">School Dashboard</PageTitle>
+      <PageTitle subtitle={t("school.dashboard.subtitle")}>{t("school.dashboard.title")}</PageTitle>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        {tiles.map((t) => (
-          <StatTile key={t.label} {...t} />
+        {tiles.map((tile) => (
+          <StatTile key={tile.label} {...tile} />
         ))}
       </div>
 
       <div className="grid lg:grid-cols-2 gap-6 mb-6">
         <Card>
-          <CardHeader title="At-risk students" subtitle="Lowest average mastery" icon="🚨" />
+          <CardHeader
+            title={t("school.dashboard.atRiskStudents")}
+            subtitle={t("school.dashboard.lowestAvgMastery")}
+            icon="🚨"
+          />
           <div className="p-2">
             <DataBoundary
               query={atRisk}
               isEmpty={(rows) => rows.length === 0}
-              emptyTitle="No mastery data yet"
+              emptyTitle={t("school.dashboard.noMasteryData")}
               loadingFallback={<Skeleton className="h-40 m-3" />}
             >
               {(rows) => (
-                <Table head={["Student", "Avg mastery"]}>
+                <Table head={[t("school.dashboard.colStudent"), t("school.dashboard.colAvgMastery")]}>
                   {rows.map((r) => (
                     <tr key={r.student_id} className="border-b border-slate-50">
                       <td className="px-4 py-2 font-medium text-slate-700">{r.student_name}</td>
@@ -75,12 +81,12 @@ export default function SchoolDashboard() {
         </Card>
 
         <Card>
-          <CardHeader title="Mastery by class" icon="🗂️" />
+          <CardHeader title={t("school.dashboard.masteryByClass")} icon="🗂️" />
           <div className="p-5">
             <DataBoundary
               query={mastery}
               isEmpty={(rows) => rows.length === 0}
-              emptyTitle="No mastery data yet"
+              emptyTitle={t("school.dashboard.noMasteryData")}
               loadingFallback={<Skeleton className="h-40" />}
             >
               {(rows) => (
@@ -101,14 +107,14 @@ export default function SchoolDashboard() {
 
       <Card className="mb-6">
         <CardHeader
-          title="LLM usage"
-          subtitle="Tokens spent against the free-tier quota (7 days)."
+          title={t("school.dashboard.llmUsage")}
+          subtitle={t("school.dashboard.llmUsageSubtitle")}
           icon="⚡"
           action={
             usage.data?.over_quota ? (
-              <Badge tone="red">⚠ Over daily quota</Badge>
+              <Badge tone="red">{t("school.dashboard.overQuota")}</Badge>
             ) : (
-              <Badge tone="green">✓ Within quota</Badge>
+              <Badge tone="green">{t("school.dashboard.withinQuota")}</Badge>
             )
           }
         />
@@ -118,12 +124,12 @@ export default function SchoolDashboard() {
           ) : (
             <>
               <div className="grid grid-cols-3 gap-4 mb-5">
-                <MiniStat label="Tokens today" value={(usage.data?.today_tokens ?? 0).toLocaleString()} />
-                <MiniStat label="Calls today" value={usage.data?.today_calls ?? 0} />
-                <MiniStat label="Error rate" value={`${Math.round((usage.data?.today_error_rate ?? 0) * 100)}%`} />
+                <MiniStat label={t("school.dashboard.tokensToday")} value={(usage.data?.today_tokens ?? 0).toLocaleString()} />
+                <MiniStat label={t("school.dashboard.callsToday")} value={usage.data?.today_calls ?? 0} />
+                <MiniStat label={t("school.dashboard.errorRate")} value={`${Math.round((usage.data?.today_error_rate ?? 0) * 100)}%`} />
               </div>
               {!usage.data?.by_day.length ? (
-                <p className="text-sm text-slate-400 text-center py-6">No LLM usage recorded yet.</p>
+                <p className="text-sm text-slate-400 text-center py-6">{t("school.dashboard.noLlmUsage")}</p>
               ) : (
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={usage.data.by_day} margin={{ left: -12 }}>
@@ -141,12 +147,12 @@ export default function SchoolDashboard() {
       </Card>
 
       <Card>
-        <CardHeader title="Recent activity" icon="📜" />
+        <CardHeader title={t("school.dashboard.recentActivity")} icon="📜" />
         <div className="p-2">
           {activity.isLoading ? (
             <Skeleton className="h-32 m-3" />
           ) : !activity.data?.items.length ? (
-            <EmptyState title="No activity recorded yet" />
+            <EmptyState title={t("school.dashboard.noActivity")} />
           ) : (
             <ul className="divide-y divide-slate-50">
               {activity.data.items.slice(0, 8).map((a) => (

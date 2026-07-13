@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { UseQueryResult } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { ApiError } from "../../api/client";
 import { Button, EmptyState, Skeleton } from "./index";
 
@@ -10,28 +11,29 @@ export function ErrorBanner({
   message: string;
   onRetry?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="flex items-center justify-between gap-4 rounded-2xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-500/10 px-5 py-4">
       <div className="flex items-center gap-3 min-w-0">
         <div className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 grid place-items-center text-lg shrink-0">!</div>
         <div className="min-w-0">
-          <p className="font-semibold text-rose-700 dark:text-rose-300 text-sm">Something went wrong</p>
+          <p className="font-semibold text-rose-700 dark:text-rose-300 text-sm">{t("common.somethingWentWrong")}</p>
           <p className="text-sm text-rose-600/80 dark:text-rose-400/80 truncate">{message}</p>
         </div>
       </div>
       {onRetry && (
         <Button variant="danger" size="sm" onClick={onRetry}>
-          Retry
+          {t("common.retry")}
         </Button>
       )}
     </div>
   );
 }
 
-function messageFor(error: unknown): string {
+function messageFor(error: unknown, fallback: string): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
-  return "Please try again.";
+  return fallback;
 }
 
 /**
@@ -43,7 +45,7 @@ export function DataBoundary<T>({
   query,
   loadingFallback,
   isEmpty,
-  emptyTitle = "Nothing here yet",
+  emptyTitle,
   emptyHint,
   children,
 }: {
@@ -54,15 +56,16 @@ export function DataBoundary<T>({
   emptyHint?: string;
   children: (data: T) => ReactNode;
 }) {
+  const { t } = useTranslation();
   if (query.isLoading) return <>{loadingFallback ?? <Skeleton className="h-40" />}</>;
 
   if (query.isError) {
-    return <ErrorBanner message={messageFor(query.error)} onRetry={() => query.refetch()} />;
+    return <ErrorBanner message={messageFor(query.error, t("common.pleaseTryAgain"))} onRetry={() => query.refetch()} />;
   }
 
   const data = query.data as T;
   if (isEmpty ? isEmpty(data) : false) {
-    return <EmptyState title={emptyTitle} hint={emptyHint} />;
+    return <EmptyState title={emptyTitle ?? t("common.nothingHere")} hint={emptyHint} />;
   }
 
   return <>{children(data)}</>;

@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import { useTranslation } from "react-i18next";
 import { Button } from "./index";
 
 /* ---------------------------------------------------------------------------
@@ -52,8 +53,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "Confirm",
-  cancelLabel = "Cancel",
+  confirmLabel,
+  cancelLabel,
   tone = "danger",
   isPending = false,
   onConfirm,
@@ -68,18 +69,19 @@ export function ConfirmDialog({
   isPending?: boolean;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Modal open={open} onOpenChange={onOpenChange} title={title} description={description} size="sm">
       <div className="flex justify-end gap-2.5">
         <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isPending}>
-          {cancelLabel}
+          {cancelLabel ?? t("common.cancel")}
         </Button>
         <Button
           variant={tone === "danger" ? "danger" : "primary"}
           onClick={onConfirm}
           disabled={isPending}
         >
-          {isPending ? "Working…" : confirmLabel}
+          {isPending ? t("common.working") : (confirmLabel ?? t("common.confirm"))}
         </Button>
       </div>
     </Modal>
