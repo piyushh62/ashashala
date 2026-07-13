@@ -63,9 +63,6 @@ frontend/.vite/
 # Docker
 .docker/
 
-# Alembic
-backend/alembic/versions/*.py
-!backend/alembic/versions/README.md
 
 # Secrets (never commit)
 *.pem
