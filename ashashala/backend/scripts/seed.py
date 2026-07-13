@@ -19,7 +19,7 @@ import sys
 # Make `app` importable when run as a bare script.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from sqlalchemy import select, text  # noqa: E402
+from sqlalchemy import select  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 import app.models  # noqa: F401,E402 — populate Base.metadata
@@ -75,11 +75,6 @@ async def seed() -> dict:
     # Dev convenience: create tables if they don't exist (idempotent; prod uses Alembic).
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Ensure new columns exist on existing tables for production/render deploys
-        try:
-            await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS tokens_valid_after TIMESTAMP WITH TIME ZONE"))
-        except Exception as e:
-            print(f"Migration warning: {e}", file=sys.stderr)
 
     async with async_session_factory() as s:
         with tenant_bypass():
