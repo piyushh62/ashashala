@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
@@ -24,11 +25,17 @@ const parentSchema = z.object({
 });
 type ParentForm = z.infer<typeof parentSchema>;
 
-function permissionDeniedMessage(action: string) {
-  return `Your school hasn't granted you permission to create ${action} yet — ask your school admin to enable it under Roles.`;
-}
+const VALIDATION_MESSAGE_KEYS: Record<string, string> = {
+  "Name is required": "common.nameRequired",
+  "Email is required": "common.emailRequired",
+  "Enter a valid email address": "common.invalidEmail",
+  "Student ID is required": "teacher.students.studentIdRequired",
+};
 
 export default function TeacherStudents() {
+  const { t } = useTranslation();
+  const errMsg = (raw?: string) => (raw ? t(VALIDATION_MESSAGE_KEYS[raw] ?? raw) : undefined);
+  const permissionDeniedMessage = (action: string) => t("teacher.students.permissionDenied", { action });
   const toast = useToast();
   const [tempCredential, setTempCredential] = useState<{ email: string; password: string } | null>(null);
 
@@ -41,12 +48,12 @@ export default function TeacherStudents() {
       teacherApi.createStudent({ name: values.name, email: values.email, grade: values.grade ? Number(values.grade) : undefined }),
     onSuccess: (res, values) => {
       if (res.temp_password) setTempCredential({ email: values.email, password: res.temp_password });
-      else toast.push("Student created.", "success");
+      else toast.push(t("teacher.students.studentCreated"), "success");
       studentForm.reset();
     },
     onError: (err: any) => {
-      if (err?.status === 403) toast.push(permissionDeniedMessage("students"), "error");
-      else toast.push("Couldn't create student (email may be taken).", "error");
+      if (err?.status === 403) toast.push(permissionDeniedMessage(t("teacher.students.permissionDeniedStudents")), "error");
+      else toast.push(t("teacher.students.createStudentFailed"), "error");
     },
   });
 
@@ -58,59 +65,59 @@ export default function TeacherStudents() {
     mutationFn: (values: ParentForm) => teacherApi.createParent(values),
     onSuccess: (res, values) => {
       if (res.temp_password) setTempCredential({ email: values.email, password: res.temp_password });
-      else toast.push("Parent created and linked.", "success");
+      else toast.push(t("teacher.students.parentCreated"), "success");
       parentForm.reset();
     },
     onError: (err: any) => {
-      if (err?.status === 403) toast.push(permissionDeniedMessage("parents"), "error");
-      else toast.push("Couldn't create parent (email or student ID may be invalid).", "error");
+      if (err?.status === 403) toast.push(permissionDeniedMessage(t("teacher.students.permissionDeniedParents")), "error");
+      else toast.push(t("teacher.students.createParentFailed"), "error");
     },
   });
 
   return (
     <div>
-      <PageTitle subtitle="Create students and parents directly, if your school admin has enabled it.">
-        Students
+      <PageTitle subtitle={t("teacher.students.subtitle")}>
+        {t("teacher.students.title")}
       </PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Add a student" />
+        <CardHeader title={t("teacher.students.addStudent")} />
         <form
           className="p-5 grid md:grid-cols-4 gap-3 items-start"
           onSubmit={studentForm.handleSubmit((v) => createStudent.mutateAsync(v))}
         >
-          <FormField label="Name" error={studentForm.formState.errors.name?.message}>
+          <FormField label={t("teacher.students.name")} error={errMsg(studentForm.formState.errors.name?.message)}>
             <Input invalid={!!studentForm.formState.errors.name} {...studentForm.register("name")} />
           </FormField>
-          <FormField label="Email" error={studentForm.formState.errors.email?.message}>
+          <FormField label={t("teacher.students.email")} error={errMsg(studentForm.formState.errors.email?.message)}>
             <Input type="email" invalid={!!studentForm.formState.errors.email} {...studentForm.register("email")} />
           </FormField>
-          <FormField label="Grade" error={studentForm.formState.errors.grade?.message} optional>
+          <FormField label={t("teacher.students.grade")} error={errMsg(studentForm.formState.errors.grade?.message)} optional>
             <Input type="number" {...studentForm.register("grade")} />
           </FormField>
           <Button type="submit" disabled={createStudent.isPending} className="mt-6">
-            {createStudent.isPending ? "Adding…" : "Add student"}
+            {createStudent.isPending ? t("teacher.students.adding") : t("teacher.students.addStudentBtn")}
           </Button>
         </form>
       </Card>
 
       <Card>
-        <CardHeader title="Add a parent" subtitle="Links the parent to an existing student by ID." />
+        <CardHeader title={t("teacher.students.addParent")} subtitle={t("teacher.students.addParentSubtitle")} />
         <form
           className="p-5 grid md:grid-cols-4 gap-3 items-start"
           onSubmit={parentForm.handleSubmit((v) => createParent.mutateAsync(v))}
         >
-          <FormField label="Name" error={parentForm.formState.errors.name?.message}>
+          <FormField label={t("teacher.students.name")} error={errMsg(parentForm.formState.errors.name?.message)}>
             <Input invalid={!!parentForm.formState.errors.name} {...parentForm.register("name")} />
           </FormField>
-          <FormField label="Email" error={parentForm.formState.errors.email?.message}>
+          <FormField label={t("teacher.students.email")} error={errMsg(parentForm.formState.errors.email?.message)}>
             <Input type="email" invalid={!!parentForm.formState.errors.email} {...parentForm.register("email")} />
           </FormField>
-          <FormField label="Student ID" error={parentForm.formState.errors.student_id?.message}>
+          <FormField label={t("teacher.students.studentId")} error={errMsg(parentForm.formState.errors.student_id?.message)}>
             <Input invalid={!!parentForm.formState.errors.student_id} {...parentForm.register("student_id")} />
           </FormField>
           <Button type="submit" disabled={createParent.isPending} className="mt-6">
-            {createParent.isPending ? "Adding…" : "Add parent"}
+            {createParent.isPending ? t("teacher.students.adding") : t("teacher.students.addParentBtn")}
           </Button>
         </form>
       </Card>
@@ -118,29 +125,29 @@ export default function TeacherStudents() {
       <Modal
         open={!!tempCredential}
         onOpenChange={(open) => !open && setTempCredential(null)}
-        title="Temporary password"
-        description="Share this password securely — it won't be shown again."
+        title={t("teacher.students.tempPasswordTitle")}
+        description={t("teacher.students.tempPasswordDesc")}
         size="sm"
       >
         {tempCredential && (
           <div className="space-y-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Email</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("teacher.students.email")}</div>
               <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Temporary password</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("teacher.students.tempPasswordLabel")}</div>
               <div className="flex items-center gap-2 mt-1">
                 <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
                   {tempCredential.password}
                 </code>
                 <Button type="button" variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(tempCredential.password)}>
-                  Copy
+                  {t("teacher.students.copy")}
                 </Button>
               </div>
             </div>
             <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
-              Done
+              {t("teacher.students.done")}
             </Button>
           </div>
         )}

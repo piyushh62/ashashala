@@ -1,23 +1,25 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import type { LearningFeedItemOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, EmptyState, Skeleton } from "../../components/ui";
 
 export default function StudentToday() {
+  const { t } = useTranslation();
   const feed = useQuery({ queryKey: ["student", "today"], queryFn: studentApi.today });
   const items = feed.data ?? [];
 
   return (
     <div>
-      <PageTitle subtitle="A short explainer for each class on your timetable today.">Today's Learning</PageTitle>
+      <PageTitle subtitle={t("student.today.subtitle")}>{t("student.today.title")}</PageTitle>
       {feed.isLoading ? (
         <Skeleton className="h-40" />
       ) : !items.length ? (
         <EmptyState
-          title="Nothing scheduled today"
-          hint="Check back on a school day once your timetable has classes on it."
+          title={t("student.today.nothingScheduled")}
+          hint={t("student.today.nothingScheduledHint")}
           icon="🌿"
         />
       ) : (
@@ -32,15 +34,16 @@ export default function StudentToday() {
 }
 
 function FeedCard({ item }: { item: LearningFeedItemOut }) {
+  const { t } = useTranslation();
   const [revealed, setRevealed] = useState<Record<number, boolean>>({});
 
   return (
     <Card>
       <CardHeader
         title={item.topic}
-        subtitle={`Period ${item.period_number}`}
+        subtitle={t("student.today.periodLabel", { n: item.period_number })}
         icon="📖"
-        action={<Badge tone="brand">Explainer</Badge>}
+        action={<Badge tone="brand">{t("student.today.explainer")}</Badge>}
       />
       <div className="p-5 space-y-5">
         <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{item.explainer}</p>
@@ -48,7 +51,7 @@ function FeedCard({ item }: { item: LearningFeedItemOut }) {
         {item.questions.length > 0 && (
           <div className="space-y-3 pt-1 border-t border-slate-100">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 pt-3">
-              Check yourself
+              {t("student.today.checkYourself")}
             </div>
             {item.questions.map((q, qi) => (
               <div key={qi} className="rounded-xl bg-slate-50 px-4 py-3">
@@ -63,7 +66,7 @@ function FeedCard({ item }: { item: LearningFeedItemOut }) {
                   </ul>
                 )}
                 {revealed[qi] ? (
-                  <p className="mt-2 text-sm text-brand-700 font-medium">Answer: {q.answer}</p>
+                  <p className="mt-2 text-sm text-brand-700 font-medium">{t("student.today.answerLabel", { answer: q.answer })}</p>
                 ) : (
                   <Button
                     variant="ghost"
@@ -71,7 +74,7 @@ function FeedCard({ item }: { item: LearningFeedItemOut }) {
                     className="mt-2"
                     onClick={() => setRevealed((r) => ({ ...r, [qi]: true }))}
                   >
-                    Show answer
+                    {t("student.today.showAnswer")}
                   </Button>
                 )}
               </div>

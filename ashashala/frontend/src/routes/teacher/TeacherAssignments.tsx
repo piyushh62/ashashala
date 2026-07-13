@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Select, Skeleton, Table } from "../../components/ui";
@@ -7,6 +8,7 @@ import { FormField } from "../../components/ui/FormField";
 import { useToast } from "../../components/ui/Toast";
 
 export default function TeacherAssignments() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const [classId, setClassId] = useState("");
@@ -43,50 +45,50 @@ export default function TeacherAssignments() {
         due_date: dueDate,
       }),
     onSuccess: () => {
-      toast.push("Assignment created and published to students.", "success");
+      toast.push(t("teacher.assignments.assignmentCreated"), "success");
       setTopic("");
       setDueDate("");
       qc.invalidateQueries({ queryKey: ["teacher", "assignment-tasks"] });
     },
-    onError: () => toast.push("Couldn't create the assignment — check your class assignment.", "error"),
+    onError: () => toast.push(t("teacher.assignments.assignmentCreateFailed"), "error"),
   });
 
   const rows = tasks.data ?? [];
 
   return (
     <div>
-      <PageTitle subtitle="Pick a topic, we'll generate the quiz and publish it to the class.">
-        Assignment Builder
+      <PageTitle subtitle={t("teacher.assignments.subtitle")}>
+        {t("teacher.assignments.title")}
       </PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="New assignment" />
+        <CardHeader title={t("teacher.assignments.newAssignment")} />
         {!assignments.isLoading && !assignments.data?.length ? (
           <div className="p-5">
-            <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class and subject first." />
+            <EmptyState title={t("teacher.assignments.noClassAssignments")} hint={t("teacher.assignments.noClassAssignmentsHint")} />
           </div>
         ) : (
           <div className="p-5 grid md:grid-cols-5 gap-3 items-start">
-            <FormField label="Class">
+            <FormField label={t("teacher.assignments.class")}>
               <Select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(""); }}>
-                <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
+                <option value="">{assignments.isLoading ? t("common.loading") : t("teacher.assignments.selectAClass")}</option>
                 {classOptions.map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </Select>
             </FormField>
-            <FormField label="Subject" optional>
+            <FormField label={t("teacher.assignments.subject")} optional>
               <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} disabled={!classId}>
-                <option value="">No specific subject</option>
+                <option value="">{t("teacher.assignments.noSpecificSubject")}</option>
                 {subjectsForClass.map((a) => (
                   <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
                 ))}
               </Select>
             </FormField>
-            <FormField label="Topic">
-              <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="e.g. Photosynthesis" />
+            <FormField label={t("teacher.assignments.topic")}>
+              <Input value={topic} onChange={(e) => setTopic(e.target.value)} placeholder={t("teacher.assignments.topicPlaceholder")} />
             </FormField>
-            <FormField label="Due date">
+            <FormField label={t("teacher.assignments.dueDate")}>
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </FormField>
             <Button
@@ -94,21 +96,21 @@ export default function TeacherAssignments() {
               disabled={!classId || !topic || !dueDate || create.isPending}
               className="mt-6"
             >
-              {create.isPending ? "Generating…" : "Create & publish"}
+              {create.isPending ? t("teacher.assignments.generating") : t("teacher.assignments.createAndPublish")}
             </Button>
           </div>
         )}
       </Card>
 
       <Card>
-        <CardHeader title="Assignments" />
+        <CardHeader title={t("teacher.assignments.assignmentsCard")} />
         <div className="p-2">
           {tasks.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !rows.length ? (
-            <EmptyState title="No assignments yet" hint="Create one above — it publishes immediately." />
+            <EmptyState title={t("teacher.assignments.noAssignmentsYet")} hint={t("teacher.assignments.noAssignmentsYetHint")} />
           ) : (
-            <Table head={["Topic", "Class", "Due", "Submissions", "Status"]}>
+            <Table head={[t("teacher.assignments.colTopic"), t("teacher.assignments.colClass"), t("teacher.assignments.colDue"), t("teacher.assignments.colSubmissions"), t("teacher.assignments.colStatus")]}>
               {rows.map((a) => (
                 <tr key={a.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700">{a.topic}</td>

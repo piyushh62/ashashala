@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Card, CardHeader } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 
 export default function TeacherClassProgress() {
+  const { t } = useTranslation();
   const { classId = "" } = useParams();
   const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
   const progress = useQuery({
@@ -13,20 +15,20 @@ export default function TeacherClassProgress() {
     queryFn: () => teacherApi.classProgress(classId),
   });
 
-  const className = assignments.data?.find((a) => a.class_id === classId)?.class_name ?? "Class";
+  const className = assignments.data?.find((a) => a.class_id === classId)?.class_name ?? t("teacher.classProgress.defaultClassName");
 
   return (
     <div>
       <Link to="/teacher" className="text-sm text-brand-600 hover:underline">
-        ← Dashboard
+        {t("teacher.classProgress.backToDashboard")}
       </Link>
-      <PageTitle subtitle="Per-student mastery, weakest first.">{className} — Progress</PageTitle>
+      <PageTitle subtitle={t("teacher.classProgress.subtitle")}>{t("teacher.classProgress.progressTitle", { className })}</PageTitle>
 
       <DataBoundary
         query={progress}
         isEmpty={(d) => d.length === 0}
-        emptyTitle="No students enrolled yet"
-        emptyHint="Once students are enrolled and attempt quizzes, their mastery will appear here."
+        emptyTitle={t("teacher.classProgress.noStudentsEnrolled")}
+        emptyHint={t("teacher.classProgress.noStudentsEnrolledHint")}
       >
         {(rows) => (
           <div className="space-y-4">
@@ -34,16 +36,16 @@ export default function TeacherClassProgress() {
               <Card key={s.student_id}>
                 <CardHeader
                   title={s.name}
-                  subtitle={s.grade != null ? `Grade ${s.grade}` : undefined}
+                  subtitle={s.grade != null ? t("teacher.classProgress.gradeLabel", { grade: s.grade }) : undefined}
                   action={
                     <Badge tone={s.avg_mastery < 40 ? "red" : s.avg_mastery < 70 ? "amber" : "green"}>
-                      Avg {s.avg_mastery}
+                      {t("teacher.classProgress.avgLabel", { score: s.avg_mastery })}
                     </Badge>
                   }
                 />
                 <div className="p-5 space-y-2.5">
                   {!s.topics.length ? (
-                    <p className="text-sm text-slate-400">No mastery data yet.</p>
+                    <p className="text-sm text-slate-400">{t("teacher.classProgress.noMasteryData")}</p>
                   ) : (
                     s.topics.map((t) => (
                       <div key={t.topic}>

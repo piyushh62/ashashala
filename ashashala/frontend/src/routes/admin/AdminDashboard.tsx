@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { adminApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
@@ -12,6 +13,7 @@ const tooltipStyle = {
 };
 
 export default function AdminDashboard() {
+  const { t } = useTranslation();
   const q = useQuery({ queryKey: ["admin", "dashboard"], queryFn: () => adminApi.dashboard(14) });
 
   if (q.isLoading)
@@ -30,25 +32,25 @@ export default function AdminDashboard() {
 
   return (
     <div>
-      <PageTitle subtitle="Platform-wide metrics from the last 24 hours.">Platform Dashboard</PageTitle>
+      <PageTitle subtitle={t("admin.dashboard.subtitle")}>{t("admin.dashboard.title")}</PageTitle>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatTile label="Active schools" value={d?.active_schools ?? 0} icon="🏫" tone="brand" />
-        <StatTile label="Total users" value={d?.total_users ?? 0} icon="👥" tone="green" />
+        <StatTile label={t("admin.dashboard.activeSchools")} value={d?.active_schools ?? 0} icon="🏫" tone="brand" />
+        <StatTile label={t("admin.dashboard.totalUsers")} value={d?.total_users ?? 0} icon="👥" tone="green" />
         <StatTile
-          label="LLM error rate"
+          label={t("admin.dashboard.llmErrorRate")}
           value={`${Math.round((d?.error_rate ?? 0) * 100)}%`}
           icon="⚠️"
           tone={(d?.error_rate ?? 0) > 0.1 ? "rose" : "amber"}
         />
-        <StatTile label="Tokens today" value={totalToday.toLocaleString()} icon="⚡" tone="slate" />
+        <StatTile label={t("admin.dashboard.tokensToday")} value={totalToday.toLocaleString()} icon="⚡" tone="slate" />
       </div>
 
       <Card className="mb-6">
-        <CardHeader title="Token usage trend" subtitle="Platform-wide, last 14 days" icon="📈" />
+        <CardHeader title={t("admin.dashboard.tokenUsageTrend")} subtitle={t("admin.dashboard.tokenUsageTrendSubtitle")} icon="📈" />
         <div className="p-5">
           {!d?.tokens_by_day.length ? (
-            <p className="text-sm text-slate-400 text-center py-6">No usage recorded yet.</p>
+            <p className="text-sm text-slate-400 text-center py-6">{t("admin.dashboard.noUsageRecorded")}</p>
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={d.tokens_by_day} margin={{ left: -12 }}>
@@ -70,10 +72,10 @@ export default function AdminDashboard() {
       </Card>
 
       <Card>
-        <CardHeader title="Token usage today" subtitle="Per school" icon="📊" />
+        <CardHeader title={t("admin.dashboard.tokenUsageToday")} subtitle={t("admin.dashboard.perSchool")} icon="📊" />
         <div className="p-5 space-y-4">
           {perSchool.length === 0 ? (
-            <EmptyState title="No usage recorded yet" icon="📈" />
+            <EmptyState title={t("admin.dashboard.noUsageRecordedTitle")} icon="📈" />
           ) : (
             perSchool.map(([school, tokens]) => (
               <div key={school}>

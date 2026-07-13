@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
@@ -7,6 +8,7 @@ import { DataBoundary } from "../../components/ui/DataBoundary";
 import { useToast } from "../../components/ui/Toast";
 
 export default function TeacherExamTimetable() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
@@ -58,22 +60,22 @@ export default function TeacherExamTimetable() {
         syllabus_ref: form.syllabus_ref || undefined,
       }),
     onSuccess: () => {
-      toast.push("Exam scheduled.", "success");
+      toast.push(t("teacher.examTimetable.examScheduled"), "success");
       setForm((f) => ({ ...f, exam_name: "", exam_date: "", start_time: "", duration_minutes: "", syllabus_ref: "" }));
       qc.invalidateQueries({ queryKey: ["teacher", "exam-timetable"] });
     },
-    onError: () => toast.push("Couldn't schedule that exam.", "error"),
+    onError: () => toast.push(t("teacher.examTimetable.scheduleExamFailed"), "error"),
   });
 
   return (
     <div>
-      <PageTitle subtitle="Schedule exams for your assigned classes.">Exam Timetable</PageTitle>
+      <PageTitle subtitle={t("teacher.examTimetable.subtitle")}>{t("teacher.examTimetable.title")}</PageTitle>
 
       <Card>
-        <CardHeader title="Schedule an exam" />
+        <CardHeader title={t("teacher.examTimetable.scheduleExam")} />
         {!assignments.isLoading && !assignments.data?.length ? (
           <div className="p-5">
-            <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class and subject first." />
+            <EmptyState title={t("teacher.examTimetable.noClassAssignments")} hint={t("teacher.examTimetable.noClassAssignmentsHint")} />
           </div>
         ) : (
           <form
@@ -84,44 +86,44 @@ export default function TeacherExamTimetable() {
             }}
           >
             <div>
-              <Label>Class</Label>
+              <Label>{t("teacher.examTimetable.class")}</Label>
               <Select
                 value={form.class_id}
                 onChange={(e) => setForm({ ...form, class_id: e.target.value, subject_id: "" })}
               >
-                <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
+                <option value="">{assignments.isLoading ? t("common.loading") : t("teacher.examTimetable.selectAClass")}</option>
                 {classOptions.map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </Select>
             </div>
             <div>
-              <Label>Subject</Label>
+              <Label>{t("teacher.examTimetable.subject")}</Label>
               <Select
                 value={form.subject_id}
                 onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
                 disabled={!form.class_id}
               >
-                <option value="">Select a subject</option>
+                <option value="">{t("teacher.examTimetable.selectASubject")}</option>
                 {subjectsForClass.map((a) => (
                   <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
                 ))}
               </Select>
             </div>
             <div>
-              <Label>Exam name</Label>
+              <Label>{t("teacher.examTimetable.examName")}</Label>
               <Input value={form.exam_name} onChange={(e) => setForm({ ...form, exam_name: e.target.value })} />
             </div>
             <div>
-              <Label>Date</Label>
+              <Label>{t("teacher.examTimetable.date")}</Label>
               <Input type="date" value={form.exam_date} onChange={(e) => setForm({ ...form, exam_date: e.target.value })} />
             </div>
             <div>
-              <Label>Start time</Label>
+              <Label>{t("teacher.examTimetable.startTime")}</Label>
               <Input type="time" value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />
             </div>
             <div>
-              <Label>Duration (min)</Label>
+              <Label>{t("teacher.examTimetable.durationMin")}</Label>
               <Input
                 type="number"
                 min={1}
@@ -130,29 +132,29 @@ export default function TeacherExamTimetable() {
               />
             </div>
             <div className="md:col-span-2">
-              <Label>Syllabus reference</Label>
+              <Label>{t("teacher.examTimetable.syllabusRef")}</Label>
               <Input value={form.syllabus_ref} onChange={(e) => setForm({ ...form, syllabus_ref: e.target.value })} />
             </div>
             <Button
               type="submit"
               disabled={!form.class_id || !form.subject_id || !form.exam_name || !form.exam_date || create.isPending}
             >
-              {create.isPending ? "Scheduling…" : "Schedule exam"}
+              {create.isPending ? t("teacher.examTimetable.scheduling") : t("teacher.examTimetable.scheduleExamBtn")}
             </Button>
           </form>
         )}
       </Card>
 
       <Card className="mt-6">
-        <CardHeader title="Scheduled exams" />
+        <CardHeader title={t("teacher.examTimetable.scheduledExams")} />
         <DataBoundary
           query={exams}
           isEmpty={(d) => d.length === 0}
-          emptyTitle="No exams scheduled yet"
+          emptyTitle={t("teacher.examTimetable.noExamsScheduled")}
           loadingFallback={<Skeleton className="h-24 m-3" />}
         >
           {(rows) => (
-            <Table head={["Exam", "Class", "Subject", "Date", "Time", "Duration"]}>
+            <Table head={[t("teacher.examTimetable.colExam"), t("teacher.examTimetable.colClass"), t("teacher.examTimetable.colSubject"), t("teacher.examTimetable.colDate"), t("teacher.examTimetable.colTime"), t("teacher.examTimetable.colDuration")]}>
               {[...rows]
                 .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
                 .map((e) => (

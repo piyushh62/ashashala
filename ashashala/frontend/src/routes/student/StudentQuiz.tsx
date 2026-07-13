@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import type { QuizOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
@@ -8,6 +9,7 @@ import { QuizGame } from "../../components/quiz/QuizGame";
 import { useToast } from "../../components/ui/Toast";
 
 export default function StudentQuiz() {
+  const { t } = useTranslation();
   const toast = useToast();
   const classes = useQuery({ queryKey: ["student", "classes"], queryFn: studentApi.classes });
   const [quiz, setQuiz] = useState<QuizOut | null>(null);
@@ -15,12 +17,12 @@ export default function StudentQuiz() {
   const start = useMutation({
     mutationFn: (classId: string) => studentApi.startQuiz({ class_id: classId }),
     onSuccess: (q) => setQuiz(q),
-    onError: () => toast.push("Couldn't start a quiz — try again.", "error"),
+    onError: () => toast.push(t("student.quiz.startQuizFailed"), "error"),
   });
 
   if (quiz) return (
     <div>
-      <PageTitle>Practice Quiz</PageTitle>
+      <PageTitle>{t("student.quiz.title")}</PageTitle>
       <QuizGame quiz={quiz} onDone={() => setQuiz(null)} />
     </div>
   );
@@ -29,18 +31,18 @@ export default function StudentQuiz() {
 
   return (
     <div>
-      <PageTitle subtitle="An adaptive quiz on your weakest topic.">Practice Quiz</PageTitle>
+      <PageTitle subtitle={t("student.quiz.subtitle")}>{t("student.quiz.title")}</PageTitle>
       <Card className="p-8 text-center">
         {classes.isLoading ? (
-          <Spinner label="Loading…" />
+          <Spinner label={t("common.loading")} />
         ) : !classId ? (
-          <EmptyState title="You're not enrolled in a class yet" />
+          <EmptyState title={t("student.quiz.notEnrolled")} />
         ) : (
           <>
             <div className="text-5xl mb-3">🧠</div>
-            <p className="text-slate-600 mb-5">Ready to practice? We'll pick the topic you need most.</p>
+            <p className="text-slate-600 mb-5">{t("student.quiz.readyToPractice")}</p>
             <Button onClick={() => start.mutate(classId)} disabled={start.isPending}>
-              {start.isPending ? "Generating…" : "Start quiz"}
+              {start.isPending ? t("student.quiz.generating") : t("student.quiz.startQuiz")}
             </Button>
           </>
         )}

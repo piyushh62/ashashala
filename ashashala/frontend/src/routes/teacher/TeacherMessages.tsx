@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Button, Card, CardHeader, EmptyState, Select, Skeleton, Textarea } from "../../components/ui";
 import { useToast } from "../../components/ui/Toast";
 
 export default function TeacherMessages() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
@@ -39,20 +41,20 @@ export default function TeacherMessages() {
       qc.invalidateQueries({ queryKey: ["teacher", "messages", studentId] });
     },
     onError: (err: any) => {
-      if (err?.status === 422) toast.push("This student has no linked parent to message.", "error");
-      else toast.push("Couldn't send message.", "error");
+      if (err?.status === 422) toast.push(t("teacher.messages.noLinkedParent"), "error");
+      else toast.push(t("teacher.messages.sendFailed"), "error");
     },
   });
 
   return (
     <div>
-      <PageTitle subtitle="Message a student's parent directly.">Messages</PageTitle>
+      <PageTitle subtitle={t("teacher.messages.subtitle")}>{t("teacher.messages.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Pick a student" />
+        <CardHeader title={t("teacher.messages.pickAStudent")} />
         {!assignments.isLoading && !assignments.data?.length ? (
           <div className="p-5">
-            <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class first." />
+            <EmptyState title={t("teacher.messages.noClassAssignments")} hint={t("teacher.messages.noClassAssignmentsHintShort")} />
           </div>
         ) : (
           <div className="p-5 grid md:grid-cols-2 gap-3">
@@ -63,13 +65,13 @@ export default function TeacherMessages() {
                 setStudentId("");
               }}
             >
-              <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
+              <option value="">{assignments.isLoading ? t("common.loading") : t("teacher.messages.selectAClass")}</option>
               {classOptions.map(([id, name]) => (
                 <option key={id} value={id}>{name}</option>
               ))}
             </Select>
             <Select value={studentId} onChange={(e) => setStudentId(e.target.value)} disabled={!classId}>
-              <option value="">{progress.isLoading ? "Loading…" : "Select a student"}</option>
+              <option value="">{progress.isLoading ? t("common.loading") : t("teacher.messages.selectAStudent")}</option>
               {(progress.data ?? []).map((s) => (
                 <option key={s.student_id} value={s.student_id}>{s.name}</option>
               ))}
@@ -80,12 +82,12 @@ export default function TeacherMessages() {
 
       {studentId && (
         <Card>
-          <CardHeader title="Conversation" subtitle="With this student's linked parent(s)." />
+          <CardHeader title={t("teacher.messages.conversation")} subtitle={t("teacher.messages.conversationWith")} />
           <div className="p-5 space-y-4">
             {thread.isLoading ? (
               <Skeleton className="h-32" />
             ) : !thread.data?.length ? (
-              <p className="text-sm text-slate-400 text-center py-4">No messages yet — start the conversation below.</p>
+              <p className="text-sm text-slate-400 text-center py-4">{t("teacher.messages.noMessagesYet")}</p>
             ) : (
               <div className="space-y-2.5 max-h-96 overflow-y-auto">
                 {thread.data.map((m) => (
@@ -115,12 +117,12 @@ export default function TeacherMessages() {
               <Textarea
                 className="flex-1"
                 rows={2}
-                placeholder="Write a message…"
+                placeholder={t("teacher.messages.messagePlaceholder")}
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
               />
               <Button type="submit" disabled={!body.trim() || send.isPending}>
-                {send.isPending ? "Sending…" : "Send"}
+                {send.isPending ? t("teacher.messages.sending") : t("teacher.messages.send")}
               </Button>
             </form>
           </div>

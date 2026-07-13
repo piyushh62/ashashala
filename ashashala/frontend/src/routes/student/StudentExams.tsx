@@ -1,27 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Card, CardHeader, Skeleton, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 
 export default function StudentExams() {
+  const { t } = useTranslation();
   const exams = useQuery({ queryKey: ["student", "exams"], queryFn: studentApi.exams });
 
   return (
     <div>
-      <PageTitle subtitle="Your upcoming exams, across all classes.">Exams</PageTitle>
+      <PageTitle subtitle={t("student.exams.subtitle")}>{t("student.exams.title")}</PageTitle>
 
       <Card>
-        <CardHeader title="Exam timetable" icon="📝" />
+        <CardHeader title={t("student.exams.examTimetable")} icon="📝" />
         <DataBoundary
           query={exams}
           isEmpty={(d) => d.length === 0}
-          emptyTitle="No exams scheduled"
-          emptyHint="Enjoy the calm! 🌿"
+          emptyTitle={t("student.exams.noExamsScheduled")}
+          emptyHint={t("student.exams.enjoyCalm")}
           loadingFallback={<Skeleton className="h-24 m-3" />}
         >
           {(rows) => (
-            <Table head={["Exam", "Date"]}>
+            <Table head={[t("student.exams.colExam"), t("student.exams.colDate")]}>
               {[...rows]
                 .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
                 .map((e, i) => (

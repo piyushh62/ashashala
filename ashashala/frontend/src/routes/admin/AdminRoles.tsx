@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { adminApi } from "../../api/endpoints";
 import type { RoleTemplateOut } from "../../types/api";
@@ -17,7 +18,13 @@ const createSchema = z.object({
 });
 type CreateForm = z.infer<typeof createSchema>;
 
+const VALIDATION_MESSAGE_KEYS: Record<string, string> = {
+  "Name is required": "common.nameRequired",
+};
+
 export default function AdminRoles() {
+  const { t } = useTranslation();
+  const errMsg = (raw?: string) => (raw ? t(VALIDATION_MESSAGE_KEYS[raw] ?? raw) : undefined);
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -41,12 +48,12 @@ export default function AdminRoles() {
     mutationFn: (values: CreateForm) =>
       adminApi.createRoleTemplate({ name: values.name, description: values.description || undefined, permissions: createPerms }),
     onSuccess: () => {
-      toast.push("Role template created.", "success");
+      toast.push(t("admin.roles.roleTemplateCreated"), "success");
       reset();
       setCreatePerms([]);
       invalidate();
     },
-    onError: () => toast.push("Couldn't create role template (name may be taken).", "error"),
+    onError: () => toast.push(t("admin.roles.createTemplateFailed"), "error"),
   });
 
   const openEdit = (t: RoleTemplateOut) => {
@@ -57,20 +64,20 @@ export default function AdminRoles() {
   const update = useMutation({
     mutationFn: () => adminApi.updateRoleTemplate(editing!.id, { permissions: selectedPerms }),
     onSuccess: () => {
-      toast.push("Role template updated.", "success");
+      toast.push(t("admin.roles.roleTemplateUpdated"), "success");
       setEditing(null);
       invalidate();
     },
-    onError: () => toast.push("Couldn't update role template.", "error"),
+    onError: () => toast.push(t("admin.roles.updateTemplateFailed"), "error"),
   });
 
   const del = useMutation({
     mutationFn: (id: string) => adminApi.deleteRoleTemplate(id),
     onSuccess: () => {
-      toast.push("Role template deleted.", "success");
+      toast.push(t("admin.roles.roleTemplateDeleted"), "success");
       invalidate();
     },
-    onError: () => toast.push("Couldn't delete this template (it may be built-in or in use).", "error"),
+    onError: () => toast.push(t("admin.roles.deleteTemplateFailed"), "error"),
   });
 
   const togglePerm = (list: string[], setList: (v: string[]) => void, perm: string) => {
@@ -81,21 +88,21 @@ export default function AdminRoles() {
 
   return (
     <div>
-      <PageTitle subtitle="Define the role templates every school's roles are cloned from.">Role Templates</PageTitle>
+      <PageTitle subtitle={t("admin.roles.subtitle")}>{t("admin.roles.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="New role template" />
+        <CardHeader title={t("admin.roles.newRoleTemplate")} />
         <form className="p-5 space-y-4" onSubmit={handleSubmit((v) => create.mutateAsync(v))}>
           <div className="grid md:grid-cols-2 gap-3">
-            <FormField label="Name" error={errors.name?.message}>
+            <FormField label={t("admin.roles.name")} error={errMsg(errors.name?.message)}>
               <Input invalid={!!errors.name} {...register("name")} />
             </FormField>
-            <FormField label="Description" optional>
+            <FormField label={t("admin.roles.description")} optional>
               <Input {...register("description")} />
             </FormField>
           </div>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Permissions</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{t("admin.roles.permissions")}</div>
             {permissions.isLoading ? (
               <Skeleton className="h-16" />
             ) : (
@@ -122,52 +129,52 @@ export default function AdminRoles() {
             )}
           </div>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? "Creating…" : "Create template"}
+            {isSubmitting ? t("admin.roles.creating") : t("admin.roles.createTemplate")}
           </Button>
         </form>
       </Card>
 
       <Card>
-        <CardHeader title="All role templates" />
+        <CardHeader title={t("admin.roles.allRoleTemplates")} />
         <div className="p-2">
           {templates.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !templates.data?.length ? (
-            <EmptyState title="No role templates yet" />
+            <EmptyState title={t("admin.roles.noRoleTemplatesYet")} />
           ) : (
             <div className="divide-y divide-slate-50 dark:divide-slate-800">
-              {templates.data.map((t) => (
-                <div key={t.id} className="p-4 flex items-start justify-between gap-4">
+              {templates.data.map((tpl) => (
+                <div key={tpl.id} className="p-4 flex items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-slate-700 dark:text-slate-200">{t.name}</span>
-                      {t.is_system && <Badge tone="brand">system</Badge>}
+                      <span className="font-medium text-slate-700 dark:text-slate-200">{tpl.name}</span>
+                      {tpl.is_system && <Badge tone="brand">{t("admin.roles.system")}</Badge>}
                     </div>
-                    {t.description && <p className="text-sm text-slate-400 mt-0.5">{t.description}</p>}
+                    {tpl.description && <p className="text-sm text-slate-400 mt-0.5">{tpl.description}</p>}
                     <div className="flex flex-wrap gap-1.5 mt-2">
-                      {t.permissions.map((p) => (
+                      {tpl.permissions.map((p) => (
                         <Badge key={p}>{p}</Badge>
                       ))}
                     </div>
                   </div>
-                  {!t.is_system && (
+                  {!tpl.is_system && (
                     <div className="flex gap-2 shrink-0">
-                      <Button variant="ghost" size="sm" onClick={() => openEdit(t)}>
-                        Edit
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(tpl)}>
+                        {t("admin.roles.edit")}
                       </Button>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() =>
                           confirm.ask({
-                            title: "Delete this role template?",
-                            description: `${t.name} will be removed. Schools already using it are unaffected.`,
-                            confirmLabel: "Delete",
-                            onConfirm: () => del.mutateAsync(t.id),
+                            title: t("admin.roles.deleteTemplateTitle"),
+                            description: t("admin.roles.deleteTemplateDescription", { name: tpl.name }),
+                            confirmLabel: t("admin.roles.delete"),
+                            onConfirm: () => del.mutateAsync(tpl.id),
                           })
                         }
                       >
-                        Delete
+                        {t("admin.roles.delete")}
                       </Button>
                     </div>
                   )}
@@ -178,7 +185,7 @@ export default function AdminRoles() {
         </div>
       </Card>
 
-      <Modal open={!!editing} onOpenChange={(open) => !open && setEditing(null)} title="Edit permissions" size="md">
+      <Modal open={!!editing} onOpenChange={(open) => !open && setEditing(null)} title={t("admin.roles.editPermissions")} size="md">
         {editing && (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-2">
@@ -202,7 +209,7 @@ export default function AdminRoles() {
               })}
             </div>
             <Button className="w-full" onClick={() => update.mutate()} disabled={update.isPending}>
-              {update.isPending ? "Saving…" : "Save changes"}
+              {update.isPending ? t("admin.roles.saving") : t("admin.roles.saveChanges")}
             </Button>
           </div>
         )}

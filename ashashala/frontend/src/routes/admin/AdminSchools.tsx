@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { api } from "../../api/client";
 import { adminApi } from "../../api/endpoints";
 import type { School } from "../../types/api";
@@ -10,6 +11,7 @@ import { Modal, useConfirm } from "../../components/ui/Modal";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 
 export default function AdminSchools() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -32,30 +34,30 @@ export default function AdminSchools() {
   const create = useMutation({
     mutationFn: () => adminApi.createSchool({ name, address: address || undefined }),
     onSuccess: () => {
-      toast.push("School created.", "success");
+      toast.push(t("admin.schools.schoolCreated"), "success");
       setName("");
       setAddress("");
       qc.invalidateQueries({ queryKey: ["admin", "schools"] });
     },
-    onError: () => toast.push("Couldn't create school.", "error"),
+    onError: () => toast.push(t("admin.schools.createSchoolFailed"), "error"),
   });
 
   const toggle = useMutation({
     mutationFn: (s: School) => adminApi.updateSchool(s.id, { is_active: !s.is_active }),
     onSuccess: (_data, s) => {
-      toast.push(s.is_active ? "School suspended." : "School reactivated.", "success");
+      toast.push(s.is_active ? t("admin.schools.schoolSuspended") : t("admin.schools.schoolReactivated"), "success");
       qc.invalidateQueries({ queryKey: ["admin", "schools"] });
     },
-    onError: () => toast.push("Couldn't update school status.", "error"),
+    onError: () => toast.push(t("admin.schools.updateStatusFailed"), "error"),
   });
 
   const del = useMutation({
     mutationFn: (id: string) => adminApi.deleteSchool(id),
     onSuccess: () => {
-      toast.push("School deleted.", "success");
+      toast.push(t("admin.schools.schoolDeleted"), "success");
       qc.invalidateQueries({ queryKey: ["admin", "schools"] });
     },
-    onError: () => toast.push("Couldn't delete school.", "error"),
+    onError: () => toast.push(t("admin.schools.deleteSchoolFailed"), "error"),
   });
 
   const createAdmin = useMutation({
@@ -66,35 +68,35 @@ export default function AdminSchools() {
       setAdminName("");
       setAdminEmail("");
     },
-    onError: () => toast.push("Couldn't create school admin (email may be taken).", "error"),
+    onError: () => toast.push(t("admin.schools.createSchoolAdminFailed"), "error"),
   });
 
   const askSuspend = (s: School) =>
     confirm.ask({
-      title: s.is_active ? "Suspend this school?" : "Reactivate this school?",
+      title: s.is_active ? t("admin.schools.suspendTitle") : t("admin.schools.reactivateTitle"),
       description: s.is_active
-        ? `${s.name} and everyone in it will immediately lose access to the platform.`
-        : `${s.name} will regain access to the platform.`,
+        ? t("admin.schools.suspendDescription", { name: s.name })
+        : t("admin.schools.reactivateDescription", { name: s.name }),
       tone: s.is_active ? "danger" : "primary",
-      confirmLabel: s.is_active ? "Suspend" : "Reactivate",
+      confirmLabel: s.is_active ? t("admin.schools.suspend") : t("admin.schools.reactivate"),
       onConfirm: () => toggle.mutateAsync(s),
     });
 
   const askDelete = (s: School) =>
     confirm.ask({
-      title: "Delete this school?",
-      description: `This permanently removes ${s.name} and all of its data. This can't be undone.`,
+      title: t("admin.schools.deleteTitle"),
+      description: t("admin.schools.deleteDescription", { name: s.name }),
       tone: "danger",
-      confirmLabel: "Delete",
+      confirmLabel: t("admin.schools.delete"),
       onConfirm: () => del.mutateAsync(s.id),
     });
 
   return (
     <div>
-      <PageTitle subtitle="Onboard and manage schools across the platform.">Schools</PageTitle>
+      <PageTitle subtitle={t("admin.schools.subtitle")}>{t("admin.schools.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Onboard a school" />
+        <CardHeader title={t("admin.schools.onboardASchool")} />
         <form
           className="p-5 flex flex-wrap items-end gap-3"
           onSubmit={(e) => {
@@ -103,31 +105,31 @@ export default function AdminSchools() {
           }}
         >
           <div className="flex-1 min-w-[180px]">
-            <Label>Name</Label>
+            <Label>{t("admin.schools.name")}</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="flex-1 min-w-[180px]">
-            <Label>Address</Label>
+            <Label>{t("admin.schools.address")}</Label>
             <Input value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <Button type="submit" disabled={create.isPending}>
-            {create.isPending ? "Creating…" : "Create"}
+            {create.isPending ? t("admin.schools.creating") : t("admin.schools.create")}
           </Button>
         </form>
       </Card>
 
       <Card>
-        <CardHeader title="All schools" />
+        <CardHeader title={t("admin.schools.allSchools")} />
         <div className="p-2">
           <DataBoundary
             query={schools}
             isEmpty={(data) => data.length === 0}
-            emptyTitle="No schools yet"
-            emptyHint="Onboard your first school above."
+            emptyTitle={t("admin.schools.noSchoolsYet")}
+            emptyHint={t("admin.schools.noSchoolsYetHint")}
             loadingFallback={<div className="h-24 m-3 rounded-xl bg-slate-100 animate-pulse" />}
           >
             {(data) => (
-              <Table head={["Name", "Status", "Actions"]}>
+              <Table head={[t("admin.schools.colName"), t("admin.schools.colStatus"), t("admin.schools.colActions")]}>
                 {data.map((s) => (
                   <tr key={s.id} className="border-b border-slate-50">
                     <td className="px-4 py-3">
@@ -135,20 +137,20 @@ export default function AdminSchools() {
                       <div className="text-xs text-slate-400">{s.address}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge tone={s.is_active ? "green" : "red"}>{s.is_active ? "active" : "suspended"}</Badge>
+                      <Badge tone={s.is_active ? "green" : "red"}>{s.is_active ? t("admin.schools.active") : t("admin.schools.suspended")}</Badge>
                     </td>
                     <td className="px-4 py-3 flex gap-2">
                       <Button variant="ghost" onClick={() => setDetailsFor(s)}>
-                        View details
+                        {t("admin.schools.viewDetails")}
                       </Button>
                       <Button variant="ghost" onClick={() => setAdminFor(s)}>
-                        Add admin
+                        {t("admin.schools.addAdmin")}
                       </Button>
                       <Button variant="ghost" onClick={() => askSuspend(s)}>
-                        {s.is_active ? "Suspend" : "Reactivate"}
+                        {s.is_active ? t("admin.schools.suspend") : t("admin.schools.reactivate")}
                       </Button>
                       <Button variant="danger" onClick={() => askDelete(s)}>
-                        Delete
+                        {t("admin.schools.delete")}
                       </Button>
                     </td>
                   </tr>
@@ -162,18 +164,18 @@ export default function AdminSchools() {
       <Modal
         open={!!detailsFor}
         onOpenChange={(open) => !open && setDetailsFor(null)}
-        title={detailsFor?.name ?? "School"}
-        description="Snapshot of teachers, students, classes and mastery."
+        title={detailsFor?.name ?? t("admin.schools.defaultSchoolTitle")}
+        description={t("admin.schools.detailsDescription")}
         size="sm"
       >
         {details.isLoading ? (
           <Skeleton className="h-32" />
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            <Stat label="Teachers" value={details.data?.teachers ?? 0} />
-            <Stat label="Students" value={details.data?.students ?? 0} />
-            <Stat label="Classes" value={details.data?.classes ?? 0} />
-            <Stat label="Avg mastery" value={details.data?.avg_mastery ?? 0} />
+            <Stat label={t("admin.schools.statTeachers")} value={details.data?.teachers ?? 0} />
+            <Stat label={t("admin.schools.statStudents")} value={details.data?.students ?? 0} />
+            <Stat label={t("admin.schools.statClasses")} value={details.data?.classes ?? 0} />
+            <Stat label={t("admin.schools.statAvgMastery")} value={details.data?.avg_mastery ?? 0} />
           </div>
         )}
       </Modal>
@@ -181,8 +183,8 @@ export default function AdminSchools() {
       <Modal
         open={!!adminFor}
         onOpenChange={(open) => !open && setAdminFor(null)}
-        title="Create school admin"
-        description={adminFor ? `Add a School Admin for ${adminFor.name}.` : undefined}
+        title={t("admin.schools.createSchoolAdmin")}
+        description={adminFor ? t("admin.schools.createSchoolAdminDescription", { name: adminFor.name }) : undefined}
         size="sm"
       >
         <form
@@ -193,15 +195,15 @@ export default function AdminSchools() {
           }}
         >
           <div>
-            <Label>Name</Label>
+            <Label>{t("admin.schools.name")}</Label>
             <Input value={adminName} onChange={(e) => setAdminName(e.target.value)} required />
           </div>
           <div>
-            <Label>Email</Label>
+            <Label>{t("admin.schools.email")}</Label>
             <Input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} required />
           </div>
           <Button type="submit" className="w-full" disabled={createAdmin.isPending}>
-            {createAdmin.isPending ? "Creating…" : "Create admin"}
+            {createAdmin.isPending ? t("admin.schools.creating") : t("admin.schools.createAdmin")}
           </Button>
         </form>
       </Modal>
@@ -209,18 +211,18 @@ export default function AdminSchools() {
       <Modal
         open={!!tempCredential}
         onOpenChange={(open) => !open && setTempCredential(null)}
-        title="Temporary password"
-        description="Share this password securely — it won't be shown again."
+        title={t("admin.schools.tempPasswordTitle")}
+        description={t("admin.schools.tempPasswordDesc")}
         size="sm"
       >
         {tempCredential && (
           <div className="space-y-3">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Email</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("admin.schools.email")}</div>
               <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">Temporary password</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("admin.schools.tempPasswordLabel")}</div>
               <div className="flex items-center gap-2 mt-1">
                 <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
                   {tempCredential.password}
@@ -231,12 +233,12 @@ export default function AdminSchools() {
                   size="sm"
                   onClick={() => navigator.clipboard.writeText(tempCredential.password)}
                 >
-                  Copy
+                  {t("admin.schools.copy")}
                 </Button>
               </div>
             </div>
             <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
-              Done
+              {t("admin.schools.done")}
             </Button>
           </div>
         )}

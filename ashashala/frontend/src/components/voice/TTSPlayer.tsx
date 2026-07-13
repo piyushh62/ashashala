@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { useVoice } from "../../stores/voice";
 
 // Speaks text via the browser SpeechSynthesis using the user's voice settings.
@@ -20,6 +21,7 @@ export function speak(text: string, langHint = "en") {
 }
 
 export function TTSToggle() {
+  const { t } = useTranslation();
   const { ttsEnabled, toggleTts } = useVoice();
   return (
     <button
@@ -27,9 +29,9 @@ export function TTSToggle() {
       className={`text-xs px-2 py-1 rounded-full ${
         ttsEnabled ? "bg-brand-100 text-brand-700" : "bg-slate-100 text-slate-500"
       }`}
-      title="Speak answers aloud"
+      title={t("student.voice.speakAloud")}
     >
-      {ttsEnabled ? "🔊 Voice on" : "🔈 Voice off"}
+      {ttsEnabled ? t("student.voice.voiceOn") : t("student.voice.voiceOff")}
     </button>
   );
 }

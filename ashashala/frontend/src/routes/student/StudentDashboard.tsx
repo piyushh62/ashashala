@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { studentApi } from "../../api/endpoints";
 import { MasteryRadar } from "../../components/dashboard/MasteryRadar";
@@ -14,6 +15,7 @@ const tooltipStyle = {
 };
 
 export default function StudentDashboard() {
+  const { t } = useTranslation();
   const dash = useQuery({ queryKey: ["student", "dashboard"], queryFn: studentApi.dashboard });
   const tt = useQuery({ queryKey: ["student", "timetable"], queryFn: studentApi.timetable });
   const exams = useQuery({ queryKey: ["student", "exams"], queryFn: studentApi.exams });
@@ -31,11 +33,11 @@ export default function StudentDashboard() {
         <div className="absolute -top-16 -right-10 w-56 h-56 rounded-full bg-white/10 blur-2xl" />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold">{dash.data ? `Hi ${dash.data.name}! 👋` : "Welcome"}</h1>
+            <h1 className="text-2xl font-bold">{dash.data ? t("student.dashboard.greeting", { name: dash.data.name }) : t("student.dashboard.welcome")}</h1>
             <p className="text-white/80 text-sm mt-1">
               {dash.data?.recommended_topic
-                ? `Your tutor suggests reviewing “${dash.data.recommended_topic}” next.`
-                : "Ready to learn something new today?"}
+                ? t("student.dashboard.recommendedTopic", { topic: dash.data.recommended_topic })
+                : t("student.dashboard.readyToLearn")}
             </p>
           </div>
           <div className="flex gap-2">
@@ -43,13 +45,13 @@ export default function StudentDashboard() {
               to="/student/chat"
               className="bg-white text-brand-700 font-semibold text-sm rounded-xl px-4 py-2.5 hover:bg-white/90 transition"
             >
-              💬 Ask tutor
+              {t("student.dashboard.askTutor")}
             </Link>
             <Link
               to="/student/quiz"
               className="bg-white/15 backdrop-blur text-white font-semibold text-sm rounded-xl px-4 py-2.5 hover:bg-white/25 transition"
             >
-              🧠 Practice
+              {t("student.dashboard.practice")}
             </Link>
           </div>
         </div>
@@ -62,35 +64,35 @@ export default function StudentDashboard() {
               📖
             </div>
             <div>
-              <div className="font-semibold text-slate-800">Today's Learning</div>
-              <div className="text-sm text-slate-500">A short explainer for each class on your timetable today.</div>
+              <div className="font-semibold text-slate-800">{t("student.dashboard.todaysLearning")}</div>
+              <div className="text-sm text-slate-500">{t("student.dashboard.todaysLearningHint")}</div>
             </div>
           </div>
-          <span className="text-brand-600 text-sm font-medium shrink-0">View →</span>
+          <span className="text-brand-600 text-sm font-medium shrink-0">{t("student.dashboard.viewArrow")}</span>
         </div>
       </Link>
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader title="Your mastery" icon="🎯" />
+          <CardHeader title={t("student.dashboard.yourMastery")} icon="🎯" />
           <div className="p-4">
             {dash.isLoading ? <Skeleton className="h-64" /> : <MasteryRadar data={dash.data?.mastery ?? []} />}
           </div>
         </Card>
 
         <Card>
-          <CardHeader title="This week" icon="🗓️" />
+          <CardHeader title={t("student.dashboard.thisWeek")} icon="🗓️" />
           <div className="p-4">{tt.isLoading ? <Skeleton className="h-40" /> : <TimetableGrid rows={tt.data ?? []} />}</div>
         </Card>
       </div>
 
       <Card className="mt-6">
-        <CardHeader title="Quiz score trend" icon="📈" />
+        <CardHeader title={t("student.dashboard.quizScoreTrend")} icon="📈" />
         <div className="p-5">
           {hist.isLoading ? (
             <Skeleton className="h-40" />
           ) : trend.length < 2 ? (
-            <p className="text-sm text-slate-400 text-center py-6">Take a few more quizzes to see your trend.</p>
+            <p className="text-sm text-slate-400 text-center py-6">{t("student.dashboard.trendHint")}</p>
           ) : (
             <ResponsiveContainer width="100%" height={200}>
               <LineChart data={trend} margin={{ left: -12 }}>
@@ -106,12 +108,12 @@ export default function StudentDashboard() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader title="Upcoming exams" icon="📝" />
+        <CardHeader title={t("student.dashboard.upcomingExams")} icon="📝" />
         <div className="p-5">
           {exams.isLoading ? (
             <Skeleton className="h-16" />
           ) : !exams.data?.length ? (
-            <p className="text-sm text-slate-400">No exams scheduled — enjoy the calm! 🌿</p>
+            <p className="text-sm text-slate-400">{t("student.dashboard.noExamsScheduled")}</p>
           ) : (
             <ul className="space-y-2.5">
               {exams.data.map((e, i) => (

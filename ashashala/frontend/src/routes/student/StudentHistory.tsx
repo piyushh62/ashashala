@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Button, Card, CardHeader, EmptyState, Skeleton, Table } from "../../components/ui";
@@ -7,6 +8,7 @@ import { Button, Card, CardHeader, EmptyState, Skeleton, Table } from "../../com
 const PAGE_SIZE = 20;
 
 export default function StudentHistory() {
+  const { t } = useTranslation();
   const [offset, setOffset] = useState(0);
   const hist = useQuery({
     queryKey: ["student", "history", offset],
@@ -20,17 +22,17 @@ export default function StudentHistory() {
 
   return (
     <div>
-      <PageTitle subtitle="Your quizzes and mastery over time.">History</PageTitle>
+      <PageTitle subtitle={t("student.history.subtitle")}>{t("student.history.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Quiz attempts" />
+        <CardHeader title={t("student.history.quizAttempts")} />
         <div className="p-2">
           {hist.isLoading ? (
             <Skeleton className="h-20 m-3" />
           ) : !attempts.length ? (
-            <EmptyState title="No attempts yet" />
+            <EmptyState title={t("student.history.noAttemptsYet")} />
           ) : (
-            <Table head={["Quiz", "Score"]}>
+            <Table head={[t("student.history.colQuiz"), t("student.history.colScore")]}>
               {attempts.map((a, i) => (
                 <tr key={i} className="border-b border-slate-50">
                   <td className="px-4 py-2 text-slate-500 text-xs">{a.quiz_id.slice(0, 8)}</td>
@@ -42,7 +44,7 @@ export default function StudentHistory() {
           {total > 0 && (
             <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
               <span>
-                {rangeStart}–{rangeEnd} of {total}
+                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -51,7 +53,7 @@ export default function StudentHistory() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -59,7 +61,7 @@ export default function StudentHistory() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -68,12 +70,12 @@ export default function StudentHistory() {
       </Card>
 
       <Card>
-        <CardHeader title="Mastery by topic" />
+        <CardHeader title={t("student.history.masteryByTopic")} />
         <div className="p-5 space-y-2">
           {prog.isLoading ? (
             <Skeleton className="h-16" />
           ) : !prog.data?.length ? (
-            <p className="text-sm text-slate-400">No mastery yet.</p>
+            <p className="text-sm text-slate-400">{t("student.history.noMasteryYet")}</p>
           ) : (
             prog.data.map((p) => (
               <div key={p.topic}>

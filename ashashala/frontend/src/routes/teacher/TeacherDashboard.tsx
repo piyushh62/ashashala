@@ -1,11 +1,13 @@
 import { useMemo } from "react";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Card, CardHeader, EmptyState, Skeleton, StatTile, Table } from "../../components/ui";
 
 export default function TeacherDashboard() {
+  const { t } = useTranslation();
   const dash = useQuery({ queryKey: ["teacher", "dashboard"], queryFn: teacherApi.dashboard });
   const assignments = useQuery({ queryKey: ["teacher", "assignments"], queryFn: teacherApi.assignments });
   const flagged = useQuery({ queryKey: ["teacher", "flagged"], queryFn: () => teacherApi.flagged() });
@@ -38,14 +40,14 @@ export default function TeacherDashboard() {
 
   return (
     <div>
-      <PageTitle subtitle="Your classes at a glance.">Teacher Dashboard</PageTitle>
+      <PageTitle subtitle={t("teacher.dashboard.subtitle")}>{t("teacher.dashboard.title")}</PageTitle>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatTile label="Classes" value={dash.data?.classes.length ?? 0} icon="🗂️" tone="brand" />
-        <StatTile label="Subjects" value={dash.data?.subjects.length ?? 0} icon="📖" tone="green" />
-        <StatTile label="Materials uploaded" value={dash.data?.materials_uploaded ?? 0} icon="📚" tone="slate" />
+        <StatTile label={t("teacher.dashboard.classes")} value={dash.data?.classes.length ?? 0} icon="🗂️" tone="brand" />
+        <StatTile label={t("teacher.dashboard.subjects")} value={dash.data?.subjects.length ?? 0} icon="📖" tone="green" />
+        <StatTile label={t("teacher.dashboard.materialsUploaded")} value={dash.data?.materials_uploaded ?? 0} icon="📚" tone="slate" />
         <StatTile
-          label="Open reviews"
+          label={t("teacher.dashboard.openReviews")}
           value={flagged.data?.total ?? 0}
           icon="🚩"
           tone={(flagged.data?.total ?? 0) > 0 ? "amber" : "green"}
@@ -53,14 +55,14 @@ export default function TeacherDashboard() {
       </div>
 
       <Card>
-        <CardHeader title="Students needing attention" subtitle="Weakest average mastery across your classes" icon="🎯" />
+        <CardHeader title={t("teacher.dashboard.studentsNeedingAttention")} subtitle={t("teacher.dashboard.weakestAvgMastery")} icon="🎯" />
         <div className="p-2">
           {loadingProgress ? (
             <Skeleton className="h-40 m-3" />
           ) : !weakest.length ? (
-            <EmptyState title="No mastery data yet" hint="Once students attempt quizzes, this list fills in." />
+            <EmptyState title={t("teacher.dashboard.noMasteryData")} hint={t("teacher.dashboard.noMasteryDataHint")} />
           ) : (
-            <Table head={["Student", "Class", "Avg mastery"]}>
+            <Table head={[t("teacher.dashboard.colStudent"), t("teacher.dashboard.colClass"), t("teacher.dashboard.colAvgMastery")]}>
               {weakest.map((s) => (
                 <tr key={`${s.class_id}-${s.student_id}`} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700">{s.name}</td>
@@ -83,7 +85,7 @@ export default function TeacherDashboard() {
 
       {classes.length > 0 && (
         <Card className="mt-6">
-          <CardHeader title="Your classes" subtitle="Jump to a class's full progress breakdown." icon="🗂️" />
+          <CardHeader title={t("teacher.dashboard.yourClasses")} subtitle={t("teacher.dashboard.yourClassesHint")} icon="🗂️" />
           <div className="p-5 flex flex-wrap gap-2.5">
             {classes.map(([classId, className]) => (
               <Link

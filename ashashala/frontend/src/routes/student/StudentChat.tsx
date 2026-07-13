@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { streamChat } from "../../api/client";
 import { studentApi } from "../../api/endpoints";
 import type { Citation } from "../../types/api";
@@ -23,6 +24,7 @@ const SUGGESTIONS = [
 ];
 
 export default function StudentChat() {
+  const { t } = useTranslation();
   const classes = useQuery({ queryKey: ["student", "classes"], queryFn: studentApi.classes });
   const [classId, setClassId] = useState("");
   const [input, setInput] = useState("");
@@ -82,8 +84,8 @@ export default function StudentChat() {
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
       <div className="flex items-start justify-between flex-wrap gap-3">
-        <PageTitle subtitle="Ask anything about your class materials — type or hold the mic.">
-          Tutor Chat
+        <PageTitle subtitle={t("student.chat.subtitle")}>
+          {t("student.chat.title")}
         </PageTitle>
         <div className="flex items-center gap-2">
           <TTSToggle />
@@ -91,7 +93,7 @@ export default function StudentChat() {
             <Select value={classId} onChange={(e) => setClassId(e.target.value)} className="w-auto py-2">
               {classes.data.class_ids.map((c) => (
                 <option key={c} value={c}>
-                  Class {c.slice(0, 6)}
+                  {t("student.chat.classLabel", { id: c.slice(0, 6) })}
                 </option>
               ))}
             </Select>
@@ -106,8 +108,8 @@ export default function StudentChat() {
               <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-violet-500 text-white grid place-items-center text-2xl mb-3">
                 अ
               </div>
-              <p className="text-slate-500 font-medium">Your patient tutor is ready.</p>
-              <p className="text-sm text-slate-400 mb-4">Cited, example-first answers — in your language.</p>
+              <p className="text-slate-500 font-medium">{t("student.chat.readyTutor")}</p>
+              <p className="text-sm text-slate-400 mb-4">{t("student.chat.citedAnswers")}</p>
               <div className="flex flex-wrap gap-2 justify-center max-w-md">
                 {SUGGESTIONS.map((s) => (
                   <button
@@ -163,7 +165,7 @@ export default function StudentChat() {
           <VoiceInputButton onTranscript={(t) => send(t)} />
           <input
             className="flex-1 px-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition"
-            placeholder="Ask your tutor…"
+            placeholder={t("student.chat.inputPlaceholder")}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             disabled={streaming}
@@ -172,7 +174,7 @@ export default function StudentChat() {
             type="submit"
             disabled={streaming || !input.trim()}
             className="w-11 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white grid place-items-center transition disabled:opacity-40 shrink-0"
-            title="Send"
+            title={t("student.chat.send")}
           >
             ➤
           </button>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { QuizOut, QuizSubmitResponse } from "../../types/api";
 import { studentApi } from "../../api/endpoints";
 import { Button, Card, EmptyState } from "../ui";
@@ -7,6 +8,7 @@ import { useToast } from "../ui/Toast";
 // Gamified quiz runner: per-question timer, XP tally, and a results view with
 // a level-up flourish when mastery increases.
 export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }) {
+  const { t } = useTranslation();
   const toast = useToast();
   const [answers, setAnswers] = useState<(number | string)[]>(() => quiz.questions.map(() => ""));
   const [seconds, setSeconds] = useState(0);
@@ -28,13 +30,13 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
       const res = await studentApi.submitQuiz(quiz.id, answers);
       setResult(res);
     } catch {
-      toast.push("Couldn't submit quiz — try again.", "error");
+      toast.push(t("student.quizGame.submitFailed"), "error");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!quiz.questions.length) return <EmptyState title="This quiz has no questions." />;
+  if (!quiz.questions.length) return <EmptyState title={t("student.quizGame.noQuestions")} />;
 
   if (result) {
     const leveledUp = !!result.mastery_update && result.mastery_update.new > result.mastery_update.old;
@@ -43,11 +45,11 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
         {leveledUp && <div className="text-4xl mb-2 animate-bounce">🎉</div>}
         <h3 className="text-lg font-semibold text-slate-800">{result.feedback_summary}</h3>
         <div className="flex justify-center gap-6 my-4">
-          <Stat label="Score" value={`${Math.round(result.attempt_score * 100)}%`} />
-          <Stat label="XP" value={`+${result.total_xp}`} />
+          <Stat label={t("student.quizGame.score")} value={`${Math.round(result.attempt_score * 100)}%`} />
+          <Stat label={t("student.quizGame.xp")} value={`+${result.total_xp}`} />
           {result.mastery_update && (
             <Stat
-              label="Mastery"
+              label={t("student.quizGame.mastery")}
               value={`${result.mastery_update.old} → ${result.mastery_update.new}`}
             />
           )}
@@ -59,11 +61,11 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
                 Q{q.index + 1}: {Math.round(q.score * 100)}%
               </span>{" "}
               — {q.feedback}
-              {q.flagged && <span className="ml-1 text-xs text-amber-500">(sent to teacher)</span>}
+              {q.flagged && <span className="ml-1 text-xs text-amber-500">{t("student.quizGame.sentToTeacher")}</span>}
             </div>
           ))}
         </div>
-        <Button onClick={onDone}>Done</Button>
+        <Button onClick={onDone}>{t("student.quizGame.done")}</Button>
       </Card>
     );
   }
@@ -71,7 +73,7 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
   return (
     <Card className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-slate-800">Quiz · {quiz.topic}</h3>
+        <h3 className="font-semibold text-slate-800">{t("student.quizGame.quizTopic", { topic: quiz.topic })}</h3>
         <span className="text-sm text-slate-500 tabular-nums">
           ⏱ {Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, "0")}
         </span>
@@ -82,7 +84,7 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
           <div key={q.index}>
             <p className="font-medium text-slate-700 mb-2">
               {i + 1}. {q.question}{" "}
-              {q.xp ? <span className="text-xs text-brand-500">+{q.xp} XP</span> : null}
+              {q.xp ? <span className="text-xs text-brand-500">{t("student.quizGame.xpBadge", { xp: q.xp })}</span> : null}
             </p>
             {q.type === "mcq" ? (
               <div className="grid gap-2">
@@ -109,7 +111,7 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
               <textarea
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm"
                 rows={2}
-                placeholder="Type your answer…"
+                placeholder={t("student.quizGame.answerPlaceholder")}
                 value={String(answers[i] ?? "")}
                 onChange={(e) => setAnswer(i, e.target.value)}
               />
@@ -120,10 +122,10 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
 
       <div className="mt-6 flex justify-end gap-2">
         <Button variant="ghost" onClick={onDone}>
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button onClick={submit} disabled={submitting}>
-          {submitting ? "Grading…" : "Submit quiz"}
+          {submitting ? t("student.quizGame.grading") : t("student.quizGame.submitQuiz")}
         </Button>
       </div>
     </Card>

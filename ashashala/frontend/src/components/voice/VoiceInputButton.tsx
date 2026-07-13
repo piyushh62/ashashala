@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Button } from "../ui";
 import { useToast } from "../ui/Toast";
 
@@ -11,6 +12,7 @@ export function VoiceInputButton({
   lang?: string;
   onTranscript: (text: string) => void;
 }) {
+  const { t } = useTranslation();
   const toast = useToast();
   const recRef = useRef<SpeechRecognition | null>(null);
   const [listening, setListening] = useState(false);
@@ -19,7 +21,7 @@ export function VoiceInputButton({
   if (!Supported) {
     return (
       <span
-        title="Voice input isn't supported in this browser — try Chrome or Edge."
+        title={t("student.voice.notSupported")}
         className="text-slate-300 cursor-not-allowed px-3 py-2"
       >
         🎤
@@ -36,7 +38,7 @@ export function VoiceInputButton({
       const text = e.results[0]?.[0]?.transcript ?? "";
       if (text) onTranscript(text);
     };
-    rec.onerror = () => toast.push("Couldn't hear that — try again.", "error");
+    rec.onerror = () => toast.push(t("student.voice.couldntHear"), "error");
     rec.onend = () => setListening(false);
     recRef.current = rec;
     rec.start();
@@ -54,9 +56,9 @@ export function VoiceInputButton({
       onMouseLeave={() => listening && stop()}
       onTouchStart={start}
       onTouchEnd={stop}
-      title="Hold to speak"
+      title={t("student.voice.holdToSpeak")}
     >
-      {listening ? "● Listening" : "🎤 Hold"}
+      {listening ? t("student.voice.listening") : t("student.voice.hold")}
     </Button>
   );
 }

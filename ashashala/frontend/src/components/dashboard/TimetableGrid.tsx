@@ -1,10 +1,12 @@
+import { useTranslation } from "react-i18next";
 import type { TimetableRow } from "../../types/api";
 import { EmptyState } from "../ui";
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_KEYS = ["common.days.mon", "common.days.tue", "common.days.wed", "common.days.thu", "common.days.fri", "common.days.sat"];
 
 export function TimetableGrid({ rows }: { rows: TimetableRow[] }) {
-  if (!rows.length) return <EmptyState title="No periods scheduled" />;
+  const { t } = useTranslation();
+  if (!rows.length) return <EmptyState title={t("student.timetable.noPeriodsScheduled")} />;
 
   const maxPeriod = Math.max(...rows.map((r) => r.period_number), 6);
   const periods = Array.from({ length: maxPeriod }, (_, i) => i + 1);
@@ -16,10 +18,10 @@ export function TimetableGrid({ rows }: { rows: TimetableRow[] }) {
       <table className="w-full text-xs border-collapse">
         <thead>
           <tr>
-            <th className="p-2 text-slate-400">Period</th>
-            {DAYS.map((d) => (
-              <th key={d} className="p-2 text-slate-500 font-medium">
-                {d}
+            <th className="p-2 text-slate-400">{t("student.timetable.period")}</th>
+            {DAY_KEYS.map((k) => (
+              <th key={k} className="p-2 text-slate-500 font-medium">
+                {t(k)}
               </th>
             ))}
           </tr>
@@ -28,7 +30,7 @@ export function TimetableGrid({ rows }: { rows: TimetableRow[] }) {
           {periods.map((p) => (
             <tr key={p}>
               <td className="p-2 text-center text-slate-400 font-medium">{p}</td>
-              {DAYS.map((_, dayIdx) => {
+              {DAY_KEYS.map((_, dayIdx) => {
                 const c = cell(dayIdx, p);
                 return (
                   <td key={dayIdx} className="p-1 border border-slate-100">

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { adminApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Select, Skeleton, Table } from "../../components/ui";
@@ -8,6 +9,7 @@ import { FormField } from "../../components/ui/FormField";
 const PAGE_SIZE = 20;
 
 export default function AdminAudit() {
+  const { t } = useTranslation();
   const [schoolId, setSchoolId] = useState("");
   const [action, setAction] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -30,36 +32,36 @@ export default function AdminAudit() {
 
   return (
     <div>
-      <PageTitle subtitle="Every state-changing action and sensitive read, across all schools.">Cross-Tenant Audit Log</PageTitle>
+      <PageTitle subtitle={t("admin.audit.subtitle")}>{t("admin.audit.title")}</PageTitle>
       <Card>
         <CardHeader
-          title="Recent activity"
+          title={t("admin.audit.recentActivity")}
           action={
             <div className="flex flex-wrap items-end gap-3">
-              <FormField label="School" optional>
+              <FormField label={t("admin.audit.school")} optional>
                 <Select
                   value={schoolId}
                   onChange={(e) => { setSchoolId(e.target.value); resetOffset(); }}
                   className="w-48"
                 >
-                  <option value="">All schools</option>
+                  <option value="">{t("admin.audit.allSchools")}</option>
                   {schools.data?.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </Select>
               </FormField>
-              <FormField label="Action" optional>
+              <FormField label={t("admin.audit.action")} optional>
                 <Input
-                  placeholder="e.g. USER_CREATE"
+                  placeholder={t("admin.audit.actionPlaceholder")}
                   value={action}
                   onChange={(e) => { setAction(e.target.value.toUpperCase()); resetOffset(); }}
                   className="w-48"
                 />
               </FormField>
-              <FormField label="From" optional>
+              <FormField label={t("admin.audit.from")} optional>
                 <Input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); resetOffset(); }} />
               </FormField>
-              <FormField label="To" optional>
+              <FormField label={t("admin.audit.to")} optional>
                 <Input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); resetOffset(); }} />
               </FormField>
             </div>
@@ -69,9 +71,9 @@ export default function AdminAudit() {
           {q.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !rows.length ? (
-            <EmptyState title="No audit entries" />
+            <EmptyState title={t("admin.audit.noAuditEntries")} />
           ) : (
-            <Table head={["Time", "School", "Action", "Actor", "Target", "Status"]}>
+            <Table head={[t("admin.audit.colTime"), t("admin.audit.colSchool"), t("admin.audit.colAction"), t("admin.audit.colActor"), t("admin.audit.colTarget"), t("admin.audit.colStatus")]}>
               {rows.map((r) => (
                 <tr key={r.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 text-slate-400 text-xs">{new Date(r.ts).toLocaleString()}</td>
@@ -93,7 +95,7 @@ export default function AdminAudit() {
           {total > 0 && (
             <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
               <span>
-                {rangeStart}–{rangeEnd} of {total}
+                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -102,7 +104,7 @@ export default function AdminAudit() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -110,7 +112,7 @@ export default function AdminAudit() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>

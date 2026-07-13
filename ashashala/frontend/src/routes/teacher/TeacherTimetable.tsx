@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Badge, Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
@@ -8,9 +9,10 @@ import { useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 import type { TimetableOptionOut } from "../../types/api";
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const DAY_KEYS = ["common.days.mon", "common.days.tue", "common.days.wed", "common.days.thu", "common.days.fri", "common.days.sat"];
 
 export default function TeacherTimetable() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -54,19 +56,19 @@ export default function TeacherTimetable() {
         room: form.room || undefined,
       }),
     onSuccess: () => {
-      toast.push("Period added.", "success");
+      toast.push(t("teacher.timetable.periodAdded"), "success");
       qc.invalidateQueries({ queryKey: ["teacher", "timetable"] });
     },
-    onError: () => toast.push("Failed — check your assignment for this class/subject.", "error"),
+    onError: () => toast.push(t("teacher.timetable.periodAddFailed"), "error"),
   });
 
   const del = useMutation({
     mutationFn: (id: string) => teacherApi.deleteTimetableEntry(id),
     onSuccess: () => {
-      toast.push("Period removed.", "success");
+      toast.push(t("teacher.timetable.periodRemoved"), "success");
       qc.invalidateQueries({ queryKey: ["teacher", "timetable"] });
     },
-    onError: () => toast.push("Couldn't remove period.", "error"),
+    onError: () => toast.push(t("teacher.timetable.periodRemoveFailed"), "error"),
   });
 
   const [periodsPerWeek, setPeriodsPerWeek] = useState(3);
@@ -80,79 +82,79 @@ export default function TeacherTimetable() {
         periods_per_week: periodsPerWeek,
       }),
     onSuccess: (opts) => setOptions(opts),
-    onError: () => toast.push("Couldn't generate suggestions — check your assignment for this class/subject.", "error"),
+    onError: () => toast.push(t("teacher.timetable.suggestFailed"), "error"),
   });
 
   const selectOption = useMutation({
     mutationFn: (optionId: string) => teacherApi.selectTimetableOption(optionId),
     onSuccess: () => {
-      toast.push("Periods added from suggestion.", "success");
+      toast.push(t("teacher.timetable.periodsAddedFromSuggestion"), "success");
       setOptions(null);
       qc.invalidateQueries({ queryKey: ["teacher", "timetable"] });
     },
     onError: (err: any) => {
-      if (err?.status === 422) toast.push("That option is no longer free — try regenerating suggestions.", "error");
-      else toast.push("Couldn't apply that suggestion.", "error");
+      if (err?.status === 422) toast.push(t("teacher.timetable.optionNoLongerFree"), "error");
+      else toast.push(t("teacher.timetable.applySuggestionFailed"), "error");
     },
   });
 
   const updateTopic = useMutation({
     mutationFn: ({ id, topic }: { id: string; topic: string }) => teacherApi.updateTimetableEntry(id, { topic }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["teacher", "timetable"] }),
-    onError: () => toast.push("Couldn't update topic.", "error"),
+    onError: () => toast.push(t("teacher.timetable.topicUpdateFailed"), "error"),
   });
 
   return (
     <div>
-      <PageTitle subtitle="Add weekly recurring periods.">Timetable</PageTitle>
+      <PageTitle subtitle={t("teacher.timetable.subtitle")}>{t("teacher.timetable.title")}</PageTitle>
       <Card>
-        <CardHeader title="Add a period" />
+        <CardHeader title={t("teacher.timetable.addAPeriod")} />
         {!assignments.isLoading && !assignments.data?.length ? (
           <div className="p-5">
-            <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class and subject first." />
+            <EmptyState title={t("teacher.timetable.noClassAssignments")} hint={t("teacher.timetable.noClassAssignmentsHint")} />
           </div>
         ) : (
           <div className="p-5 grid md:grid-cols-3 gap-3 items-end">
             <div>
-              <Label>Class</Label>
+              <Label>{t("teacher.timetable.class")}</Label>
               <Select
                 value={form.class_id}
                 onChange={(e) => setForm({ ...form, class_id: e.target.value, subject_id: "" })}
               >
-                <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
+                <option value="">{assignments.isLoading ? t("common.loading") : t("teacher.timetable.selectAClass")}</option>
                 {classOptions.map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </Select>
             </div>
             <div>
-              <Label>Subject</Label>
+              <Label>{t("teacher.timetable.subject")}</Label>
               <Select
                 value={form.subject_id}
                 onChange={(e) => setForm({ ...form, subject_id: e.target.value })}
                 disabled={!form.class_id}
               >
-                <option value="">Select a subject</option>
+                <option value="">{t("teacher.timetable.selectASubject")}</option>
                 {subjectsForClass.map((a) => (
                   <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
                 ))}
               </Select>
             </div>
             <div>
-              <Label>Day</Label>
+              <Label>{t("teacher.timetable.day")}</Label>
               <Select
                 value={form.day_of_week}
                 onChange={(e) => setForm({ ...form, day_of_week: Number(e.target.value) })}
               >
-                {DAYS.map((d, i) => (
-                  <option key={d} value={i}>
-                    {d}
+                {DAY_KEYS.map((key, i) => (
+                  <option key={key} value={i}>
+                    {t(key)}
                   </option>
                 ))}
               </Select>
             </div>
             <div>
-              <Label>Period</Label>
+              <Label>{t("teacher.timetable.period")}</Label>
               <Input
                 type="number"
                 min={1}
@@ -161,11 +163,11 @@ export default function TeacherTimetable() {
               />
             </div>
             <div>
-              <Label>Room</Label>
+              <Label>{t("teacher.timetable.room")}</Label>
               <Input value={form.room} onChange={(e) => setForm({ ...form, room: e.target.value })} />
             </div>
             <Button onClick={() => create.mutate()} disabled={!form.class_id || !form.subject_id}>
-              Add period
+              {t("teacher.timetable.addPeriod")}
             </Button>
           </div>
         )}
@@ -173,13 +175,13 @@ export default function TeacherTimetable() {
 
       <Card className="mt-6">
         <CardHeader
-          title="AI Suggest"
-          subtitle="Let the scheduling agent propose conflict-free options for the class/subject selected above."
+          title={t("teacher.timetable.aiSuggest")}
+          subtitle={t("teacher.timetable.aiSuggestSubtitle")}
         />
         <div className="p-5">
           <div className="flex flex-wrap items-end gap-3 mb-4">
             <div>
-              <Label>Periods per week</Label>
+              <Label>{t("teacher.timetable.periodsPerWeek")}</Label>
               <Input
                 type="number"
                 min={1}
@@ -194,7 +196,7 @@ export default function TeacherTimetable() {
               onClick={() => aiSuggest.mutate()}
               disabled={!form.class_id || !form.subject_id || aiSuggest.isPending}
             >
-              {aiSuggest.isPending ? "Generating…" : "✨ Suggest options"}
+              {aiSuggest.isPending ? t("teacher.timetable.generating") : t("teacher.timetable.suggestOptions")}
             </Button>
           </div>
 
@@ -209,7 +211,7 @@ export default function TeacherTimetable() {
                   <ul className="text-sm space-y-1 mb-4">
                     {opt.slots.map((s, i) => (
                       <li key={i} className="flex justify-between text-slate-600">
-                        <span>{DAYS[s.day_of_week]}, period {s.period_number}</span>
+                        <span>{t("teacher.timetable.periodLabel", { day: t(DAY_KEYS[s.day_of_week]), period: s.period_number })}</span>
                         <span className="text-slate-400">{s.room || "—"}</span>
                       </li>
                     ))}
@@ -220,7 +222,7 @@ export default function TeacherTimetable() {
                     onClick={() => selectOption.mutate(opt.option_id)}
                     disabled={selectOption.isPending}
                   >
-                    Use this option
+                    {t("teacher.timetable.useThisOption")}
                   </Button>
                 </div>
               ))}
@@ -230,21 +232,21 @@ export default function TeacherTimetable() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader title="My weekly periods" />
+        <CardHeader title={t("teacher.timetable.myWeeklyPeriods")} />
         <DataBoundary
           query={timetable}
           isEmpty={(d) => d.length === 0}
-          emptyTitle="No periods scheduled yet"
-          emptyHint="Add a period above to see it here."
+          emptyTitle={t("teacher.timetable.noPeriodsScheduled")}
+          emptyHint={t("teacher.timetable.noPeriodsScheduledHint")}
           loadingFallback={<Skeleton className="h-24 m-3" />}
         >
           {(rows) => (
-            <Table head={["Day", "Period", "Class", "Subject", "Room", "Topic", ""]}>
+            <Table head={[t("teacher.timetable.colDay"), t("teacher.timetable.colPeriod"), t("teacher.timetable.colClass"), t("teacher.timetable.colSubject"), t("teacher.timetable.colRoom"), t("teacher.timetable.colTopic"), ""]}>
               {[...rows]
                 .sort((a, b) => a.day_of_week - b.day_of_week || a.period_number - b.period_number)
                 .map((r) => (
                   <tr key={r.id} className="border-b border-slate-50">
-                    <td className="px-4 py-2 font-medium text-slate-700">{DAYS[r.day_of_week]}</td>
+                    <td className="px-4 py-2 font-medium text-slate-700">{t(DAY_KEYS[r.day_of_week])}</td>
                     <td className="px-4 py-2 text-slate-500">{r.period_number}</td>
                     <td className="px-4 py-2 text-slate-500">{names.classes.get(r.class_id) ?? r.class_id}</td>
                     <td className="px-4 py-2 text-slate-500">{names.subjects.get(r.subject_id) ?? r.subject_id}</td>
@@ -252,7 +254,7 @@ export default function TeacherTimetable() {
                     <td className="px-4 py-2 text-slate-500">
                       <Input
                         defaultValue={r.topic ?? ""}
-                        placeholder="Add a topic…"
+                        placeholder={t("teacher.timetable.topicPlaceholder")}
                         className="!py-1 !px-2 text-sm w-40"
                         onBlur={(e) => {
                           const topic = e.target.value;
@@ -265,13 +267,13 @@ export default function TeacherTimetable() {
                         variant="ghost"
                         size="sm"
                         onClick={() => confirm.ask({
-                          title: "Remove this period?",
-                          description: `${DAYS[r.day_of_week]}, period ${r.period_number} will be removed from your timetable.`,
-                          confirmLabel: "Remove",
+                          title: t("teacher.timetable.removePeriodTitle"),
+                          description: t("teacher.timetable.removePeriodDesc", { day: t(DAY_KEYS[r.day_of_week]), period: r.period_number }),
+                          confirmLabel: t("teacher.timetable.remove"),
                           onConfirm: () => del.mutateAsync(r.id),
                         })}
                       >
-                        Remove
+                        {t("teacher.timetable.remove")}
                       </Button>
                     </td>
                   </tr>

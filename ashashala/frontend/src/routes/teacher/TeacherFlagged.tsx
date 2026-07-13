@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import type { FlaggedAnswer } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
@@ -9,6 +10,7 @@ import { useToast } from "../../components/ui/Toast";
 const PAGE_SIZE = 20;
 
 export default function TeacherFlagged() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const [offset, setOffset] = useState(0);
@@ -23,11 +25,11 @@ export default function TeacherFlagged() {
 
   return (
     <div>
-      <PageTitle subtitle="Low-confidence AI grades awaiting your review.">Flagged Answers</PageTitle>
+      <PageTitle subtitle={t("teacher.flagged.subtitle")}>{t("teacher.flagged.title")}</PageTitle>
       {q.isLoading ? (
         <Skeleton className="h-24" />
       ) : !rows.length ? (
-        <EmptyState title="Queue is empty" hint="Nothing needs review right now." />
+        <EmptyState title={t("teacher.flagged.queueEmpty")} hint={t("teacher.flagged.queueEmptyHint")} />
       ) : (
         <div className="space-y-4">
           {rows.map((f) => (
@@ -36,7 +38,7 @@ export default function TeacherFlagged() {
           {total > 0 && (
             <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-500">
               <span>
-                {rangeStart}–{rangeEnd} of {total}
+                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -45,7 +47,7 @@ export default function TeacherFlagged() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -53,7 +55,7 @@ export default function TeacherFlagged() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -73,40 +75,41 @@ function FlaggedCard({
   onResolved: () => void;
   toast: ReturnType<typeof useToast>;
 }) {
+  const { t } = useTranslation();
   const [score, setScore] = useState("0.7");
   const [feedback, setFeedback] = useState("");
   const override = useMutation({
     mutationFn: () => teacherApi.override(f.id, { score: Number(score), feedback: feedback || undefined }),
     onSuccess: () => {
-      toast.push("Grade overridden.", "success");
+      toast.push(t("teacher.flagged.gradeOverridden"), "success");
       onResolved();
     },
-    onError: () => toast.push("Couldn't save override.", "error"),
+    onError: () => toast.push(t("teacher.flagged.saveOverrideFailed"), "error"),
   });
 
   return (
     <Card>
-      <CardHeader title={f.question_text} subtitle={`AI: score ${f.ai_score ?? "?"} · confidence ${f.ai_confidence ?? "?"}`} />
+      <CardHeader title={f.question_text} subtitle={t("teacher.flagged.aiScoreConfidence", { score: f.ai_score ?? "?", confidence: f.ai_confidence ?? "?" })} />
       <div className="p-5 space-y-3">
         <div className="text-sm">
-          <span className="text-slate-400">Student answer:</span> {f.student_answer}
+          <span className="text-slate-400">{t("teacher.flagged.studentAnswer")}</span> {f.student_answer}
         </div>
         {f.expected_answer && (
           <div className="text-sm">
-            <span className="text-slate-400">Expected:</span> {f.expected_answer}
+            <span className="text-slate-400">{t("teacher.flagged.expected")}</span> {f.expected_answer}
           </div>
         )}
         <div className="flex items-end gap-3 pt-2">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Score (0–1)</label>
+            <label className="block text-xs text-slate-500 mb-1">{t("teacher.flagged.score01")}</label>
             <Input type="number" min={0} max={1} step={0.1} value={score} onChange={(e) => setScore(e.target.value)} className="w-24" />
           </div>
           <div className="flex-1">
-            <label className="block text-xs text-slate-500 mb-1">Feedback (optional)</label>
+            <label className="block text-xs text-slate-500 mb-1">{t("teacher.flagged.feedbackOptional")}</label>
             <Input value={feedback} onChange={(e) => setFeedback(e.target.value)} />
           </div>
           <Button onClick={() => override.mutate()} disabled={override.isPending}>
-            Resolve
+            {t("teacher.flagged.resolve")}
           </Button>
         </div>
       </div>

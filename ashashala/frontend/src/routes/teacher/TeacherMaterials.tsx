@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { z } from "zod";
 import { teacherApi } from "../../api/endpoints";
 import type { SuggestedQuizOut } from "../../types/api";
@@ -16,7 +17,13 @@ const PAGE_SIZE = 20;
 const urlSchema = z.string().url("Enter a valid URL (including https://)");
 const youtubeSchema = urlSchema.refine((v) => /youtu\.?be/.test(v), "Enter a valid YouTube URL");
 
+const URL_VALIDATION_MESSAGE_KEYS: Record<string, string> = {
+  "Enter a valid URL (including https://)": "teacher.materials.invalidUrl",
+  "Enter a valid YouTube URL": "teacher.materials.invalidYoutubeUrl",
+};
+
 export default function TeacherMaterials() {
+  const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const [tab, setTab] = useState<Tab>("file");
@@ -59,13 +66,13 @@ export default function TeacherMaterials() {
   }, [assignments.data, classId]);
 
   const done = () => {
-    toast.push("Uploaded — indexing in the background.", "success");
+    toast.push(t("teacher.materials.uploaded"), "success");
     setUrl("");
     setFile(null);
     setOffset(0);
     qc.invalidateQueries({ queryKey: ["teacher", "materials"] });
   };
-  const fail = () => toast.push("Upload failed — check your class/subject assignment.", "error");
+  const fail = () => toast.push(t("teacher.materials.uploadFailed"), "error");
 
   const upFile = useMutation({
     mutationFn: () => {
@@ -92,16 +99,16 @@ export default function TeacherMaterials() {
   const suggestQuiz = useMutation({
     mutationFn: (docId: string) => teacherApi.suggestQuizFromMaterial(docId),
     onSuccess: (quiz) => setDraftQuiz(quiz),
-    onError: () => toast.push("Couldn't generate a quiz — the material may still be processing.", "error"),
+    onError: () => toast.push(t("teacher.materials.quizGenerateFailed"), "error"),
   });
 
   const approveDraft = useMutation({
     mutationFn: (quizId: string) => teacherApi.approveQuiz(quizId, true),
     onSuccess: () => {
-      toast.push("Quiz approved and published.", "success");
+      toast.push(t("teacher.materials.quizApproved"), "success");
       setDraftQuiz(null);
     },
-    onError: () => toast.push("Couldn't approve the quiz.", "error"),
+    onError: () => toast.push(t("teacher.materials.quizApproveFailed"), "error"),
   });
 
   const submit = () => {
@@ -122,59 +129,62 @@ export default function TeacherMaterials() {
 
   return (
     <div>
-      <PageTitle subtitle="Upload PDFs, links or YouTube videos for a class.">Materials</PageTitle>
+      <PageTitle subtitle={t("teacher.materials.subtitle")}>{t("teacher.materials.title")}</PageTitle>
 
       <Card className="mb-6">
-        <CardHeader title="Add material" />
+        <CardHeader title={t("teacher.materials.addMaterial")} />
         <div className="px-5 pt-4 flex gap-2">
-          {(["file", "url", "youtube"] as Tab[]).map((t) => (
+          {(["file", "url", "youtube"] as Tab[]).map((tabOption) => (
             <button
-              key={t}
+              key={tabOption}
               onClick={() => {
-                setTab(t);
+                setTab(tabOption);
                 setUrlError(undefined);
               }}
               className={`px-3 py-1.5 rounded-lg text-sm ${
-                tab === t ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"
+                tab === tabOption ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600"
               }`}
             >
-              {t === "file" ? "📄 File" : t === "url" ? "🔗 URL" : "▶ YouTube"}
+              {tabOption === "file" ? t("teacher.materials.tabFile") : tabOption === "url" ? t("teacher.materials.tabUrl") : t("teacher.materials.tabYoutube")}
             </button>
           ))}
         </div>
         {!assignments.isLoading && !assignments.data?.length ? (
           <div className="p-5">
-            <EmptyState title="No class assignments yet" hint="Ask your school admin to assign you to a class and subject first." />
+            <EmptyState title={t("teacher.materials.noClassAssignments")} hint={t("teacher.materials.noClassAssignmentsHint")} />
           </div>
         ) : (
           <div className="p-5 grid md:grid-cols-3 gap-3 items-start">
-            <FormField label="Class">
+            <FormField label={t("teacher.materials.class")}>
               <Select value={classId} onChange={(e) => { setClassId(e.target.value); setSubjectId(""); }}>
-                <option value="">{assignments.isLoading ? "Loading…" : "Select a class"}</option>
+                <option value="">{assignments.isLoading ? t("common.loading") : t("teacher.materials.selectAClass")}</option>
                 {classOptions.map(([id, name]) => (
                   <option key={id} value={id}>{name}</option>
                 ))}
               </Select>
             </FormField>
-            <FormField label="Subject" optional>
+            <FormField label={t("teacher.materials.subject")} optional>
               <Select value={subjectId} onChange={(e) => setSubjectId(e.target.value)} disabled={!classId}>
-                <option value="">No specific subject</option>
+                <option value="">{t("teacher.materials.noSpecificSubject")}</option>
                 {subjectsForClass.map((a) => (
                   <option key={a.subject_id} value={a.subject_id}>{a.subject_name}</option>
                 ))}
               </Select>
             </FormField>
             {tab === "file" ? (
-              <FormField label="File">
+              <FormField label={t("teacher.materials.file")}>
                 <input type="file" accept=".pdf,.docx,.txt,.jpg,.png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
               </FormField>
             ) : (
-              <FormField label={tab === "url" ? "URL" : "YouTube URL"} error={urlError}>
+              <FormField
+                label={tab === "url" ? t("teacher.materials.url") : t("teacher.materials.youtubeUrl")}
+                error={urlError ? t(URL_VALIDATION_MESSAGE_KEYS[urlError] ?? urlError) : undefined}
+              >
                 <Input
                   value={url}
                   invalid={!!urlError}
                   onChange={(e) => { setUrl(e.target.value); setUrlError(undefined); }}
-                  placeholder="https://…"
+                  placeholder={t("teacher.materials.urlPlaceholder")}
                 />
               </FormField>
             )}
@@ -182,21 +192,21 @@ export default function TeacherMaterials() {
               onClick={submit}
               disabled={!classId || (tab === "file" ? !file : !url) || upFile.isPending || upUrl.isPending || upYt.isPending}
             >
-              Upload
+              {t("teacher.materials.upload")}
             </Button>
           </div>
         )}
       </Card>
 
       <Card>
-        <CardHeader title="My materials" />
+        <CardHeader title={t("teacher.materials.myMaterials")} />
         <div className="p-2">
           {materials.isLoading ? (
             <Skeleton className="h-24 m-3" />
           ) : !materialRows.length ? (
-            <EmptyState title="No materials yet" />
+            <EmptyState title={t("teacher.materials.noMaterialsYet")} />
           ) : (
-            <Table head={["Name", "Type", "Status", ""]}>
+            <Table head={[t("teacher.materials.colName"), t("teacher.materials.colType"), t("teacher.materials.colStatus"), ""]}>
               {materialRows.map((m) => (
                 <tr key={m.id} className="border-b border-slate-50">
                   <td className="px-4 py-2 font-medium text-slate-700 truncate max-w-xs">{m.filename}</td>
@@ -215,7 +225,7 @@ export default function TeacherMaterials() {
                       disabled={m.status !== "indexed" || suggestQuiz.isPending}
                       onClick={() => suggestQuiz.mutate(m.id)}
                     >
-                      {suggestQuiz.isPending && suggestQuiz.variables === m.id ? "Generating…" : "Generate quiz"}
+                      {suggestQuiz.isPending && suggestQuiz.variables === m.id ? t("teacher.materials.generatingQuiz") : t("teacher.materials.generateQuiz")}
                     </Button>
                   </td>
                 </tr>
@@ -225,7 +235,7 @@ export default function TeacherMaterials() {
           {total > 0 && (
             <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
               <span>
-                {rangeStart}–{rangeEnd} of {total}
+                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -234,7 +244,7 @@ export default function TeacherMaterials() {
                   onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
                   disabled={offset === 0}
                 >
-                  Previous
+                  {t("common.previous")}
                 </Button>
                 <Button
                   variant="ghost"
@@ -242,7 +252,7 @@ export default function TeacherMaterials() {
                   onClick={() => setOffset(offset + PAGE_SIZE)}
                   disabled={rangeEnd >= total}
                 >
-                  Next
+                  {t("common.next")}
                 </Button>
               </div>
             </div>
@@ -253,8 +263,8 @@ export default function TeacherMaterials() {
       <Modal
         open={!!draftQuiz}
         onOpenChange={(open) => !open && setDraftQuiz(null)}
-        title={draftQuiz ? `Suggested quiz: ${draftQuiz.topic}` : ""}
-        description="Review the generated questions, then approve to publish it to the class."
+        title={draftQuiz ? t("teacher.materials.suggestedQuizTitle", { topic: draftQuiz.topic }) : ""}
+        description={t("teacher.materials.suggestedQuizDesc")}
         size="lg"
       >
         {draftQuiz && (
@@ -283,7 +293,7 @@ export default function TeacherMaterials() {
                       ))}
                     </ul>
                   ) : (
-                    <p className="mt-2 text-sm text-brand-700 font-medium">Expected: {q.expected_answer}</p>
+                    <p className="mt-2 text-sm text-brand-700 font-medium">{t("teacher.materials.expectedAnswer", { answer: q.expected_answer })}</p>
                   )}
                   {q.explanation && <p className="mt-2 text-xs text-slate-400">{q.explanation}</p>}
                 </div>
@@ -291,13 +301,13 @@ export default function TeacherMaterials() {
             </div>
             <div className="flex justify-end gap-2 pt-2 border-t border-slate-100">
               <Button variant="ghost" onClick={() => setDraftQuiz(null)}>
-                Discard
+                {t("teacher.materials.discard")}
               </Button>
               <Button
                 onClick={() => draftQuiz && approveDraft.mutate(draftQuiz.quiz_id)}
                 disabled={approveDraft.isPending}
               >
-                {approveDraft.isPending ? "Publishing…" : "Approve & publish"}
+                {approveDraft.isPending ? t("teacher.materials.publishing") : t("teacher.materials.approveAndPublish")}
               </Button>
             </div>
           </div>
