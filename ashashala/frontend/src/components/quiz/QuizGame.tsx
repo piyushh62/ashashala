@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { QuizOut, QuizSubmitResponse } from "../../types/api";
 import { studentApi } from "../../api/endpoints";
-import { Button, Card, EmptyState } from "../ui";
+import { Button, Card, EmptyState, Icon } from "../ui";
 import { useToast } from "../ui/Toast";
 
 // Gamified quiz runner: per-question timer, XP tally, and a results view with
@@ -42,7 +42,9 @@ export function QuizGame({ quiz, onDone }: { quiz: QuizOut; onDone: () => void }
     const leveledUp = !!result.mastery_update && result.mastery_update.new > result.mastery_update.old;
     return (
       <Card className="p-6 text-center">
-        {leveledUp && <div className="text-4xl mb-2 animate-bounce">🎉</div>}
+        {leveledUp && (
+          <Icon name="celebrate" className="w-10 h-10 mx-auto mb-2 text-amber-500 animate-bounce" />
+        )}
         <h3 className="text-lg font-semibold text-slate-800">{result.feedback_summary}</h3>
         <div className="flex justify-center gap-6 my-4">
           <Stat label={t("student.quizGame.score")} value={`${Math.round(result.attempt_score * 100)}%`} />

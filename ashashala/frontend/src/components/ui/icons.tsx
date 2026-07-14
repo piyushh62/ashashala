@@ -23,7 +23,9 @@ import {
   Library,
   LogOut,
   MessageSquare,
+  Mic,
   Moon,
+  PartyPopper,
   Pencil,
   Play,
   Presentation,
@@ -38,6 +40,7 @@ import {
   Target,
   Trash2,
   TrendingUp,
+  Upload,
   Users,
   UsersRound,
   X,
@@ -112,6 +115,9 @@ export const ICONS = {
   play: Play,
   file: FileText,
   send: Send,
+  mic: Mic,
+  upload: Upload,
+  celebrate: PartyPopper,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

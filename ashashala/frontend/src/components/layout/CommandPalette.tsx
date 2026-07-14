@@ -60,7 +60,7 @@ export function CommandPalette({
       overlayClassName="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 data-[state=open]:animate-fade-in"
     >
       <div className="flex items-center gap-2 px-4 border-b border-slate-100 dark:border-slate-700">
-        <span className="text-slate-400">🔎</span>
+        <Icon name="search" className="w-4 h-4 text-slate-400" />
         <Command.Input
           value={query}
           onValueChange={setQuery}

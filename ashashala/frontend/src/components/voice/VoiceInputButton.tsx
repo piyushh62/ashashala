@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button } from "../ui";
+import { Button, Icon } from "../ui";
 import { useToast } from "../ui/Toast";
 
 // Push-to-talk. Prefers the browser Web Speech API; if unsupported, the button
@@ -24,7 +24,7 @@ export function VoiceInputButton({
         title={t("student.voice.notSupported")}
         className="text-slate-300 cursor-not-allowed px-3 py-2"
       >
-        🎤
+        <Icon name="mic" className="w-4 h-4" />
       </span>
     );
   }
@@ -58,6 +58,7 @@ export function VoiceInputButton({
       onTouchEnd={stop}
       title={t("student.voice.holdToSpeak")}
     >
+      <Icon name="mic" className="w-4 h-4" />
       {listening ? t("student.voice.listening") : t("student.voice.hold")}
     </Button>
   );

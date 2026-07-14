@@ -15,6 +15,7 @@ interface Msg {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  isError?: boolean;
 }
 
 const SUGGESTIONS = [
@@ -69,7 +70,7 @@ export default function StudentChat() {
         onError: (msg) => {
           setMessages((m) => {
             const copy = [...m];
-            copy[copy.length - 1] = { role: "assistant", content: `⚠ ${msg}` };
+            copy[copy.length - 1] = { role: "assistant", content: msg, isError: true };
             return copy;
           });
         },
@@ -133,12 +134,15 @@ export default function StudentChat() {
               )}
               <div className={`max-w-[78%] ${m.role === "user" ? "items-end" : "items-start"} flex flex-col`}>
                 <div
-                  className={`px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed ${
+                  className={`px-4 py-2.5 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed flex items-start gap-2 ${
                     m.role === "user"
                       ? "bg-brand-600 text-white rounded-br-md"
-                      : "bg-slate-100 text-slate-800 rounded-bl-md"
+                      : m.isError
+                        ? "bg-rose-50 text-rose-700 rounded-bl-md dark:bg-rose-500/10 dark:text-rose-400"
+                        : "bg-slate-100 text-slate-800 rounded-bl-md"
                   }`}
                 >
+                  {m.isError && <Icon name="alert" className="w-4 h-4 mt-0.5 shrink-0" />}
                   {m.content ? (
                     m.content
                   ) : streaming && i === messages.length - 1 ? (

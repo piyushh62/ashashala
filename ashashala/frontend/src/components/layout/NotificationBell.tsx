@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { notificationsApi } from "../../api/endpoints";
 import type { Notification } from "../../types/api";
 import { PopoverPanel } from "../ui/Dropdown";
+import { Icon } from "../ui";
 
 function timeAgo(iso: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -54,7 +55,7 @@ export function NotificationBell() {
           aria-label={t("common.notifications")}
           className="relative w-9 h-9 grid place-items-center rounded-full text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 transition"
         >
-          <span className="text-lg">🔔</span>
+          <Icon name="bell" className="w-[18px] h-[18px]" />
           {unreadCount > 0 && (
             <span className="absolute top-1 right-1 min-w-[16px] h-4 px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold grid place-items-center">
               {unreadCount > 9 ? "9+" : unreadCount}
