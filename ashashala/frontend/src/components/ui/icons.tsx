@@ -21,6 +21,7 @@ import {
   LayoutDashboard,
   Leaf,
   Library,
+  Link2,
   LogOut,
   MessageSquare,
   Mic,
@@ -118,6 +119,7 @@ export const ICONS = {
   mic: Mic,
   upload: Upload,
   celebrate: PartyPopper,
+  link: Link2,
 } satisfies Record<string, LucideIcon>;
 
 export type IconName = keyof typeof ICONS;

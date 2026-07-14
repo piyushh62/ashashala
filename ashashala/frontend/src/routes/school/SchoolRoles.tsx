@@ -11,6 +11,7 @@ import { Badge, Button, Card, CardHeader, EmptyState, Input, Skeleton } from "..
 import { FormField } from "../../components/ui/FormField";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
+import { PermissionChecklist } from "../../components/PermissionChecklist";
 
 const createSchema = z.object({ name: z.string().min(1) });
 type CreateForm = z.infer<typeof createSchema>;
@@ -122,7 +123,7 @@ export default function SchoolRoles() {
   const toggle = (list: string[], setList: (v: string[]) => void, v: string) =>
     setList(list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
-  const perms = (permissions.data ?? []).map((p) => `${p.resource}:${p.action}`);
+  const perms = permissions.data ?? [];
   const templateNames = (templates.data ?? []).map((tpl) => tpl.name);
 
   return (
@@ -137,7 +138,13 @@ export default function SchoolRoles() {
           </FormField>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{t("school.roles.permissions")}</div>
-            {permissions.isLoading ? <Skeleton className="h-16" /> : <Pills options={perms} selected={createPerms} onToggle={(v) => toggle(createPerms, setCreatePerms, v)} />}
+            <PermissionChecklist
+              permissions={perms}
+              loading={permissions.isLoading}
+              selected={createPerms}
+              onToggle={(key) => toggle(createPerms, setCreatePerms, key)}
+              idPrefix="create"
+            />
           </div>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? t("school.roles.creating") : t("school.roles.createRole")}
@@ -203,7 +210,13 @@ export default function SchoolRoles() {
       <Modal open={!!editing} onOpenChange={(open) => !open && setEditing(null)} title={t("school.roles.editPermissions")} size="md">
         {editing && (
           <div className="space-y-4">
-            <Pills options={perms} selected={editPerms} onToggle={(v) => toggle(editPerms, setEditPerms, v)} />
+            <PermissionChecklist
+              permissions={perms}
+              loading={permissions.isLoading}
+              selected={editPerms}
+              onToggle={(key) => toggle(editPerms, setEditPerms, key)}
+              idPrefix="edit"
+            />
             <Button className="w-full" onClick={() => update.mutate()} disabled={update.isPending}>
               {update.isPending ? t("school.roles.saving") : t("school.roles.saveChanges")}
             </Button>

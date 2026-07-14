@@ -6,7 +6,7 @@ import { z } from "zod";
 import { authApi, parentApi } from "../api/endpoints";
 import { useAuth } from "../stores/auth";
 import { PageTitle } from "../components/layout/AppLayout";
-import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton } from "../components/ui";
+import { Avatar, Badge, Button, Card, CardHeader, Input, Select, Skeleton, Switch } from "../components/ui";
 import { FormField } from "../components/ui/FormField";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { useTheme } from "../stores/theme";
@@ -176,22 +176,12 @@ function NotificationPreferencesCard() {
                 <div className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</div>
                 <div className="text-xs text-slate-400 mt-0.5">{hint}</div>
               </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={!!q.data?.[key]}
-                onClick={() => update.mutate({ [key]: !q.data?.[key] })}
+              <Switch
+                label={label}
+                checked={!!q.data?.[key]}
+                onCheckedChange={(checked) => update.mutate({ [key]: checked })}
                 disabled={update.isPending}
-                className={`relative w-11 h-6 rounded-full transition ${
-                  q.data?.[key] ? "bg-brand-600" : "bg-slate-200 dark:bg-slate-700"
-                } disabled:opacity-50`}
-              >
-                <span
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
-                    q.data?.[key] ? "translate-x-5" : ""
-                  }`}
-                />
-              </button>
+              />
             </div>
           ))
         )}
