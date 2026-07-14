@@ -5,10 +5,14 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
 } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
 import { Icon } from "./icons";
+import { cn } from "../../lib/cn";
 
 export { Icon, ICONS, type IconName } from "./icons";
 export { Pager } from "./Pager";
+export { Switch } from "./Switch";
+export { cn } from "../../lib/cn";
 
 /* ---------------------------------- Card --------------------------------- */
 
@@ -63,27 +67,30 @@ export function CardHeader({
 
 /* -------------------------------- Button --------------------------------- */
 
-interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: "primary" | "ghost" | "danger" | "subtle";
-  size?: "sm" | "md";
-}
-export function Button({ variant = "primary", size = "md", className = "", ...rest }: BtnProps) {
-  const styles: Record<string, string> = {
-    primary: "bg-brand-600 hover:bg-brand-700 text-white shadow-sm hover:shadow-pop",
-    ghost: "bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300",
-    subtle: "bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-500/10 dark:hover:bg-brand-500/20 dark:text-brand-300",
-    danger: "bg-rose-600 hover:bg-rose-700 text-white shadow-sm",
-  };
-  const sizes: Record<string, string> = {
-    sm: "px-3 py-1.5 text-xs rounded-lg",
-    md: "px-4 py-2 text-sm rounded-xl",
-  };
-  return (
-    <button
-      className={`inline-flex items-center justify-center gap-1.5 font-medium transition active:scale-[.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 ${styles[variant]} ${sizes[size]} ${className}`}
-      {...rest}
-    />
-  );
+const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-1.5 font-medium transition active:scale-[.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
+  {
+    variants: {
+      variant: {
+        primary: "bg-brand-600 hover:bg-brand-700 text-white shadow-sm hover:shadow-pop",
+        ghost:
+          "bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-300",
+        subtle:
+          "bg-brand-50 hover:bg-brand-100 text-brand-700 dark:bg-brand-500/10 dark:hover:bg-brand-500/20 dark:text-brand-300",
+        danger: "bg-rose-600 hover:bg-rose-700 text-white shadow-sm",
+      },
+      size: {
+        sm: "px-3 py-1.5 text-xs rounded-lg",
+        md: "px-4 py-2 text-sm rounded-xl",
+      },
+    },
+    defaultVariants: { variant: "primary", size: "md" },
+  },
+);
+
+interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {}
+export function Button({ variant, size, className, ...rest }: BtnProps) {
+  return <button className={cn(buttonVariants({ variant, size }), className)} {...rest} />;
 }
 
 /* --------------------------------- Inputs -------------------------------- */
@@ -194,22 +201,34 @@ export function Table({ head, children }: { head: string[]; children: ReactNode 
 
 /* --------------------------------- Badge --------------------------------- */
 
-export function Badge({ children, tone = "slate" }: { children: ReactNode; tone?: string }) {
-  const tones: Record<string, string> = {
-    slate: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700",
-    brand: "bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/30",
-    green: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
-    amber: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30",
-    red: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30",
-    blue: "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/30",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset ${tones[tone] || tones.slate}`}
-    >
-      {children}
-    </span>
-  );
+const badgeVariants = cva("inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ring-1 ring-inset", {
+  variants: {
+    tone: {
+      slate: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700",
+      brand: "bg-brand-50 text-brand-700 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-500/30",
+      green:
+        "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
+      amber:
+        "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30",
+      red: "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-500/30",
+      blue: "bg-sky-50 text-sky-700 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-500/30",
+    },
+  },
+  defaultVariants: { tone: "slate" },
+});
+
+export type BadgeTone = NonNullable<VariantProps<typeof badgeVariants>["tone"]>;
+
+export function Badge({
+  children,
+  tone,
+  className,
+}: {
+  children: ReactNode;
+  tone?: BadgeTone;
+  className?: string;
+}) {
+  return <span className={cn(badgeVariants({ tone }), className)}>{children}</span>;
 }
 
 /* ------------------------------- StatTile -------------------------------- */

@@ -3,12 +3,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { agentActionsApi } from "../api/endpoints";
 import type { AgentActionOut } from "../types/api";
-import { Badge, Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "./ui";
+import { Badge, type BadgeTone, Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "./ui";
 import { useToast } from "./ui/Toast";
 
 const PAGE_SIZE = 20;
 
-const STATUS_TONE: Record<AgentActionOut["status"], string> = {
+const STATUS_TONE: Record<AgentActionOut["status"], BadgeTone> = {
   pending: "amber",
   approved: "green",
   rejected: "red",

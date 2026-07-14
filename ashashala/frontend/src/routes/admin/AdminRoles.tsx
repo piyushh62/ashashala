@@ -11,6 +11,7 @@ import { Badge, Button, Card, CardHeader, EmptyState, Input, Skeleton } from "..
 import { FormField } from "../../components/ui/FormField";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
+import { PermissionChecklist } from "../../components/PermissionChecklist";
 
 const createSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -103,30 +104,13 @@ export default function AdminRoles() {
           </div>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{t("admin.roles.permissions")}</div>
-            {permissions.isLoading ? (
-              <Skeleton className="h-16" />
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {perms.map((p) => {
-                  const key = `${p.resource}:${p.action}`;
-                  const active = createPerms.includes(key);
-                  return (
-                    <button
-                      type="button"
-                      key={p.id}
-                      onClick={() => togglePerm(createPerms, setCreatePerms, key)}
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ring-1 ring-inset transition ${
-                        active
-                          ? "bg-brand-600 text-white ring-brand-600"
-                          : "bg-slate-50 text-slate-600 ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
-                      }`}
-                    >
-                      {key}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
+            <PermissionChecklist
+              permissions={perms}
+              loading={permissions.isLoading}
+              selected={createPerms}
+              onToggle={(key) => togglePerm(createPerms, setCreatePerms, key)}
+              idPrefix="create"
+            />
           </div>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? t("admin.roles.creating") : t("admin.roles.createTemplate")}
@@ -188,26 +172,13 @@ export default function AdminRoles() {
       <Modal open={!!editing} onOpenChange={(open) => !open && setEditing(null)} title={t("admin.roles.editPermissions")} size="md">
         {editing && (
           <div className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              {perms.map((p) => {
-                const key = `${p.resource}:${p.action}`;
-                const active = selectedPerms.includes(key);
-                return (
-                  <button
-                    type="button"
-                    key={p.id}
-                    onClick={() => togglePerm(selectedPerms, setSelectedPerms, key)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium ring-1 ring-inset transition ${
-                      active
-                        ? "bg-brand-600 text-white ring-brand-600"
-                        : "bg-slate-50 text-slate-600 ring-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700"
-                    }`}
-                  >
-                    {key}
-                  </button>
-                );
-              })}
-            </div>
+            <PermissionChecklist
+              permissions={perms}
+              loading={permissions.isLoading}
+              selected={selectedPerms}
+              onToggle={(key) => togglePerm(selectedPerms, setSelectedPerms, key)}
+              idPrefix="edit"
+            />
             <Button className="w-full" onClick={() => update.mutate()} disabled={update.isPending}>
               {update.isPending ? t("admin.roles.saving") : t("admin.roles.saveChanges")}
             </Button>

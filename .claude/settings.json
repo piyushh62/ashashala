@@ -1,0 +1,16 @@
+{
+  "apiKeyHelper": "echo fe_oa_c67d8652677881b6b9eef70a7f79983d258b5993cfd9a33d",
+  "env": {
+    "ANTHROPIC_API_KEY": "fe_oa_c67d8652677881b6b9eef70a7f79983d258b5993cfd9a33d",
+    "ANTHROPIC_BASE_URL": "https://cc.freemodel.dev",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"
+  },
+  "permissions": {
+    "allow": [],
+    "deny": []
+  },
+  "model": "claude-opus-4-8",
+  "theme": "dark",
+  "switchModelsOnFlag": true,
+  "effortLevel": "high"
+}
