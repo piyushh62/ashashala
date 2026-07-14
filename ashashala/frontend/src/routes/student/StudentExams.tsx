@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Card, CardHeader, Skeleton, Table } from "../../components/ui";
+import { Card, CardHeader, Icon, Skeleton, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 
 export default function StudentExams() {
@@ -14,7 +14,7 @@ export default function StudentExams() {
       <PageTitle subtitle={t("student.exams.subtitle")}>{t("student.exams.title")}</PageTitle>
 
       <Card>
-        <CardHeader title={t("student.exams.examTimetable")} icon="📝" />
+        <CardHeader title={t("student.exams.examTimetable")} icon={<Icon name="exams" />} />
         <DataBoundary
           query={exams}
           isEmpty={(d) => d.length === 0}

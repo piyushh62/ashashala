@@ -6,7 +6,7 @@ import { parentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { MasteryRadar } from "../../components/dashboard/MasteryRadar";
 import { TimetableGrid } from "../../components/dashboard/TimetableGrid";
-import { Card, CardHeader, EmptyState, Skeleton } from "../../components/ui";
+import { Card, CardHeader, EmptyState, Icon, Skeleton } from "../../components/ui";
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -72,7 +72,7 @@ export default function ParentChild() {
       </div>
 
       <Card className="mt-6">
-        <CardHeader title={t("parent.child.quizScoreTrend")} icon="📈" />
+        <CardHeader title={t("parent.child.quizScoreTrend")} icon={<Icon name="trend" />} />
         <div className="p-5">
           {hist.isLoading ? (
             <Skeleton className="h-40" />
@@ -93,7 +93,7 @@ export default function ParentChild() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader title={t("parent.child.upcomingExams")} icon="📝" />
+        <CardHeader title={t("parent.child.upcomingExams")} icon={<Icon name="exams" />} />
         <div className="p-5">
           {examTt.isLoading ? (
             <Skeleton className="h-16" />

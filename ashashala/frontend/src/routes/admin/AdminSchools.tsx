@@ -1,14 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "../../api/client";
 import { adminApi } from "../../api/endpoints";
 import type { School } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, Input, Label, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, Input, Label, Skeleton } from "../../components/ui";
+import { DataTable } from "../../components/ui/DataTable";
 import { useToast } from "../../components/ui/Toast";
 import { Modal, useConfirm } from "../../components/ui/Modal";
-import { DataBoundary } from "../../components/ui/DataBoundary";
 
 export default function AdminSchools() {
   const { t } = useTranslation();
@@ -91,6 +92,59 @@ export default function AdminSchools() {
       onConfirm: () => del.mutateAsync(s.id),
     });
 
+  const columns = useMemo<ColumnDef<School, unknown>[]>(
+    () => [
+      {
+        id: "name",
+        accessorFn: (s) => `${s.name} ${s.address ?? ""}`,
+        header: t("admin.schools.colName"),
+        cell: ({ row }) => (
+          <div>
+            <div className="font-medium text-slate-700 dark:text-slate-200">{row.original.name}</div>
+            <div className="text-xs text-slate-400">{row.original.address}</div>
+          </div>
+        ),
+      },
+      {
+        id: "status",
+        accessorFn: (s) => (s.is_active ? "active" : "suspended"),
+        header: t("admin.schools.colStatus"),
+        cell: ({ row }) => (
+          <Badge tone={row.original.is_active ? "green" : "red"}>
+            {row.original.is_active ? t("admin.schools.active") : t("admin.schools.suspended")}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        header: t("admin.schools.colActions"),
+        enableSorting: false,
+        enableGlobalFilter: false,
+        cell: ({ row }) => {
+          const s = row.original;
+          return (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setDetailsFor(s)}>
+                {t("admin.schools.viewDetails")}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setAdminFor(s)}>
+                {t("admin.schools.addAdmin")}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => askSuspend(s)}>
+                {s.is_active ? t("admin.schools.suspend") : t("admin.schools.reactivate")}
+              </Button>
+              <Button variant="danger" size="sm" onClick={() => askDelete(s)}>
+                {t("admin.schools.delete")}
+              </Button>
+            </div>
+          );
+        },
+      },
+    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [t],
+  );
+
   return (
     <div>
       <PageTitle subtitle={t("admin.schools.subtitle")}>{t("admin.schools.title")}</PageTitle>
@@ -121,43 +175,14 @@ export default function AdminSchools() {
       <Card>
         <CardHeader title={t("admin.schools.allSchools")} />
         <div className="p-2">
-          <DataBoundary
-            query={schools}
-            isEmpty={(data) => data.length === 0}
+          <DataTable
+            data={schools.data ?? []}
+            columns={columns}
+            isLoading={schools.isLoading}
             emptyTitle={t("admin.schools.noSchoolsYet")}
             emptyHint={t("admin.schools.noSchoolsYetHint")}
-            loadingFallback={<div className="h-24 m-3 rounded-xl bg-slate-100 animate-pulse" />}
-          >
-            {(data) => (
-              <Table head={[t("admin.schools.colName"), t("admin.schools.colStatus"), t("admin.schools.colActions")]}>
-                {data.map((s) => (
-                  <tr key={s.id} className="border-b border-slate-50">
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-700">{s.name}</div>
-                      <div className="text-xs text-slate-400">{s.address}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge tone={s.is_active ? "green" : "red"}>{s.is_active ? t("admin.schools.active") : t("admin.schools.suspended")}</Badge>
-                    </td>
-                    <td className="px-4 py-3 flex gap-2">
-                      <Button variant="ghost" onClick={() => setDetailsFor(s)}>
-                        {t("admin.schools.viewDetails")}
-                      </Button>
-                      <Button variant="ghost" onClick={() => setAdminFor(s)}>
-                        {t("admin.schools.addAdmin")}
-                      </Button>
-                      <Button variant="ghost" onClick={() => askSuspend(s)}>
-                        {s.is_active ? t("admin.schools.suspend") : t("admin.schools.reactivate")}
-                      </Button>
-                      <Button variant="danger" onClick={() => askDelete(s)}>
-                        {t("admin.schools.delete")}
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </Table>
-            )}
-          </DataBoundary>
+            searchPlaceholder={t("common.searchPlaceholder")}
+          />
         </div>
       </Card>
 

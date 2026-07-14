@@ -5,7 +5,7 @@ import { streamChat } from "../../api/client";
 import { studentApi } from "../../api/endpoints";
 import type { Citation } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Card, Select } from "../../components/ui";
+import { Card, Icon, Select } from "../../components/ui";
 import { CitationList } from "../../components/citations/ClickableCitation";
 import { VoiceInputButton } from "../../components/voice/VoiceInputButton";
 import { TTSToggle, speak } from "../../components/voice/TTSPlayer";
@@ -176,7 +176,7 @@ export default function StudentChat() {
             className="w-11 h-11 rounded-xl bg-brand-600 hover:bg-brand-700 text-white grid place-items-center transition disabled:opacity-40 shrink-0"
             title={t("student.chat.send")}
           >
-            ➤
+            <Icon name="send" className="w-5 h-5" />
           </button>
         </form>
       </Card>

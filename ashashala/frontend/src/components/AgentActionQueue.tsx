@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { agentActionsApi } from "../api/endpoints";
 import type { AgentActionOut } from "../types/api";
-import { Badge, Button, Card, CardHeader, EmptyState, Skeleton } from "./ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "./ui";
 import { useToast } from "./ui/Toast";
 
 const PAGE_SIZE = 20;
@@ -39,7 +39,7 @@ export function AgentActionQueue() {
       {q.isLoading ? (
         <Skeleton className="h-24" />
       ) : !rows.length ? (
-        <EmptyState title={t("agentQueue.queueEmpty")} hint={t("agentQueue.queueEmptyHint")} icon="🤖" />
+        <EmptyState title={t("agentQueue.queueEmpty")} hint={t("agentQueue.queueEmptyHint")} icon={<Icon name="agentQueue" />} />
       ) : (
         <div className="space-y-4">
           {rows.map((a) => (

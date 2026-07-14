@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import type { FlaggedAnswer } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Button, Card, CardHeader, EmptyState, Input, Skeleton } from "../../components/ui";
+import { Button, Card, CardHeader, EmptyState, Input, Pager, Skeleton } from "../../components/ui";
 import { useToast } from "../../components/ui/Toast";
 
 const PAGE_SIZE = 20;
@@ -20,8 +20,6 @@ export default function TeacherFlagged() {
   });
   const rows = q.data?.items ?? [];
   const total = q.data?.total ?? 0;
-  const rangeStart = total === 0 ? 0 : offset + 1;
-  const rangeEnd = offset + rows.length;
 
   return (
     <div>
@@ -35,31 +33,7 @@ export default function TeacherFlagged() {
           {rows.map((f) => (
             <FlaggedCard key={f.id} f={f} onResolved={() => qc.invalidateQueries({ queryKey: ["teacher", "flagged"] })} toast={toast} />
           ))}
-          {total > 0 && (
-            <div className="flex items-center justify-between px-1 py-2 text-sm text-slate-500">
-              <span>
-                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                  disabled={offset === 0}
-                >
-                  {t("common.previous")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                  disabled={rangeEnd >= total}
-                >
-                  {t("common.next")}
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pager offset={offset} limit={PAGE_SIZE} total={total} count={rows.length} onOffsetChange={setOffset} />
         </div>
       )}
     </div>

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Button, Card, CardHeader, EmptyState, Skeleton, Table } from "../../components/ui";
+import { Card, CardHeader, EmptyState, Pager, Skeleton, Table } from "../../components/ui";
 
 const PAGE_SIZE = 20;
 
@@ -17,8 +17,6 @@ export default function StudentHistory() {
   const prog = useQuery({ queryKey: ["student", "progress"], queryFn: studentApi.progress });
   const attempts = hist.data?.items ?? [];
   const total = hist.data?.total ?? 0;
-  const rangeStart = total === 0 ? 0 : offset + 1;
-  const rangeEnd = offset + attempts.length;
 
   return (
     <div>
@@ -41,31 +39,7 @@ export default function StudentHistory() {
               ))}
             </Table>
           )}
-          {total > 0 && (
-            <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
-              <span>
-                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                  disabled={offset === 0}
-                >
-                  {t("common.previous")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                  disabled={rangeEnd >= total}
-                >
-                  {t("common.next")}
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pager offset={offset} limit={PAGE_SIZE} total={total} count={attempts.length} onOffsetChange={setOffset} />
         </div>
       </Card>
 

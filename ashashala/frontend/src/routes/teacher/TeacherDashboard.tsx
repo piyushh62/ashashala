@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Card, CardHeader, EmptyState, Skeleton, StatTile, Table } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, Icon, Skeleton, StatTile, Table } from "../../components/ui";
 
 export default function TeacherDashboard() {
   const { t } = useTranslation();
@@ -43,19 +43,19 @@ export default function TeacherDashboard() {
       <PageTitle subtitle={t("teacher.dashboard.subtitle")}>{t("teacher.dashboard.title")}</PageTitle>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatTile label={t("teacher.dashboard.classes")} value={dash.data?.classes.length ?? 0} icon="🗂️" tone="brand" />
-        <StatTile label={t("teacher.dashboard.subjects")} value={dash.data?.subjects.length ?? 0} icon="📖" tone="green" />
-        <StatTile label={t("teacher.dashboard.materialsUploaded")} value={dash.data?.materials_uploaded ?? 0} icon="📚" tone="slate" />
+        <StatTile label={t("teacher.dashboard.classes")} value={dash.data?.classes.length ?? 0} icon={<Icon name="structure" />} tone="brand" />
+        <StatTile label={t("teacher.dashboard.subjects")} value={dash.data?.subjects.length ?? 0} icon={<Icon name="today" />} tone="green" />
+        <StatTile label={t("teacher.dashboard.materialsUploaded")} value={dash.data?.materials_uploaded ?? 0} icon={<Icon name="materials" />} tone="slate" />
         <StatTile
           label={t("teacher.dashboard.openReviews")}
           value={flagged.data?.total ?? 0}
-          icon="🚩"
+          icon={<Icon name="flagged" />}
           tone={(flagged.data?.total ?? 0) > 0 ? "amber" : "green"}
         />
       </div>
 
       <Card>
-        <CardHeader title={t("teacher.dashboard.studentsNeedingAttention")} subtitle={t("teacher.dashboard.weakestAvgMastery")} icon="🎯" />
+        <CardHeader title={t("teacher.dashboard.studentsNeedingAttention")} subtitle={t("teacher.dashboard.weakestAvgMastery")} icon={<Icon name="target" />} />
         <div className="p-2">
           {loadingProgress ? (
             <Skeleton className="h-40 m-3" />
@@ -85,7 +85,7 @@ export default function TeacherDashboard() {
 
       {classes.length > 0 && (
         <Card className="mt-6">
-          <CardHeader title={t("teacher.dashboard.yourClasses")} subtitle={t("teacher.dashboard.yourClassesHint")} icon="🗂️" />
+          <CardHeader title={t("teacher.dashboard.yourClasses")} subtitle={t("teacher.dashboard.yourClassesHint")} icon={<Icon name="structure" />} />
           <div className="p-5 flex flex-wrap gap-2.5">
             {classes.map(([classId, className]) => (
               <Link

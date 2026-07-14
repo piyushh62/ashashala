@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import type { LearningFeedItemOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Skeleton } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "../../components/ui";
 
 export default function StudentToday() {
   const { t } = useTranslation();
@@ -20,7 +20,7 @@ export default function StudentToday() {
         <EmptyState
           title={t("student.today.nothingScheduled")}
           hint={t("student.today.nothingScheduledHint")}
-          icon="🌿"
+          icon={<Icon name="wellbeing" />}
         />
       ) : (
         <div className="space-y-5">
@@ -42,7 +42,7 @@ function FeedCard({ item }: { item: LearningFeedItemOut }) {
       <CardHeader
         title={item.topic}
         subtitle={t("student.today.periodLabel", { n: item.period_number })}
-        icon="📖"
+        icon={<Icon name="today" />}
         action={<Badge tone="brand">{t("student.today.explainer")}</Badge>}
       />
       <div className="p-5 space-y-5">

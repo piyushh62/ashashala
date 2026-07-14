@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, Input, Label, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, Input, Label, Pager, Select, Skeleton, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
@@ -116,34 +116,6 @@ export default function SchoolStructure() {
     <div className="p-5 grid md:grid-cols-4 gap-3 items-end">{children}</div>
   );
 
-  // Minimal Prev/Next footer shared by the three paginated join-tables below.
-  const Pager = ({
-    offset, limit, total, count, onOffsetChange,
-  }: {
-    offset: number;
-    limit: number;
-    total: number;
-    count: number;
-    onOffsetChange: (next: number) => void;
-  }) => {
-    if (total === 0) return null;
-    const rangeStart = offset + 1;
-    const rangeEnd = offset + count;
-    return (
-      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 text-sm text-slate-500">
-        <span>{t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}</span>
-        <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => onOffsetChange(Math.max(0, offset - limit))} disabled={offset === 0}>
-            {t("common.previous")}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => onOffsetChange(offset + limit)} disabled={rangeEnd >= total}>
-            {t("common.next")}
-          </Button>
-        </div>
-      </div>
-    );
-  };
-
   const ClassPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <Select value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{classes.isLoading ? t("common.loading") : t("school.structure.selectAClass")}</option>
@@ -163,21 +135,32 @@ export default function SchoolStructure() {
   );
 
   const UserPicker = ({
-    users, loading, value, onChange, placeholder,
+    users, loading, value, onChange, placeholder, total,
   }: {
     users?: { id: string; name: string; email: string }[];
     loading: boolean;
     value: string;
     onChange: (v: string) => void;
     placeholder: string;
-  }) => (
-    <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{loading ? t("common.loading") : placeholder}</option>
-      {users?.map((u) => (
-        <option key={u.id} value={u.id}>{t("school.structure.userEmailOption", { name: u.name, email: u.email })}</option>
-      ))}
-    </Select>
-  );
+    total?: number;
+  }) => {
+    const truncated = total != null && users != null && users.length < total;
+    return (
+      <div>
+        <Select value={value} onChange={(e) => onChange(e.target.value)}>
+          <option value="">{loading ? t("common.loading") : placeholder}</option>
+          {users?.map((u) => (
+            <option key={u.id} value={u.id}>{t("school.structure.userEmailOption", { name: u.name, email: u.email })}</option>
+          ))}
+        </Select>
+        {truncated && (
+          <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+            {t("school.structure.pickerTruncated", { shown: users!.length, total })}
+          </p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div>
@@ -214,7 +197,7 @@ export default function SchoolStructure() {
           <Row>
             <div>
               <Label>{t("school.structure.teacher")}</Label>
-              <UserPicker users={teachers.data?.items} loading={teachers.isLoading} placeholder={t("school.structure.selectATeacher")}
+              <UserPicker users={teachers.data?.items} total={teachers.data?.total} loading={teachers.isLoading} placeholder={t("school.structure.selectATeacher")}
                 value={assign.teacher_id} onChange={(v) => setAssign({ ...assign, teacher_id: v })} />
             </div>
             <div><Label>{t("school.structure.class")}</Label><ClassPicker value={assign.class_id} onChange={(v) => setAssign({ ...assign, class_id: v })} /></div>
@@ -269,7 +252,7 @@ export default function SchoolStructure() {
                       </tr>
                     ))}
                   </Table>
-                  <Pager offset={taOffset} limit={PAGE_SIZE} total={page.total} count={page.items.length} onOffsetChange={setTaOffset} />
+                  <Pager offset={taOffset} limit={PAGE_SIZE} total={page.total} count={page.items.length} onOffsetChange={setTaOffset} className="border-t border-slate-100 dark:border-slate-800" />
                 </>
               )}
             </DataBoundary>
@@ -289,7 +272,7 @@ export default function SchoolStructure() {
           <Row>
             <div>
               <Label>{t("school.structure.student")}</Label>
-              <UserPicker users={students.data?.items} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
+              <UserPicker users={students.data?.items} total={students.data?.total} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
                 value={enroll.student_id} onChange={(v) => setEnroll({ ...enroll, student_id: v })} />
             </div>
             <div><Label>{t("school.structure.class")}</Label><ClassPicker value={enroll.class_id} onChange={(v) => setEnroll({ ...enroll, class_id: v })} /></div>
@@ -342,7 +325,7 @@ export default function SchoolStructure() {
                       </tr>
                     ))}
                   </Table>
-                  <Pager offset={enrollOffset} limit={PAGE_SIZE} total={page.total} count={page.items.length} onOffsetChange={setEnrollOffset} />
+                  <Pager offset={enrollOffset} limit={PAGE_SIZE} total={page.total} count={page.items.length} onOffsetChange={setEnrollOffset} className="border-t border-slate-100 dark:border-slate-800" />
                 </>
               )}
             </DataBoundary>
@@ -354,12 +337,12 @@ export default function SchoolStructure() {
           <Row>
             <div>
               <Label>{t("school.structure.parent")}</Label>
-              <UserPicker users={parents.data?.items} loading={parents.isLoading} placeholder={t("school.structure.selectAParent")}
+              <UserPicker users={parents.data?.items} total={parents.data?.total} loading={parents.isLoading} placeholder={t("school.structure.selectAParent")}
                 value={link.parent_id} onChange={(v) => setLink({ ...link, parent_id: v })} />
             </div>
             <div>
               <Label>{t("school.structure.student")}</Label>
-              <UserPicker users={students.data?.items} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
+              <UserPicker users={students.data?.items} total={students.data?.total} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
                 value={link.student_id} onChange={(v) => setLink({ ...link, student_id: v })} />
             </div>
           </Row>
@@ -407,7 +390,7 @@ export default function SchoolStructure() {
                       </tr>
                     ))}
                   </Table>
-                  <Pager offset={linkOffset} limit={PAGE_SIZE} total={page.total} count={page.items.length} onOffsetChange={setLinkOffset} />
+                  <Pager offset={linkOffset} limit={PAGE_SIZE} total={page.total} count={page.items.length} onOffsetChange={setLinkOffset} className="border-t border-slate-100 dark:border-slate-800" />
                 </>
               )}
             </DataBoundary>

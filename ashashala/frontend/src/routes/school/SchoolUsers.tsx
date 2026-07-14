@@ -7,7 +7,7 @@ import { z } from "zod";
 import { schoolApi } from "../../api/endpoints";
 import type { Role, UserRow } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Input, Pager, Select, Skeleton, Table } from "../../components/ui";
 import { FormField } from "../../components/ui/FormField";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
@@ -78,8 +78,6 @@ export default function SchoolUsers() {
   });
   const userRows = users.data?.items ?? [];
   const total = users.data?.total ?? 0;
-  const rangeStart = total === 0 ? 0 : offset + 1;
-  const rangeEnd = offset + userRows.length;
 
   const {
     register,
@@ -362,8 +360,8 @@ export default function SchoolUsers() {
         <CardHeader
           title={t("school.users.allUsers")}
           action={
-            <select
-              className="text-sm border border-slate-300 rounded-lg px-2 py-1"
+            <Select
+              className="w-40"
               value={filter}
               onChange={(e) => changeFilter(e.target.value as Role | "")}
             >
@@ -373,7 +371,7 @@ export default function SchoolUsers() {
                   {t(ROLE_TITLE_KEY[r])}
                 </option>
               ))}
-            </select>
+            </Select>
           }
         />
         <div className="p-2">
@@ -442,31 +440,7 @@ export default function SchoolUsers() {
               ))}
             </Table>
           )}
-          {total > 0 && (
-            <div className="flex items-center justify-between px-3 py-3 text-sm text-slate-500">
-              <span>
-                {t("common.rangeOfTotal", { start: rangeStart, end: rangeEnd, total })}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}
-                  disabled={offset === 0}
-                >
-                  {t("common.previous")}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setOffset(offset + PAGE_SIZE)}
-                  disabled={rangeEnd >= total}
-                >
-                  {t("common.next")}
-                </Button>
-              </div>
-            </div>
-          )}
+          <Pager offset={offset} limit={PAGE_SIZE} total={total} count={userRows.length} onOffsetChange={setOffset} />
         </div>
       </Card>
       {confirm.dialog}

@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next";
 import { studentApi } from "../../api/endpoints";
 import type { QuizOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Button, Card, EmptyState, Spinner } from "../../components/ui";
+import { Button, Card, EmptyState, Icon, Spinner } from "../../components/ui";
 import { QuizGame } from "../../components/quiz/QuizGame";
 import { useToast } from "../../components/ui/Toast";
 
@@ -39,7 +39,7 @@ export default function StudentQuiz() {
           <EmptyState title={t("student.quiz.notEnrolled")} />
         ) : (
           <>
-            <div className="text-5xl mb-3">🧠</div>
+            <div className="mb-3"><Icon name="quiz" className="w-12 h-12 mx-auto" /></div>
             <p className="text-slate-600 mb-5">{t("student.quiz.readyToPractice")}</p>
             <Button onClick={() => start.mutate(classId)} disabled={start.isPending}>
               {start.isPending ? t("student.quiz.generating") : t("student.quiz.startQuiz")}

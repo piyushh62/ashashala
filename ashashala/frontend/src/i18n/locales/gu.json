@@ -269,7 +269,8 @@
       "assignmentEndDated": "સોંપણીની સમાપ્તિ તારીખ સેટ થઈ.",
       "enrollmentEndDated": "નોંધણીની સમાપ્તિ તારીખ સેટ થઈ.",
       "classGradeOption": "{{name}} (ધોરણ {{grade}})",
-      "userEmailOption": "{{name}} ({{email}})"
+      "userEmailOption": "{{name}} ({{email}})",
+      "pickerTruncated": "{{total}} માંથી પ્રથમ {{shown}} બતાવ્યા છે. કેટલીક એન્ટ્રીઓ અહીં પસંદ કરી શકાતી નથી."
     },
     "users": {
       "subtitle": "શિક્ષકો, વિદ્યાર્થીઓ અને વાલીઓને આમંત્રિત કરો.",

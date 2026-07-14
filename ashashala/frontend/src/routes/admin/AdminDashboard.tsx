@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { adminApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Card, CardHeader, EmptyState, ProgressBar, Skeleton, StatTile } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, Icon, ProgressBar, Skeleton, StatTile } from "../../components/ui";
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -35,19 +35,19 @@ export default function AdminDashboard() {
       <PageTitle subtitle={t("admin.dashboard.subtitle")}>{t("admin.dashboard.title")}</PageTitle>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatTile label={t("admin.dashboard.activeSchools")} value={d?.active_schools ?? 0} icon="🏫" tone="brand" />
-        <StatTile label={t("admin.dashboard.totalUsers")} value={d?.total_users ?? 0} icon="👥" tone="green" />
+        <StatTile label={t("admin.dashboard.activeSchools")} value={d?.active_schools ?? 0} icon={<Icon name="schools" />} tone="brand" />
+        <StatTile label={t("admin.dashboard.totalUsers")} value={d?.total_users ?? 0} icon={<Icon name="users" />} tone="green" />
         <StatTile
           label={t("admin.dashboard.llmErrorRate")}
           value={`${Math.round((d?.error_rate ?? 0) * 100)}%`}
-          icon="⚠️"
+          icon={<Icon name="alert" />}
           tone={(d?.error_rate ?? 0) > 0.1 ? "rose" : "amber"}
         />
-        <StatTile label={t("admin.dashboard.tokensToday")} value={totalToday.toLocaleString()} icon="⚡" tone="slate" />
+        <StatTile label={t("admin.dashboard.tokensToday")} value={totalToday.toLocaleString()} icon={<Icon name="activity" />} tone="slate" />
       </div>
 
       <Card className="mb-6">
-        <CardHeader title={t("admin.dashboard.tokenUsageTrend")} subtitle={t("admin.dashboard.tokenUsageTrendSubtitle")} icon="📈" />
+        <CardHeader title={t("admin.dashboard.tokenUsageTrend")} subtitle={t("admin.dashboard.tokenUsageTrendSubtitle")} icon={<Icon name="trend" />} />
         <div className="p-5">
           {!d?.tokens_by_day.length ? (
             <p className="text-sm text-slate-400 text-center py-6">{t("admin.dashboard.noUsageRecorded")}</p>
@@ -72,10 +72,10 @@ export default function AdminDashboard() {
       </Card>
 
       <Card>
-        <CardHeader title={t("admin.dashboard.tokenUsageToday")} subtitle={t("admin.dashboard.perSchool")} icon="📊" />
+        <CardHeader title={t("admin.dashboard.tokenUsageToday")} subtitle={t("admin.dashboard.perSchool")} icon={<Icon name="platform" />} />
         <div className="p-5 space-y-4">
           {perSchool.length === 0 ? (
-            <EmptyState title={t("admin.dashboard.noUsageRecordedTitle")} icon="📈" />
+            <EmptyState title={t("admin.dashboard.noUsageRecordedTitle")} icon={<Icon name="trend" />} />
           ) : (
             perSchool.map(([school, tokens]) => (
               <div key={school}>

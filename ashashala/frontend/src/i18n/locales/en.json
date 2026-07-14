@@ -269,7 +269,8 @@
       "assignmentEndDated": "Assignment end-dated.",
       "enrollmentEndDated": "Enrollment end-dated.",
       "classGradeOption": "{{name}} (Grade {{grade}})",
-      "userEmailOption": "{{name}} ({{email}})"
+      "userEmailOption": "{{name}} ({{email}})",
+      "pickerTruncated": "Showing first {{shown}} of {{total}}. Some entries may not be selectable here."
     },
     "users": {
       "subtitle": "Invite teachers, students and parents.",

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Command } from "cmdk";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { Icon } from "../ui";
 import type { NavItem } from "./AppLayout";
 
 export interface SearchSource<T> {
@@ -81,7 +82,9 @@ export function CommandPalette({
               onSelect={() => go(n.to)}
               className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm cursor-pointer text-slate-700 dark:text-slate-200 data-[selected=true]:bg-slate-100 dark:data-[selected=true]:bg-slate-800"
             >
-              <span className="text-base w-5 text-center">{n.icon}</span>
+              <span className="w-5 grid place-items-center">
+                <Icon name={n.icon} className="w-4 h-4" />
+              </span>
               {n.label}
             </Command.Item>
           ))}

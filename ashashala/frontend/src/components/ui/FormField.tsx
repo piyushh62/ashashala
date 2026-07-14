@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AlertCircle } from "lucide-react";
 import { Label } from "./index";
 
 /**
@@ -28,7 +29,7 @@ export function FormField({
       {children}
       {error ? (
         <p className="text-xs text-rose-600 mt-1.5 flex items-center gap-1">
-          <span aria-hidden>⚠</span> {error}
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden /> {error}
         </p>
       ) : (
         hint && <p className="text-xs text-slate-400 mt-1.5">{hint}</p>

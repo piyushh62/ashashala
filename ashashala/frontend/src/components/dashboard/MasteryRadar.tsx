@@ -9,13 +9,13 @@ import {
 } from "recharts";
 import { useTranslation } from "react-i18next";
 import type { MasteryItem } from "../../types/api";
-import { EmptyState } from "../ui";
+import { EmptyState, Icon } from "../ui";
 
 // Single-series magnitude on a radial layout → one brand hue, recessive grid,
 // hover tooltip (dataviz mark specs). No legend needed for one series.
 export function MasteryRadar({ data }: { data: MasteryItem[] }) {
   const { t } = useTranslation();
-  if (!data.length) return <EmptyState title={t("student.mastery.noMasteryYet")} hint={t("student.mastery.takeQuizHint")} icon="🧠" />;
+  if (!data.length) return <EmptyState title={t("student.mastery.noMasteryYet")} hint={t("student.mastery.takeQuizHint")} icon={<Icon name="mastery" />} />;
 
   const padded = [...data];
   while (padded.length < 3) padded.push({ topic: "", score: 0 });

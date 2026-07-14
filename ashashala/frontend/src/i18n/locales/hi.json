@@ -269,7 +269,8 @@
       "assignmentEndDated": "नियुक्ति समाप्ति तिथि निर्धारित की गई।",
       "enrollmentEndDated": "नामांकन समाप्ति तिथि निर्धारित की गई।",
       "classGradeOption": "{{name}} (कक्षा {{grade}})",
-      "userEmailOption": "{{name}} ({{email}})"
+      "userEmailOption": "{{name}} ({{email}})",
+      "pickerTruncated": "{{total}} में से पहले {{shown}} दिखाए जा रहे हैं। कुछ प्रविष्टियाँ यहाँ चयन योग्य नहीं हो सकतीं।"
     },
     "users": {
       "subtitle": "शिक्षकों, छात्रों और अभिभावकों को आमंत्रित करें।",

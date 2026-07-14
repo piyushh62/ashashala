@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
+import { Menu, Search, X } from "lucide-react";
 import { useAuth } from "../../stores/auth";
-import { Avatar } from "../ui";
+import { Avatar, Icon, type IconName } from "../ui";
 import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from "../ui/Dropdown";
 import { NotificationBell } from "./NotificationBell";
 import { CommandPalette, type SearchSource } from "./CommandPalette";
@@ -13,7 +14,7 @@ import { ConnectivityBanner } from "./ConnectivityBanner";
 export interface NavItem {
   to: string;
   label: string;
-  icon: string;
+  icon: IconName;
   permission?: string;
 }
 
@@ -63,7 +64,9 @@ function NavLinks({ nav, onNavigate }: { nav: NavItem[]; onNavigate?: () => void
                   isActive ? "opacity-100" : "opacity-0"
                 }`}
               />
-              <span className="text-lg w-6 text-center">{n.icon}</span>
+              <span className="w-6 grid place-items-center">
+                <Icon name={n.icon} className="w-[18px] h-[18px]" />
+              </span>
               {n.label}
             </>
           )}
@@ -124,7 +127,9 @@ function UserMenu({ onLogout }: { onLogout: () => void }) {
       <DropdownLabel>{user?.role ? t(ROLE_LABEL_KEY[user.role]) : t("layout.account")}</DropdownLabel>
       <div className="px-3 pb-2 text-xs text-slate-400 truncate">{user?.email}</div>
       <DropdownSeparator />
-      <DropdownItem onSelect={() => navigate("/settings")}>⚙️ {t("nav.settings")}</DropdownItem>
+      <DropdownItem onSelect={() => navigate("/settings")}>
+        <Icon name="settings" className="w-4 h-4" /> {t("nav.settings")}
+      </DropdownItem>
       <DropdownItem danger onSelect={onLogout}>
         {t("layout.logout")}
       </DropdownItem>
@@ -197,7 +202,7 @@ export function AppLayout({
                 <div className="font-bold text-slate-800 dark:text-slate-100 leading-tight">AshaShala</div>
               </div>
               <Dialog.Close className="w-8 h-8 grid place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-300">
-                ✕
+                <X className="w-5 h-5" />
               </Dialog.Close>
             </div>
             <NavLinks nav={nav} onNavigate={() => setDrawerOpen(false)} />
@@ -215,7 +220,7 @@ export function AppLayout({
             aria-label={t("layout.openNav")}
             className="w-9 h-9 grid place-items-center rounded-lg text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
           >
-            ☰
+            <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 font-bold text-brand-600">
             <Logo compact />
@@ -243,7 +248,7 @@ export function AppLayout({
               onClick={() => setPaletteOpen(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm text-slate-400 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 transition"
             >
-              <span>🔎</span>
+              <Search className="w-4 h-4" />
               <span>{t("layout.search")}</span>
               <kbd className="text-[10px] font-medium text-slate-400 border border-slate-300 dark:border-slate-600 rounded px-1">
                 ⌘K

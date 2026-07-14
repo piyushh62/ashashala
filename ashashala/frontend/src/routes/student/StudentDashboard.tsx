@@ -5,7 +5,7 @@ import { Line, LineChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { studentApi } from "../../api/endpoints";
 import { MasteryRadar } from "../../components/dashboard/MasteryRadar";
 import { TimetableGrid } from "../../components/dashboard/TimetableGrid";
-import { Card, CardHeader, Skeleton } from "../../components/ui";
+import { Card, CardHeader, Icon, Skeleton } from "../../components/ui";
 
 const tooltipStyle = {
   borderRadius: 12,
@@ -60,8 +60,8 @@ export default function StudentDashboard() {
       <Link to="/student/today" className="block mb-6 group">
         <div className="rounded-2xl px-5 py-4 bg-white border border-slate-200/70 shadow-card flex items-center justify-between gap-4 transition group-hover:border-brand-200 group-hover:shadow-soft">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 grid place-items-center text-lg shrink-0">
-              📖
+            <div className="w-10 h-10 rounded-xl bg-brand-50 text-brand-600 grid place-items-center shrink-0">
+              <Icon name="today" className="w-5 h-5" />
             </div>
             <div>
               <div className="font-semibold text-slate-800">{t("student.dashboard.todaysLearning")}</div>
@@ -74,20 +74,20 @@ export default function StudentDashboard() {
 
       <div className="grid lg:grid-cols-2 gap-6">
         <Card>
-          <CardHeader title={t("student.dashboard.yourMastery")} icon="🎯" />
+          <CardHeader title={t("student.dashboard.yourMastery")} icon={<Icon name="target" />} />
           <div className="p-4">
             {dash.isLoading ? <Skeleton className="h-64" /> : <MasteryRadar data={dash.data?.mastery ?? []} />}
           </div>
         </Card>
 
         <Card>
-          <CardHeader title={t("student.dashboard.thisWeek")} icon="🗓️" />
+          <CardHeader title={t("student.dashboard.thisWeek")} icon={<Icon name="timetable" />} />
           <div className="p-4">{tt.isLoading ? <Skeleton className="h-40" /> : <TimetableGrid rows={tt.data ?? []} />}</div>
         </Card>
       </div>
 
       <Card className="mt-6">
-        <CardHeader title={t("student.dashboard.quizScoreTrend")} icon="📈" />
+        <CardHeader title={t("student.dashboard.quizScoreTrend")} icon={<Icon name="trend" />} />
         <div className="p-5">
           {hist.isLoading ? (
             <Skeleton className="h-40" />
@@ -108,7 +108,7 @@ export default function StudentDashboard() {
       </Card>
 
       <Card className="mt-6">
-        <CardHeader title={t("student.dashboard.upcomingExams")} icon="📝" />
+        <CardHeader title={t("student.dashboard.upcomingExams")} icon={<Icon name="exams" />} />
         <div className="p-5">
           {exams.isLoading ? (
             <Skeleton className="h-16" />

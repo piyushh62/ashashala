@@ -5,6 +5,10 @@ import {
   type ReactNode,
   type SelectHTMLAttributes,
 } from "react";
+import { Icon } from "./icons";
+
+export { Icon, ICONS, type IconName } from "./icons";
+export { Pager } from "./Pager";
 
 /* ---------------------------------- Card --------------------------------- */
 
@@ -147,10 +151,20 @@ export function Skeleton({ className = "" }: { className?: string }) {
   );
 }
 
-export function EmptyState({ title, hint, icon = "✨" }: { title: string; hint?: string; icon?: ReactNode }) {
+export function EmptyState({
+  title,
+  hint,
+  icon = <Icon name="sparkles" className="w-6 h-6" />,
+}: {
+  title: string;
+  hint?: string;
+  icon?: ReactNode;
+}) {
   return (
     <div className="text-center py-14 px-6">
-      <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 grid place-items-center text-2xl mb-3">{icon}</div>
+      <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-400 dark:text-slate-500 mb-3">
+        {icon}
+      </div>
       <p className="font-semibold text-slate-600 dark:text-slate-300">{title}</p>
       {hint && <p className="text-sm mt-1 text-slate-400">{hint}</p>}
     </div>

@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { useTranslation } from "react-i18next";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Card, CardHeader, EmptyState, Skeleton, StatTile, Table } from "../../components/ui";
+import { Badge, Card, CardHeader, EmptyState, Icon, Skeleton, StatTile, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 
 const tooltipStyle = {
@@ -32,10 +32,10 @@ export default function SchoolDashboard() {
 
   const d = q.data;
   const tiles = [
-    { label: t("school.dashboard.teachers"), value: d?.teachers ?? 0, icon: "🧑‍🏫", tone: "brand" as const },
-    { label: t("school.dashboard.students"), value: d?.students ?? 0, icon: "🎓", tone: "green" as const },
-    { label: t("school.dashboard.classes"), value: d?.classes ?? 0, icon: "🗂️", tone: "slate" as const },
-    { label: t("school.dashboard.avgMastery"), value: `${d?.avg_mastery ?? 0}`, icon: "📈", tone: "amber" as const },
+    { label: t("school.dashboard.teachers"), value: d?.teachers ?? 0, icon: <Icon name="teacher" />, tone: "brand" as const },
+    { label: t("school.dashboard.students"), value: d?.students ?? 0, icon: <Icon name="students" />, tone: "green" as const },
+    { label: t("school.dashboard.classes"), value: d?.classes ?? 0, icon: <Icon name="structure" />, tone: "slate" as const },
+    { label: t("school.dashboard.avgMastery"), value: `${d?.avg_mastery ?? 0}`, icon: <Icon name="trend" />, tone: "amber" as const },
   ];
 
   return (
@@ -53,7 +53,7 @@ export default function SchoolDashboard() {
           <CardHeader
             title={t("school.dashboard.atRiskStudents")}
             subtitle={t("school.dashboard.lowestAvgMastery")}
-            icon="🚨"
+            icon={<Icon name="critical" />}
           />
           <div className="p-2">
             <DataBoundary
@@ -81,7 +81,7 @@ export default function SchoolDashboard() {
         </Card>
 
         <Card>
-          <CardHeader title={t("school.dashboard.masteryByClass")} icon="🗂️" />
+          <CardHeader title={t("school.dashboard.masteryByClass")} icon={<Icon name="structure" />} />
           <div className="p-5">
             <DataBoundary
               query={mastery}
@@ -109,7 +109,7 @@ export default function SchoolDashboard() {
         <CardHeader
           title={t("school.dashboard.llmUsage")}
           subtitle={t("school.dashboard.llmUsageSubtitle")}
-          icon="⚡"
+          icon={<Icon name="activity" />}
           action={
             usage.data?.over_quota ? (
               <Badge tone="red">{t("school.dashboard.overQuota")}</Badge>
@@ -147,7 +147,7 @@ export default function SchoolDashboard() {
       </Card>
 
       <Card>
-        <CardHeader title={t("school.dashboard.recentActivity")} icon="📜" />
+        <CardHeader title={t("school.dashboard.recentActivity")} icon={<Icon name="audit" />} />
         <div className="p-2">
           {activity.isLoading ? (
             <Skeleton className="h-32 m-3" />

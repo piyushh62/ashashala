@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, type ComponentType, type ReactNode } from "react";
+import { Check, Info, X } from "lucide-react";
 
 type ToastKind = "success" | "error" | "info";
 interface Toast {
@@ -28,10 +29,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ push }), [push]);
 
-  const meta: Record<ToastKind, { ring: string; icon: string; iconBg: string }> = {
-    success: { ring: "border-emerald-200", icon: "✓", iconBg: "bg-emerald-500" },
-    error: { ring: "border-rose-200", icon: "!", iconBg: "bg-rose-500" },
-    info: { ring: "border-slate-200", icon: "i", iconBg: "bg-slate-700" },
+  const meta: Record<ToastKind, { ring: string; icon: ComponentType<{ className?: string }>; iconBg: string }> = {
+    success: { ring: "border-emerald-200", icon: Check, iconBg: "bg-emerald-500" },
+    error: { ring: "border-rose-200", icon: X, iconBg: "bg-rose-500" },
+    info: { ring: "border-slate-200", icon: Info, iconBg: "bg-slate-700" },
   };
 
   return (
@@ -43,11 +44,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             key={t.id}
             className={`flex items-center gap-3 bg-white text-slate-700 text-sm pl-3 pr-4 py-2.5 rounded-xl shadow-soft border ${meta[t.kind].ring} max-w-xs animate-slide-up`}
           >
-            <span
-              className={`w-6 h-6 rounded-full ${meta[t.kind].iconBg} text-white grid place-items-center text-xs font-bold shrink-0`}
-            >
-              {meta[t.kind].icon}
-            </span>
+            {(() => {
+              const ToastIcon = meta[t.kind].icon;
+              return (
+                <span
+                  className={`w-6 h-6 rounded-full ${meta[t.kind].iconBg} text-white grid place-items-center shrink-0`}
+                >
+                  <ToastIcon className="w-3.5 h-3.5" />
+                </span>
+              );
+            })()}
             <span className="min-w-0">{t.message}</span>
           </div>
         ))}
