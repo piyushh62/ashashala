@@ -9,7 +9,7 @@ server state via TanStack Query, charts via Recharts, routing via React Router.
 cd frontend
 cp .env.example .env        # leave VITE_API_URL blank to use the Vite dev proxy
 npm install
-npm run dev                 # http://localhost:5173
+npm run dev                 # http://localhost:3000
 ```
 
 The Vite dev server proxies `/api/*` to the backend at `http://localhost:8000`

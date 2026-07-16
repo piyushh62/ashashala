@@ -8,8 +8,8 @@ import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Button, Card, CardHeader, Input } from "../../components/ui";
 import { FormField } from "../../components/ui/FormField";
-import { Modal } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
+import { TempCredentialModal } from "../../components/TempCredentialModal";
 
 const studentSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -122,36 +122,7 @@ export default function TeacherStudents() {
         </form>
       </Card>
 
-      <Modal
-        open={!!tempCredential}
-        onOpenChange={(open) => !open && setTempCredential(null)}
-        title={t("teacher.students.tempPasswordTitle")}
-        description={t("teacher.students.tempPasswordDesc")}
-        size="sm"
-      >
-        {tempCredential && (
-          <div className="space-y-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("teacher.students.email")}</div>
-              <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("teacher.students.tempPasswordLabel")}</div>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
-                  {tempCredential.password}
-                </code>
-                <Button type="button" variant="ghost" size="sm" onClick={() => navigator.clipboard.writeText(tempCredential.password)}>
-                  {t("teacher.students.copy")}
-                </Button>
-              </div>
-            </div>
-            <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
-              {t("teacher.students.done")}
-            </Button>
-          </div>
-        )}
-      </Modal>
+      <TempCredentialModal credential={tempCredential} onClose={() => setTempCredential(null)} />
     </div>
   );
 }

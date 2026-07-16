@@ -38,7 +38,13 @@
       "fri": "शुक्र",
       "sat": "शनि",
       "sun": "रवि"
-    }
+    },
+    "email": "ईमेल",
+    "tempPasswordTitle": "अस्थायी पासवर्ड",
+    "tempPasswordDesc": "इस पासवर्ड को सुरक्षित रूप से साझा करें — यह फिर से नहीं दिखाया जाएगा।",
+    "tempPasswordLabel": "अस्थायी पासवर्ड",
+    "copy": "कॉपी करें",
+    "done": "हो गया"
   },
   "nav": {
     "schools": "स्कूल",
@@ -61,7 +67,21 @@
     "tutor": "ट्यूटर",
     "quiz": "प्रश्नोत्तरी",
     "history": "इतिहास",
-    "children": "बच्चे"
+    "children": "बच्चे",
+    "schoolList": "स्कूल सूची",
+    "addSchool": "स्कूल जोड़ें",
+    "roleList": "भूमिका सूची",
+    "addRole": "भूमिका जोड़ें",
+    "userList": "उपयोगकर्ता सूची",
+    "addUser": "उपयोगकर्ता जोड़ें",
+    "structureOverview": "अवलोकन",
+    "structureAdd": "जोड़ें / सौंपें",
+    "materialList": "सामग्री सूची",
+    "addMaterial": "सामग्री जोड़ें",
+    "assignmentList": "असाइनमेंट सूची",
+    "addAssignment": "असाइनमेंट जोड़ें",
+    "timetableView": "साप्ताहिक दृश्य",
+    "addPeriod": "पीरियड जोड़ें"
   },
   "roleTitle": {
     "superAdmin": "सुपर एडमिन",
@@ -83,10 +103,10 @@
     "heroHeading1": "हर छात्र के लिए",
     "heroHeading2": "एक धैर्यवान एआई ट्यूटर।",
     "heroSubtitle": "उद्धृत उत्तर, उदाहरण-आधारित शिक्षण, और मूल गुजराती और हिंदी में — पूरे स्कूल को चलाने के उपकरणों के साथ।",
-    "pillCited": "📚 उद्धृत उत्तर",
-    "pillVoice": "🗣️ गुजराती में आवाज़",
-    "pillQuiz": "🧠 अनुकूली प्रश्नोत्तरी",
-    "pillTenant": "🔒 टेनेंट-पृथक",
+    "pillCited": "उद्धृत उत्तर",
+    "pillVoice": "गुजराती में आवाज़",
+    "pillQuiz": "अनुकूली प्रश्नोत्तरी",
+    "pillTenant": "टेनेंट-पृथक",
     "footer": "मुफ़्त, ओपन-सोर्स, स्व-होस्ट करने योग्य।",
     "welcomeBack": "वापसी पर स्वागत है",
     "signInToContinue": "जारी रखने के लिए साइन इन करें।",
@@ -174,8 +194,8 @@
       "masteryByClass": "कक्षा अनुसार निपुणता",
       "llmUsage": "एलएलएम उपयोग",
       "llmUsageSubtitle": "फ्री-टियर कोटा के विरुद्ध खर्च किए गए टोकन (7 दिन)।",
-      "overQuota": "⚠ दैनिक कोटा से अधिक",
-      "withinQuota": "✓ कोटा के भीतर",
+      "overQuota": "दैनिक कोटा से अधिक",
+      "withinQuota": "कोटा के भीतर",
       "tokensToday": "आज के टोकन",
       "callsToday": "आज की कॉल्स",
       "errorRate": "त्रुटि दर",
@@ -332,7 +352,10 @@
       "absenceRecordedWithSubs": "अनुपस्थिति दर्ज की गई — {{count}} विकल्प सुझाव अनुमोदन के लिए कतारबद्ध।",
       "absenceRecordedNoClasses": "अनुपस्थिति दर्ज की गई — उस दिन कोई कक्षा निर्धारित नहीं थी।",
       "absenceRecordFailed": "अनुपस्थिति दर्ज नहीं की जा सकी।",
-      "gradeRequiredForStudents": "छात्रों के लिए कक्षा आवश्यक है"
+      "gradeRequiredForStudents": "छात्रों के लिए कक्षा आवश्यक है",
+      "exportExcel": "एक्सेल निर्यात करें",
+      "bulkDropzoneLabel": "CSV यहाँ खींचें, या ब्राउज़ करने के लिए क्लिक करें",
+      "bulkDropzoneHint": "name, email, role कॉलम वाली CSV फ़ाइल"
     }
   },
   "teacher": {
@@ -417,7 +440,8 @@
       "colSubject": "विषय",
       "colDate": "तारीख",
       "colTime": "समय",
-      "colDuration": "अवधि"
+      "colDuration": "अवधि",
+      "selectDate": "तारीख़ चुनें"
     },
     "flagged": {
       "subtitle": "आपकी समीक्षा की प्रतीक्षा कर रहे कम-विश्वास वाले AI ग्रेड।",
@@ -471,7 +495,9 @@
       "publishing": "प्रकाशित हो रहा है…",
       "approveAndPublish": "स्वीकृत करें और प्रकाशित करें",
       "invalidUrl": "एक मान्य URL दर्ज करें (https:// सहित)",
-      "invalidYoutubeUrl": "एक मान्य YouTube URL दर्ज करें"
+      "invalidYoutubeUrl": "एक मान्य YouTube URL दर्ज करें",
+      "dropzoneLabel": "फ़ाइल यहाँ खींचें, या ब्राउज़ करने के लिए क्लिक करें",
+      "dropzoneHint": "PDF, DOCX, TXT, JPG या PNG"
     },
     "messages": {
       "subtitle": "किसी छात्र के अभिभावक को सीधे संदेश भेजें।",
@@ -535,7 +561,7 @@
       "aiSuggestSubtitle": "अनुसूचन एजेंट को ऊपर चयनित कक्षा/विषय के लिए संघर्ष-मुक्त विकल्प सुझाने दें।",
       "periodsPerWeek": "प्रति सप्ताह पीरियड",
       "generating": "उत्पन्न हो रहा है…",
-      "suggestOptions": "✨ विकल्प सुझाएँ",
+      "suggestOptions": "विकल्प सुझाएँ",
       "periodLabel": "{{day}}, पीरियड {{period}}",
       "useThisOption": "यह विकल्प उपयोग करें",
       "myWeeklyPeriods": "मेरे साप्ताहिक पीरियड",
@@ -679,8 +705,8 @@
       "greeting": "नमस्ते {{name}}! 👋",
       "recommendedTopic": "आपके शिक्षक ने अगली बार “{{topic}}” दोहराने का सुझाव दिया है।",
       "readyToLearn": "आज कुछ नया सीखने के लिए तैयार हैं?",
-      "askTutor": "💬 ट्यूटर से पूछें",
-      "practice": "🧠 अभ्यास करें",
+      "askTutor": "ट्यूटर से पूछें",
+      "practice": "अभ्यास करें",
       "todaysLearning": "आज की पढ़ाई",
       "todaysLearningHint": "आपकी आज की समय-सारणी की हर कक्षा के लिए एक संक्षिप्त व्याख्या।",
       "viewArrow": "देखें →",
@@ -755,13 +781,13 @@
     },
     "voice": {
       "speakAloud": "उत्तर बोलकर सुनाएँ",
-      "voiceOn": "🔊 आवाज़ चालू",
-      "voiceOff": "🔈 आवाज़ बंद",
+      "voiceOn": "आवाज़ चालू",
+      "voiceOff": "आवाज़ बंद",
       "notSupported": "इस ब्राउज़र में वॉइस इनपुट समर्थित नहीं है — Chrome या Edge आज़माएँ।",
       "couldntHear": "सुनाई नहीं दिया — फिर से प्रयास करें।",
       "holdToSpeak": "बोलने के लिए दबाकर रखें",
       "listening": "● सुन रहा है",
-      "hold": "🎤 दबाकर रखें"
+      "hold": "दबाकर रखें"
     },
     "mastery": {
       "noMasteryYet": "अभी तक कोई दक्षता नहीं",
@@ -785,8 +811,8 @@
     },
     "child": {
       "allChildren": "← सभी बच्चे",
-      "reports": "📄 रिपोर्ट",
-      "messages": "💬 संदेश",
+      "reports": "रिपोर्ट",
+      "messages": "संदेश",
       "subtitle": "केवल-पठन प्रगति अवलोकन।",
       "defaultName": "बच्चा",
       "mastery": "दक्षता",
@@ -818,7 +844,7 @@
       "noReportsSentYetHint": "तैयार होने पर आपके बच्चे के शिक्षक यहाँ रिपोर्ट प्रकाशित करेंगे।",
       "sentOn": "{{date}} को भेजी गई",
       "downloading": "डाउनलोड हो रहा है…",
-      "downloadPdf": "⬇ PDF",
+      "downloadPdf": "PDF",
       "downloadFailed": "रिपोर्ट PDF डाउनलोड नहीं हो सकी।",
       "masterySnapshot": "दक्षता स्नैपशॉट",
       "teacherNotes": "शिक्षक की टिप्पणियाँ"

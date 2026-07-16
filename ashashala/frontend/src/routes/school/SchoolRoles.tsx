@@ -1,20 +1,14 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
+import { useNavigate } from "react-router-dom";
 import { schoolApi } from "../../api/endpoints";
 import type { RoleOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Skeleton } from "../../components/ui";
-import { FormField } from "../../components/ui/FormField";
+import { Badge, Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "../../components/ui";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 import { PermissionChecklist } from "../../components/PermissionChecklist";
-
-const createSchema = z.object({ name: z.string().min(1) });
-type CreateForm = z.infer<typeof createSchema>;
 
 function Pills({
   options,
@@ -53,35 +47,17 @@ export default function SchoolRoles() {
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const [editing, setEditing] = useState<RoleOut | null>(null);
   const [editPerms, setEditPerms] = useState<string[]>([]);
   const [rightsFor, setRightsFor] = useState<RoleOut | null>(null);
   const [rightsSelected, setRightsSelected] = useState<string[]>([]);
-  const [createPerms, setCreatePerms] = useState<string[]>([]);
 
   const permissions = useQuery({ queryKey: ["school", "permissions"], queryFn: () => schoolApi.listPermissions() });
   const templates = useQuery({ queryKey: ["school", "role-templates"], queryFn: () => schoolApi.listRoleTemplates() });
   const roles = useQuery({ queryKey: ["school", "roles"], queryFn: () => schoolApi.listRoles() });
 
   const invalidateRoles = () => qc.invalidateQueries({ queryKey: ["school", "roles"] });
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateForm>({ resolver: zodResolver(createSchema), defaultValues: { name: "" } });
-
-  const create = useMutation({
-    mutationFn: (values: CreateForm) => schoolApi.createRole({ name: values.name, permissions: createPerms }),
-    onSuccess: () => {
-      toast.push(t("school.roles.roleCreated"), "success");
-      reset();
-      setCreatePerms([]);
-      invalidateRoles();
-    },
-    onError: () => toast.push(t("school.roles.createRoleFailed"), "error"),
-  });
 
   const openEdit = (r: RoleOut) => {
     setEditing(r);
@@ -130,30 +106,17 @@ export default function SchoolRoles() {
     <div>
       <PageTitle subtitle={t("school.roles.subtitle")}>{t("school.roles.title")}</PageTitle>
 
-      <Card className="mb-6">
-        <CardHeader title={t("school.roles.newCustomRole")} />
-        <form className="p-5 space-y-4" onSubmit={handleSubmit((v) => create.mutateAsync(v))}>
-          <FormField label={t("school.roles.name")} error={errors.name ? t("common.nameRequired") : undefined}>
-            <Input invalid={!!errors.name} {...register("name")} className="max-w-sm" />
-          </FormField>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{t("school.roles.permissions")}</div>
-            <PermissionChecklist
-              permissions={perms}
-              loading={permissions.isLoading}
-              selected={createPerms}
-              onToggle={(key) => toggle(createPerms, setCreatePerms, key)}
-              idPrefix="create"
-            />
-          </div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t("school.roles.creating") : t("school.roles.createRole")}
-          </Button>
-        </form>
-      </Card>
-
       <Card>
-        <CardHeader title={t("school.roles.allRoles")} subtitle={t("school.roles.allRolesSubtitle")} />
+        <CardHeader
+          title={t("school.roles.allRoles")}
+          subtitle={t("school.roles.allRolesSubtitle")}
+          action={
+            <Button size="sm" onClick={() => navigate("/school/roles/new")}>
+              <Icon name="add" className="w-4 h-4" />
+              {t("school.roles.newCustomRole")}
+            </Button>
+          }
+        />
         <div className="p-2">
           {roles.isLoading ? (
             <Skeleton className="h-24 m-3" />

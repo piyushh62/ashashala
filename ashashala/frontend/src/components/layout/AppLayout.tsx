@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Menu, Search, X } from "lucide-react";
+import { ChevronDown, Menu, Search, X } from "lucide-react";
 import { useAuth } from "../../stores/auth";
 import { Avatar, Icon, type IconName } from "../ui";
 import { Dropdown, DropdownItem, DropdownLabel, DropdownSeparator } from "../ui/Dropdown";
@@ -17,6 +17,20 @@ export interface NavItem {
   icon: IconName;
   permission?: string;
 }
+
+export interface NavGroup {
+  label: string;
+  icon: IconName;
+  permission?: string;
+  children: NavItem[];
+}
+
+export type NavEntry = NavItem | NavGroup;
+
+export const isNavGroup = (e: NavEntry): e is NavGroup => "children" in e;
+
+export const flattenNav = (nav: NavEntry[]): NavItem[] =>
+  nav.flatMap((e) => (isNavGroup(e) ? e.children : [e]));
 
 const ROLE_LABEL_KEY: Record<string, string> = {
   super_admin: "roleTitle.superAdmin",
@@ -38,40 +52,103 @@ function Logo({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function NavLinks({ nav, onNavigate }: { nav: NavItem[]; onNavigate?: () => void }) {
+function NavLeafLink({
+  item,
+  indent = false,
+  onNavigate,
+}: {
+  item: NavItem;
+  indent?: boolean;
+  onNavigate?: () => void;
+}) {
+  return (
+    <NavLink
+      to={item.to}
+      end
+      onClick={onNavigate}
+      className={({ isActive }) =>
+        `group flex items-center gap-3 ${indent ? "pl-9 pr-3" : "px-3"} py-2.5 rounded-xl text-sm transition relative ${
+          isActive
+            ? "bg-brand-50 text-brand-700 font-semibold dark:bg-brand-500/10 dark:text-brand-300"
+            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <span
+            className={`absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-full bg-brand-500 transition-all ${
+              isActive ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          {!indent && (
+            <span className="w-6 grid place-items-center">
+              <Icon name={item.icon} className="w-[18px] h-[18px]" />
+            </span>
+          )}
+          {indent && (
+            <span className="w-5 grid place-items-center">
+              <Icon name={item.icon} className="w-4 h-4" />
+            </span>
+          )}
+          {item.label}
+        </>
+      )}
+    </NavLink>
+  );
+}
+
+function NavGroupRow({ group, onNavigate }: { group: NavGroup; onNavigate?: () => void }) {
+  const location = useLocation();
+  const childActive = group.children.some(
+    (c) => location.pathname === c.to || location.pathname.startsWith(c.to + "/"),
+  );
+  const [open, setOpen] = useState(childActive);
+  // Auto-open when navigating into a child route; never auto-close.
+  useEffect(() => {
+    if (childActive) setOpen(true);
+  }, [childActive]);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition ${
+          childActive
+            ? "text-brand-700 font-semibold dark:text-brand-300"
+            : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+        }`}
+      >
+        <span className="w-6 grid place-items-center">
+          <Icon name={group.icon} className="w-[18px] h-[18px]" />
+        </span>
+        <span className="flex-1 text-left">{group.label}</span>
+        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div className="space-y-1 mt-1">
+          {group.children.map((c) => (
+            <NavLeafLink key={c.to} item={c} indent onNavigate={onNavigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NavLinks({ nav, onNavigate }: { nav: NavEntry[]; onNavigate?: () => void }) {
   const { t } = useTranslation();
   return (
     <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
       <div className="px-3 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-widest text-slate-300 dark:text-slate-600">{t("layout.menu")}</div>
-      {nav.map((n) => (
-        <NavLink
-          key={n.to}
-          to={n.to}
-          end
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            `group flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition relative ${
-              isActive
-                ? "bg-brand-50 text-brand-700 font-semibold dark:bg-brand-500/10 dark:text-brand-300"
-                : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
-            }`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              <span
-                className={`absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-full bg-brand-500 transition-all ${
-                  isActive ? "opacity-100" : "opacity-0"
-                }`}
-              />
-              <span className="w-6 grid place-items-center">
-                <Icon name={n.icon} className="w-[18px] h-[18px]" />
-              </span>
-              {n.label}
-            </>
-          )}
-        </NavLink>
-      ))}
+      {nav.map((e) =>
+        isNavGroup(e) ? (
+          <NavGroupRow key={e.label} group={e} onNavigate={onNavigate} />
+        ) : (
+          <NavLeafLink key={e.to} item={e} onNavigate={onNavigate} />
+        ),
+      )}
     </nav>
   );
 }
@@ -144,7 +221,7 @@ export function AppLayout({
   children,
 }: {
   title: string;
-  nav: NavItem[];
+  nav: NavEntry[];
   searchSource?: SearchSource<any>;
   children: ReactNode;
 }) {
@@ -160,11 +237,13 @@ export function AppLayout({
     navigate("/login", { replace: true });
   };
 
+  const flatNav = useMemo(() => flattenNav(nav), [nav]);
+
   const currentSection = useMemo(() => {
-    const matches = nav.filter((n) => location.pathname.startsWith(n.to));
+    const matches = flatNav.filter((n) => location.pathname.startsWith(n.to));
     matches.sort((a, b) => b.to.length - a.to.length);
     return matches[0]?.label;
-  }, [nav, location.pathname]);
+  }, [flatNav, location.pathname]);
 
   useEffect(() => {
     document.title = currentSection ? `${currentSection} · AshaShala` : `${title} · AshaShala`;
@@ -263,7 +342,7 @@ export function AppLayout({
         <main className="flex-1 min-w-0 p-5 md:p-8 max-w-6xl w-full mx-auto animate-fade-in">{children}</main>
       </div>
 
-      <CommandPalette nav={nav} searchSource={searchSource} open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette nav={flatNav} searchSource={searchSource} open={paletteOpen} onOpenChange={setPaletteOpen} />
       <ConnectivityBanner />
     </div>
   );

@@ -37,7 +37,7 @@ export default defineConfig({
     globals: true,
   },
   server: {
-    port: 5173,
+    port: 3000,
     proxy: {
       // Dev convenience: proxy API calls to the FastAPI backend so cookies/SSE
       // work same-origin. Override with VITE_API_URL for a remote backend.

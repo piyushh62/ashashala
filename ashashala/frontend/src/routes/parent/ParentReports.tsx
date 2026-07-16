@@ -4,9 +4,10 @@ import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { parentApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, Skeleton } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, Icon, Skeleton } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 import { useToast } from "../../components/ui/Toast";
+import { formatDate } from "../../lib/dates";
 
 export default function ParentReports() {
   const { t } = useTranslation();
@@ -43,8 +44,8 @@ export default function ParentReports() {
               .map((r) => (
                 <Card key={r.id}>
                   <CardHeader
-                    title={`${r.period_start} → ${r.period_end}`}
-                    subtitle={r.sent_at ? t("parent.reports.sentOn", { date: new Date(r.sent_at).toLocaleDateString() }) : undefined}
+                    title={`${formatDate(r.period_start)} → ${formatDate(r.period_end)}`}
+                    subtitle={r.sent_at ? t("parent.reports.sentOn", { date: formatDate(r.sent_at) }) : undefined}
                     action={
                       <div className="flex items-center gap-2">
                         <Badge tone="green">{r.status}</Badge>
@@ -54,13 +55,18 @@ export default function ParentReports() {
                           onClick={() => download.mutate(r.id)}
                           disabled={downloadingId === r.id}
                         >
+                          <Icon name="download" className="w-4 h-4" />
                           {downloadingId === r.id ? t("parent.reports.downloading") : t("parent.reports.downloadPdf")}
                         </Button>
                       </div>
                     }
                   />
                   <div className="p-5 space-y-4">
-                    {r.narrative && <p className="text-sm text-slate-600 whitespace-pre-line">{r.narrative}</p>}
+                    {r.narrative && (
+                      <div className="prose prose-sm prose-slate max-w-none dark:prose-invert whitespace-pre-line">
+                        {r.narrative}
+                      </div>
+                    )}
                     {r.mastery_snapshot_json.length > 0 && (
                       <div>
                         <div className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">

@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useAuth } from "../stores/auth";
 import { HOME_FOR } from "../components/layout/RoleGuard";
-import { Button, Card, Input } from "../components/ui";
+import { Button, Card, Icon, type IconName, Input } from "../components/ui";
 import { FormField } from "../components/ui/FormField";
 import { useToast } from "../components/ui/Toast";
 
@@ -15,6 +15,13 @@ const loginSchema = z.object({
 });
 
 type LoginForm = z.infer<typeof loginSchema>;
+
+const FEATURE_PILLS: { icon: IconName; key: string }[] = [
+  { icon: "reading", key: "login.pillCited" },
+  { icon: "mic", key: "login.pillVoice" },
+  { icon: "quiz", key: "login.pillQuiz" },
+  { icon: "lock", key: "login.pillTenant" },
+];
 
 export default function Login() {
   const { t } = useTranslation();
@@ -58,13 +65,15 @@ export default function Login() {
           </h1>
           <p className="mt-4 text-white/80 max-w-md">{t("login.heroSubtitle")}</p>
           <div className="mt-8 flex flex-wrap gap-2">
-            {[t("login.pillCited"), t("login.pillVoice"), t("login.pillQuiz"), t("login.pillTenant")].map(
-              (pill) => (
-                <span key={pill} className="text-sm bg-white/10 rounded-full px-3 py-1 backdrop-blur">
-                  {pill}
-                </span>
-              ),
-            )}
+            {FEATURE_PILLS.map(({ icon, key }) => (
+              <span
+                key={key}
+                className="inline-flex items-center gap-1.5 text-sm bg-white/10 rounded-full px-3 py-1 backdrop-blur"
+              >
+                <Icon name={icon} className="w-3.5 h-3.5" />
+                {t(key)}
+              </span>
+            ))}
           </div>
         </div>
         <div className="relative text-white/60 text-sm">{t("login.footer")}</div>

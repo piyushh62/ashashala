@@ -1,34 +1,28 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { schoolApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, Input, Label, Pager, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, Icon, Input, Label, Pager, Skeleton, Table } from "../../components/ui";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 
-// Classes, subjects, and the id-based joins (teacher assignment / enrollment /
-// parent link) — all pickers are populated by name from the school's real
-// classes/subjects/users, so nobody has to type a UUID by hand.
+// The browse/manage side of school structure: teacher assignments,
+// enrollments, and parent links. Creating classes/subjects and the id-based
+// joins live on /school/structure/new.
 export default function SchoolStructure() {
   const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const ok = (m: string) => {
     toast.push(m, "success");
     qc.invalidateQueries({ queryKey: ["school"] });
   };
   const fail = () => toast.push(t("common.requestFailed"), "error");
-
-  const classes = useQuery({ queryKey: ["school", "classes"], queryFn: schoolApi.listClasses });
-  const subjects = useQuery({ queryKey: ["school", "subjects"], queryFn: schoolApi.listSubjects });
-  // Dropdown data sources — not a browsable list, so fetch the max page size
-  // instead of adding Prev/Next (a <select> has no pagination UI).
-  const teachers = useQuery({ queryKey: ["school", "users", "teacher"], queryFn: () => schoolApi.listUsers("teacher", 200) });
-  const students = useQuery({ queryKey: ["school", "users", "student"], queryFn: () => schoolApi.listUsers("student", 200) });
-  const parents = useQuery({ queryKey: ["school", "users", "parent"], queryFn: () => schoolApi.listUsers("parent", 200) });
 
   const PAGE_SIZE = 20;
   const [taOffset, setTaOffset] = useState(0);
@@ -50,39 +44,6 @@ export default function SchoolStructure() {
   const parentLinks = useQuery({
     queryKey: ["school", "parent-links", linkOffset],
     queryFn: () => schoolApi.listParentLinks(PAGE_SIZE, linkOffset),
-  });
-
-  const [cls, setCls] = useState({ name: "", grade: "6" });
-  const [subj, setSubj] = useState("");
-  const [assign, setAssign] = useState({ teacher_id: "", class_id: "", subject_id: "" });
-  const [enroll, setEnroll] = useState({ student_id: "", class_id: "" });
-  const [link, setLink] = useState({ parent_id: "", student_id: "" });
-  const [linkConsent, setLinkConsent] = useState(false);
-
-  const mCls = useMutation({
-    mutationFn: () => schoolApi.createClass({ name: cls.name, grade_level: Number(cls.grade) }),
-    onSuccess: (r) => { ok(t("school.structure.classCreated", { name: r.name })); qc.invalidateQueries({ queryKey: ["school", "classes"] }); },
-    onError: fail,
-  });
-  const mSubj = useMutation({
-    mutationFn: () => schoolApi.createSubject({ name: subj }),
-    onSuccess: (r) => { ok(t("school.structure.subjectCreated", { name: r.name })); qc.invalidateQueries({ queryKey: ["school", "subjects"] }); },
-    onError: fail,
-  });
-  const mAssign = useMutation({
-    mutationFn: () => schoolApi.assignTeacher(assign),
-    onSuccess: () => { ok(t("school.structure.teacherAssigned")); qc.invalidateQueries({ queryKey: ["school", "teacher-assignments"] }); setAssign({ teacher_id: "", class_id: "", subject_id: "" }); },
-    onError: fail,
-  });
-  const mEnroll = useMutation({
-    mutationFn: () => schoolApi.enroll(enroll),
-    onSuccess: () => { ok(t("school.structure.studentEnrolled")); qc.invalidateQueries({ queryKey: ["school", "enrollments"] }); setEnroll({ student_id: "", class_id: "" }); },
-    onError: fail,
-  });
-  const mLink = useMutation({
-    mutationFn: () => schoolApi.linkParent({ ...link, consent_confirmed: linkConsent }),
-    onSuccess: () => { ok(t("school.structure.parentLinked")); qc.invalidateQueries({ queryKey: ["school", "parent-links"] }); setLink({ parent_id: "", student_id: "" }); setLinkConsent(false); },
-    onError: fail,
   });
 
   const mUnassign = useMutation({
@@ -112,78 +73,18 @@ export default function SchoolStructure() {
     onError: fail,
   });
 
-  const Row = ({ children }: { children: React.ReactNode }) => (
-    <div className="p-5 grid md:grid-cols-4 gap-3 items-end">{children}</div>
-  );
-
-  const ClassPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{classes.isLoading ? t("common.loading") : t("school.structure.selectAClass")}</option>
-      {classes.data?.map((c) => (
-        <option key={c.id} value={c.id}>{t("school.structure.classGradeOption", { name: c.name, grade: c.grade_level })}</option>
-      ))}
-    </Select>
-  );
-
-  const SubjectPicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <Select value={value} onChange={(e) => onChange(e.target.value)}>
-      <option value="">{subjects.isLoading ? t("common.loading") : t("school.structure.selectASubject")}</option>
-      {subjects.data?.map((s) => (
-        <option key={s.id} value={s.id}>{s.name}</option>
-      ))}
-    </Select>
-  );
-
-  const UserPicker = ({
-    users, loading, value, onChange, placeholder, total,
-  }: {
-    users?: { id: string; name: string; email: string }[];
-    loading: boolean;
-    value: string;
-    onChange: (v: string) => void;
-    placeholder: string;
-    total?: number;
-  }) => {
-    const truncated = total != null && users != null && users.length < total;
-    return (
-      <div>
-        <Select value={value} onChange={(e) => onChange(e.target.value)}>
-          <option value="">{loading ? t("common.loading") : placeholder}</option>
-          {users?.map((u) => (
-            <option key={u.id} value={u.id}>{t("school.structure.userEmailOption", { name: u.name, email: u.email })}</option>
-          ))}
-        </Select>
-        {truncated && (
-          <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-            {t("school.structure.pickerTruncated", { shown: users!.length, total })}
-          </p>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div>
       <PageTitle subtitle={t("school.structure.subtitle")}>{t("school.structure.title")}</PageTitle>
 
+      <div className="mb-6 flex justify-end">
+        <Button size="sm" onClick={() => navigate("/school/structure/new")}>
+          <Icon name="add" className="w-4 h-4" />
+          {t("nav.structureAdd")}
+        </Button>
+      </div>
+
       <div className="grid gap-6">
-        <Card>
-          <CardHeader title={t("school.structure.createClass")} />
-          <Row>
-            <div><Label>{t("school.structure.name")}</Label><Input value={cls.name} onChange={(e) => setCls({ ...cls, name: e.target.value })} /></div>
-            <div><Label>{t("school.structure.grade")}</Label><Input type="number" value={cls.grade} onChange={(e) => setCls({ ...cls, grade: e.target.value })} /></div>
-            <Button onClick={() => mCls.mutate()} disabled={!cls.name}>{t("school.structure.createClass")}</Button>
-          </Row>
-        </Card>
-
-        <Card>
-          <CardHeader title={t("school.structure.createSubject")} />
-          <Row>
-            <div className="md:col-span-2"><Label>{t("school.structure.name")}</Label><Input value={subj} onChange={(e) => setSubj(e.target.value)} /></div>
-            <Button onClick={() => mSubj.mutate()} disabled={!subj}>{t("school.structure.createSubject")}</Button>
-          </Row>
-        </Card>
-
         <Card>
           <CardHeader
             title={t("school.structure.assignTeacherTitle")}
@@ -194,16 +95,6 @@ export default function SchoolStructure() {
               </label>
             }
           />
-          <Row>
-            <div>
-              <Label>{t("school.structure.teacher")}</Label>
-              <UserPicker users={teachers.data?.items} total={teachers.data?.total} loading={teachers.isLoading} placeholder={t("school.structure.selectATeacher")}
-                value={assign.teacher_id} onChange={(v) => setAssign({ ...assign, teacher_id: v })} />
-            </div>
-            <div><Label>{t("school.structure.class")}</Label><ClassPicker value={assign.class_id} onChange={(v) => setAssign({ ...assign, class_id: v })} /></div>
-            <div><Label>{t("school.structure.subject")}</Label><SubjectPicker value={assign.subject_id} onChange={(v) => setAssign({ ...assign, subject_id: v })} /></div>
-            <Button onClick={() => mAssign.mutate()} disabled={!assign.teacher_id || !assign.class_id || !assign.subject_id}>{t("school.structure.assign")}</Button>
-          </Row>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={teacherAssignments}
@@ -269,15 +160,6 @@ export default function SchoolStructure() {
               </label>
             }
           />
-          <Row>
-            <div>
-              <Label>{t("school.structure.student")}</Label>
-              <UserPicker users={students.data?.items} total={students.data?.total} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
-                value={enroll.student_id} onChange={(v) => setEnroll({ ...enroll, student_id: v })} />
-            </div>
-            <div><Label>{t("school.structure.class")}</Label><ClassPicker value={enroll.class_id} onChange={(v) => setEnroll({ ...enroll, class_id: v })} /></div>
-            <Button onClick={() => mEnroll.mutate()} disabled={!enroll.student_id || !enroll.class_id}>{t("school.structure.enroll")}</Button>
-          </Row>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={enrollments}
@@ -334,30 +216,6 @@ export default function SchoolStructure() {
 
         <Card>
           <CardHeader title={t("school.structure.linkParentTitle")} />
-          <Row>
-            <div>
-              <Label>{t("school.structure.parent")}</Label>
-              <UserPicker users={parents.data?.items} total={parents.data?.total} loading={parents.isLoading} placeholder={t("school.structure.selectAParent")}
-                value={link.parent_id} onChange={(v) => setLink({ ...link, parent_id: v })} />
-            </div>
-            <div>
-              <Label>{t("school.structure.student")}</Label>
-              <UserPicker users={students.data?.items} total={students.data?.total} loading={students.isLoading} placeholder={t("school.structure.selectAStudent")}
-                value={link.student_id} onChange={(v) => setLink({ ...link, student_id: v })} />
-            </div>
-          </Row>
-          <div className="px-5 pb-4 flex items-center justify-between gap-3 flex-wrap">
-            <label className="flex items-center gap-2 text-sm text-slate-600">
-              <input
-                type="checkbox"
-                className="rounded border-slate-300"
-                checked={linkConsent}
-                onChange={(e) => setLinkConsent(e.target.checked)}
-              />
-              {t("school.structure.consentLabel")}
-            </label>
-            <Button onClick={() => mLink.mutate()} disabled={!link.parent_id || !link.student_id || !linkConsent}>{t("school.structure.link")}</Button>
-          </div>
           <div className="border-t border-slate-100">
             <DataBoundary
               query={parentLinks}

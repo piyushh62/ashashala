@@ -30,6 +30,12 @@
     "requestFailed": "Request failed.",
     "saving": "Saving…",
     "saveChanges": "Save changes",
+    "email": "Email",
+    "tempPasswordTitle": "Temporary password",
+    "tempPasswordDesc": "Share this password securely — it won't be shown again.",
+    "tempPasswordLabel": "Temporary password",
+    "copy": "Copy",
+    "done": "Done",
     "days": {
       "mon": "Mon",
       "tue": "Tue",
@@ -61,7 +67,21 @@
     "tutor": "Tutor",
     "quiz": "Quiz",
     "history": "History",
-    "children": "Children"
+    "children": "Children",
+    "schoolList": "School List",
+    "addSchool": "Add School",
+    "roleList": "Role List",
+    "addRole": "Add Role",
+    "userList": "User List",
+    "addUser": "Add User",
+    "structureOverview": "Overview",
+    "structureAdd": "Add / Assign",
+    "materialList": "Material List",
+    "addMaterial": "Add Material",
+    "assignmentList": "Assignment List",
+    "addAssignment": "Add Assignment",
+    "timetableView": "Weekly View",
+    "addPeriod": "Add Period"
   },
   "roleTitle": {
     "superAdmin": "Super Admin",
@@ -83,10 +103,10 @@
     "heroHeading1": "A patient AI tutor",
     "heroHeading2": "for every student.",
     "heroSubtitle": "Cited answers, example-first teaching, and native Gujarati & Hindi — with the tools to run a whole school.",
-    "pillCited": "📚 Cited answers",
-    "pillVoice": "🗣️ Voice in Gujarati",
-    "pillQuiz": "🧠 Adaptive quizzes",
-    "pillTenant": "🔒 Tenant-isolated",
+    "pillCited": "Cited answers",
+    "pillVoice": "Voice in Gujarati",
+    "pillQuiz": "Adaptive quizzes",
+    "pillTenant": "Tenant-isolated",
     "footer": "Free, open-source, self-hostable.",
     "welcomeBack": "Welcome back",
     "signInToContinue": "Sign in to continue.",
@@ -174,8 +194,8 @@
       "masteryByClass": "Mastery by class",
       "llmUsage": "LLM usage",
       "llmUsageSubtitle": "Tokens spent against the free-tier quota (7 days).",
-      "overQuota": "⚠ Over daily quota",
-      "withinQuota": "✓ Within quota",
+      "overQuota": "Over daily quota",
+      "withinQuota": "Within quota",
       "tokensToday": "Tokens today",
       "callsToday": "Calls today",
       "errorRate": "Error rate",
@@ -332,7 +352,10 @@
       "absenceRecordedWithSubs": "Absence recorded — {{count}} substitute suggestion(s) queued for approval.",
       "absenceRecordedNoClasses": "Absence recorded — no classes scheduled that day.",
       "absenceRecordFailed": "Couldn't record the absence.",
-      "gradeRequiredForStudents": "Grade is required for students"
+      "gradeRequiredForStudents": "Grade is required for students",
+      "exportExcel": "Export Excel",
+      "bulkDropzoneLabel": "Drag a CSV here, or click to browse",
+      "bulkDropzoneHint": "CSV file with name, email, role columns"
     }
   },
   "teacher": {
@@ -417,7 +440,8 @@
       "colSubject": "Subject",
       "colDate": "Date",
       "colTime": "Time",
-      "colDuration": "Duration"
+      "colDuration": "Duration",
+      "selectDate": "Select a date"
     },
     "flagged": {
       "subtitle": "Low-confidence AI grades awaiting your review.",
@@ -471,7 +495,9 @@
       "publishing": "Publishing…",
       "approveAndPublish": "Approve & publish",
       "invalidUrl": "Enter a valid URL (including https://)",
-      "invalidYoutubeUrl": "Enter a valid YouTube URL"
+      "invalidYoutubeUrl": "Enter a valid YouTube URL",
+      "dropzoneLabel": "Drag a file here, or click to browse",
+      "dropzoneHint": "PDF, DOCX, TXT, JPG or PNG"
     },
     "messages": {
       "subtitle": "Message a student's parent directly.",
@@ -535,7 +561,7 @@
       "aiSuggestSubtitle": "Let the scheduling agent propose conflict-free options for the class/subject selected above.",
       "periodsPerWeek": "Periods per week",
       "generating": "Generating…",
-      "suggestOptions": "✨ Suggest options",
+      "suggestOptions": "Suggest options",
       "periodLabel": "{{day}}, period {{period}}",
       "useThisOption": "Use this option",
       "myWeeklyPeriods": "My weekly periods",
@@ -679,8 +705,8 @@
       "greeting": "Hi {{name}}! 👋",
       "recommendedTopic": "Your tutor suggests reviewing “{{topic}}” next.",
       "readyToLearn": "Ready to learn something new today?",
-      "askTutor": "💬 Ask tutor",
-      "practice": "🧠 Practice",
+      "askTutor": "Ask tutor",
+      "practice": "Practice",
       "todaysLearning": "Today's Learning",
       "todaysLearningHint": "A short explainer for each class on your timetable today.",
       "viewArrow": "View →",
@@ -755,13 +781,13 @@
     },
     "voice": {
       "speakAloud": "Speak answers aloud",
-      "voiceOn": "🔊 Voice on",
-      "voiceOff": "🔈 Voice off",
+      "voiceOn": "Voice on",
+      "voiceOff": "Voice off",
       "notSupported": "Voice input isn't supported in this browser — try Chrome or Edge.",
       "couldntHear": "Couldn't hear that — try again.",
       "holdToSpeak": "Hold to speak",
       "listening": "● Listening",
-      "hold": "🎤 Hold"
+      "hold": "Hold"
     },
     "mastery": {
       "noMasteryYet": "No mastery yet",
@@ -785,8 +811,8 @@
     },
     "child": {
       "allChildren": "← All children",
-      "reports": "📄 Reports",
-      "messages": "💬 Messages",
+      "reports": "Reports",
+      "messages": "Messages",
       "subtitle": "Read-only progress overview.",
       "defaultName": "Child",
       "mastery": "Mastery",
@@ -818,7 +844,7 @@
       "noReportsSentYetHint": "Your child's teacher will publish reports here once ready.",
       "sentOn": "Sent {{date}}",
       "downloading": "Downloading…",
-      "downloadPdf": "⬇ PDF",
+      "downloadPdf": "PDF",
       "downloadFailed": "Couldn't download the report PDF.",
       "masterySnapshot": "Mastery snapshot",
       "teacherNotes": "Teacher notes"

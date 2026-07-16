@@ -144,7 +144,13 @@ export default function StudentChat() {
                 >
                   {m.isError && <Icon name="alert" className="w-4 h-4 mt-0.5 shrink-0" />}
                   {m.content ? (
-                    m.content
+                    m.role === "assistant" && !m.isError ? (
+                      <div className="prose prose-sm prose-slate max-w-none dark:prose-invert prose-p:my-1 prose-pre:my-1">
+                        {m.content}
+                      </div>
+                    ) : (
+                      m.content
+                    )
                   ) : streaming && i === messages.length - 1 ? (
                     <span className="inline-flex gap-1 py-1">
                       <Dot /> <Dot delay="150ms" /> <Dot delay="300ms" />

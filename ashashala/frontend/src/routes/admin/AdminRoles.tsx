@@ -1,34 +1,21 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
-import { z } from "zod";
+import { useNavigate } from "react-router-dom";
 import { adminApi } from "../../api/endpoints";
 import type { RoleTemplateOut } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Skeleton } from "../../components/ui";
-import { FormField } from "../../components/ui/FormField";
+import { Badge, Button, Card, CardHeader, EmptyState, Icon, Skeleton } from "../../components/ui";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
 import { PermissionChecklist } from "../../components/PermissionChecklist";
 
-const createSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
-});
-type CreateForm = z.infer<typeof createSchema>;
-
-const VALIDATION_MESSAGE_KEYS: Record<string, string> = {
-  "Name is required": "common.nameRequired",
-};
-
 export default function AdminRoles() {
   const { t } = useTranslation();
-  const errMsg = (raw?: string) => (raw ? t(VALIDATION_MESSAGE_KEYS[raw] ?? raw) : undefined);
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const navigate = useNavigate();
   const [editing, setEditing] = useState<RoleTemplateOut | null>(null);
   const [selectedPerms, setSelectedPerms] = useState<string[]>([]);
 
@@ -36,26 +23,6 @@ export default function AdminRoles() {
   const templates = useQuery({ queryKey: ["admin", "role-templates"], queryFn: () => adminApi.listRoleTemplates() });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "role-templates"] });
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateForm>({ resolver: zodResolver(createSchema), defaultValues: { name: "", description: "" } });
-  const [createPerms, setCreatePerms] = useState<string[]>([]);
-
-  const create = useMutation({
-    mutationFn: (values: CreateForm) =>
-      adminApi.createRoleTemplate({ name: values.name, description: values.description || undefined, permissions: createPerms }),
-    onSuccess: () => {
-      toast.push(t("admin.roles.roleTemplateCreated"), "success");
-      reset();
-      setCreatePerms([]);
-      invalidate();
-    },
-    onError: () => toast.push(t("admin.roles.createTemplateFailed"), "error"),
-  });
 
   const openEdit = (t: RoleTemplateOut) => {
     setEditing(t);
@@ -91,35 +58,16 @@ export default function AdminRoles() {
     <div>
       <PageTitle subtitle={t("admin.roles.subtitle")}>{t("admin.roles.title")}</PageTitle>
 
-      <Card className="mb-6">
-        <CardHeader title={t("admin.roles.newRoleTemplate")} />
-        <form className="p-5 space-y-4" onSubmit={handleSubmit((v) => create.mutateAsync(v))}>
-          <div className="grid md:grid-cols-2 gap-3">
-            <FormField label={t("admin.roles.name")} error={errMsg(errors.name?.message)}>
-              <Input invalid={!!errors.name} {...register("name")} />
-            </FormField>
-            <FormField label={t("admin.roles.description")} optional>
-              <Input {...register("description")} />
-            </FormField>
-          </div>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">{t("admin.roles.permissions")}</div>
-            <PermissionChecklist
-              permissions={perms}
-              loading={permissions.isLoading}
-              selected={createPerms}
-              onToggle={(key) => togglePerm(createPerms, setCreatePerms, key)}
-              idPrefix="create"
-            />
-          </div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t("admin.roles.creating") : t("admin.roles.createTemplate")}
-          </Button>
-        </form>
-      </Card>
-
       <Card>
-        <CardHeader title={t("admin.roles.allRoleTemplates")} />
+        <CardHeader
+          title={t("admin.roles.allRoleTemplates")}
+          action={
+            <Button size="sm" onClick={() => navigate("/admin/roles/new")}>
+              <Icon name="add" className="w-4 h-4" />
+              {t("admin.roles.newRoleTemplate")}
+            </Button>
+          }
+        />
         <div className="p-2">
           {templates.isLoading ? (
             <Skeleton className="h-24 m-3" />

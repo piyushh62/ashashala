@@ -38,7 +38,13 @@
       "fri": "શુક્ર",
       "sat": "શનિ",
       "sun": "રવિ"
-    }
+    },
+    "email": "ઈમેલ",
+    "tempPasswordTitle": "કામચલાઉ પાસવર્ડ",
+    "tempPasswordDesc": "આ પાસવર્ડ સુરક્ષિત રીતે શેર કરો — તે ફરી બતાવવામાં આવશે નહીં.",
+    "tempPasswordLabel": "કામચલાઉ પાસવર્ડ",
+    "copy": "કૉપિ કરો",
+    "done": "થઈ ગયું"
   },
   "nav": {
     "schools": "શાળાઓ",
@@ -61,7 +67,21 @@
     "tutor": "ટ્યુટર",
     "quiz": "ક્વિઝ",
     "history": "ઇતિહાસ",
-    "children": "બાળકો"
+    "children": "બાળકો",
+    "schoolList": "શાળા યાદી",
+    "addSchool": "શાળા ઉમેરો",
+    "roleList": "ભૂમિકા યાદી",
+    "addRole": "ભૂમિકા ઉમેરો",
+    "userList": "વપરાશકર્તા યાદી",
+    "addUser": "વપરાશકર્તા ઉમેરો",
+    "structureOverview": "ઝાંખી",
+    "structureAdd": "ઉમેરો / સોંપો",
+    "materialList": "સામગ્રી યાદી",
+    "addMaterial": "સામગ્રી ઉમેરો",
+    "assignmentList": "અસાઇનમેન્ટ યાદી",
+    "addAssignment": "અસાઇનમેન્ટ ઉમેરો",
+    "timetableView": "સાપ્તાહિક દૃશ્ય",
+    "addPeriod": "પિરિયડ ઉમેરો"
   },
   "roleTitle": {
     "superAdmin": "સુપર એડમિન",
@@ -83,10 +103,10 @@
     "heroHeading1": "દરેક વિદ્યાર્થી માટે",
     "heroHeading2": "એક ધીરજવાન AI ટ્યુટર.",
     "heroSubtitle": "ટાંકેલા જવાબો, ઉદાહરણ-પ્રથમ શિક્ષણ, અને મૂળ ગુજરાતી અને હિન્દીમાં — આખી શાળા ચલાવવાનાં સાધનો સાથે.",
-    "pillCited": "📚 ટાંકેલા જવાબો",
-    "pillVoice": "🗣️ ગુજરાતીમાં અવાજ",
-    "pillQuiz": "🧠 અનુકૂલનશીલ ક્વિઝ",
-    "pillTenant": "🔒 ટેનન્ટ-આઇસોલેટેડ",
+    "pillCited": "ટાંકેલા જવાબો",
+    "pillVoice": "ગુજરાતીમાં અવાજ",
+    "pillQuiz": "અનુકૂલનશીલ ક્વિઝ",
+    "pillTenant": "ટેનન્ટ-આઇસોલેટેડ",
     "footer": "મફત, ઓપન-સોર્સ, સ્વ-હોસ્ટ કરી શકાય તેવું.",
     "welcomeBack": "ફરી સ્વાગત છે",
     "signInToContinue": "ચાલુ રાખવા માટે સાઇન ઇન કરો.",
@@ -174,8 +194,8 @@
       "masteryByClass": "વર્ગ પ્રમાણે નિપુણતા",
       "llmUsage": "LLM ઉપયોગ",
       "llmUsageSubtitle": "ફ્રી-ટિયર ક્વોટા સામે ખર્ચાયેલા ટોકન (7 દિવસ).",
-      "overQuota": "⚠ દૈનિક ક્વોટા કરતાં વધુ",
-      "withinQuota": "✓ ક્વોટાની અંદર",
+      "overQuota": "દૈનિક ક્વોટા કરતાં વધુ",
+      "withinQuota": "ક્વોટાની અંદર",
       "tokensToday": "આજના ટોકન",
       "callsToday": "આજની કૉલ્સ",
       "errorRate": "ભૂલ દર",
@@ -332,7 +352,10 @@
       "absenceRecordedWithSubs": "ગેરહાજરી નોંધાઈ — {{count}} વિકલ્પ સૂચનો મંજૂરી માટે કતારમાં.",
       "absenceRecordedNoClasses": "ગેરહાજરી નોંધાઈ — તે દિવસે કોઈ વર્ગ સુનિશ્ચિત નહોતો.",
       "absenceRecordFailed": "ગેરહાજરી નોંધી શકાઈ નહીં.",
-      "gradeRequiredForStudents": "વિદ્યાર્થીઓ માટે ધોરણ જરૂરી છે"
+      "gradeRequiredForStudents": "વિદ્યાર્થીઓ માટે ધોરણ જરૂરી છે",
+      "exportExcel": "એક્સેલ નિકાસ કરો",
+      "bulkDropzoneLabel": "CSV અહીં ખેંચો, અથવા બ્રાઉઝ કરવા ક્લિક કરો",
+      "bulkDropzoneHint": "name, email, role કૉલમ સાથે CSV ફાઇલ"
     }
   },
   "teacher": {
@@ -417,7 +440,8 @@
       "colSubject": "વિષય",
       "colDate": "તારીખ",
       "colTime": "સમય",
-      "colDuration": "અવધિ"
+      "colDuration": "અવધિ",
+      "selectDate": "તારીખ પસંદ કરો"
     },
     "flagged": {
       "subtitle": "તમારી સમીક્ષાની રાહ જોઈ રહેલા ઓછા-વિશ્વાસવાળા AI ગ્રેડ.",
@@ -471,7 +495,9 @@
       "publishing": "પ્રકાશિત થઈ રહ્યું છે…",
       "approveAndPublish": "મંજૂર કરો અને પ્રકાશિત કરો",
       "invalidUrl": "એક માન્ય URL દાખલ કરો (https:// સહિત)",
-      "invalidYoutubeUrl": "એક માન્ય YouTube URL દાખલ કરો"
+      "invalidYoutubeUrl": "એક માન્ય YouTube URL દાખલ કરો",
+      "dropzoneLabel": "ફાઇલ અહીં ખેંચો, અથવા બ્રાઉઝ કરવા ક્લિક કરો",
+      "dropzoneHint": "PDF, DOCX, TXT, JPG અથવા PNG"
     },
     "messages": {
       "subtitle": "કોઈ વિદ્યાર્થીના વાલીને સીધો સંદેશ મોકલો.",
@@ -535,7 +561,7 @@
       "aiSuggestSubtitle": "શેડ્યુલિંગ એજન્ટને ઉપર પસંદ કરેલા વર્ગ/વિષય માટે સંઘર્ષ-મુક્ત વિકલ્પો સૂચવવા દો.",
       "periodsPerWeek": "દર અઠવાડિયે પિરિયડ",
       "generating": "ઉત્પન્ન થઈ રહ્યું છે…",
-      "suggestOptions": "✨ વિકલ્પો સૂચવો",
+      "suggestOptions": "વિકલ્પો સૂચવો",
       "periodLabel": "{{day}}, પિરિયડ {{period}}",
       "useThisOption": "આ વિકલ્પ વાપરો",
       "myWeeklyPeriods": "મારા સાપ્તાહિક પિરિયડ",
@@ -679,8 +705,8 @@
       "greeting": "નમસ્તે {{name}}! 👋",
       "recommendedTopic": "તમારા ટ્યુટરે આગળ “{{topic}}” ફરીથી જોવાનું સૂચન કર્યું છે.",
       "readyToLearn": "આજે કંઈક નવું શીખવા તૈયાર છો?",
-      "askTutor": "💬 ટ્યુટરને પૂછો",
-      "practice": "🧠 અભ્યાસ કરો",
+      "askTutor": "ટ્યુટરને પૂછો",
+      "practice": "અભ્યાસ કરો",
       "todaysLearning": "આજનું શિક્ષણ",
       "todaysLearningHint": "તમારા આજના સમયપત્રકના દરેક વર્ગ માટે ટૂંકું સમજૂતી.",
       "viewArrow": "જુઓ →",
@@ -755,13 +781,13 @@
     },
     "voice": {
       "speakAloud": "જવાબો બોલીને સંભળાવો",
-      "voiceOn": "🔊 અવાજ ચાલુ",
-      "voiceOff": "🔈 અવાજ બંધ",
+      "voiceOn": "અવાજ ચાલુ",
+      "voiceOff": "અવાજ બંધ",
       "notSupported": "આ બ્રાઉઝરમાં વૉઇસ ઇનપુટ સપોર્ટેડ નથી — Chrome અથવા Edge અજમાવો.",
       "couldntHear": "સાંભળી શકાયું નહીં — ફરી પ્રયાસ કરો.",
       "holdToSpeak": "બોલવા માટે દબાવી રાખો",
       "listening": "● સાંભળી રહ્યું છે",
-      "hold": "🎤 દબાવી રાખો"
+      "hold": "દબાવી રાખો"
     },
     "mastery": {
       "noMasteryYet": "હજુ સુધી કોઈ નિપુણતા નથી",
@@ -785,8 +811,8 @@
     },
     "child": {
       "allChildren": "← બધા બાળકો",
-      "reports": "📄 રિપોર્ટ્સ",
-      "messages": "💬 સંદેશા",
+      "reports": "રિપોર્ટ્સ",
+      "messages": "સંદેશા",
       "subtitle": "ફક્ત-જોવા માટેની પ્રગતિ ઝાંખી.",
       "defaultName": "બાળક",
       "mastery": "નિપુણતા",
@@ -818,7 +844,7 @@
       "noReportsSentYetHint": "તૈયાર થતાં તમારા બાળકના શિક્ષક અહીં રિપોર્ટ પ્રકાશિત કરશે.",
       "sentOn": "{{date}} ના રોજ મોકલાયું",
       "downloading": "ડાઉનલોડ થઈ રહ્યું છે…",
-      "downloadPdf": "⬇ PDF",
+      "downloadPdf": "PDF",
       "downloadFailed": "રિપોર્ટ PDF ડાઉનલોડ થઈ શક્યો નથી.",
       "masterySnapshot": "નિપુણતા સ્નેપશોટ",
       "teacherNotes": "શિક્ષકની નોંધો"

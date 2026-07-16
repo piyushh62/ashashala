@@ -4,8 +4,10 @@ import { useTranslation } from "react-i18next";
 import { teacherApi } from "../../api/endpoints";
 import { PageTitle } from "../../components/layout/AppLayout";
 import { Button, Card, CardHeader, EmptyState, Input, Label, Select, Skeleton, Table } from "../../components/ui";
+import { DatePicker } from "../../components/ui/DatePicker";
 import { DataBoundary } from "../../components/ui/DataBoundary";
 import { useToast } from "../../components/ui/Toast";
+import { formatDate } from "../../lib/dates";
 
 export default function TeacherExamTimetable() {
   const { t } = useTranslation();
@@ -116,7 +118,11 @@ export default function TeacherExamTimetable() {
             </div>
             <div>
               <Label>{t("teacher.examTimetable.date")}</Label>
-              <Input type="date" value={form.exam_date} onChange={(e) => setForm({ ...form, exam_date: e.target.value })} />
+              <DatePicker
+                value={form.exam_date}
+                onChange={(iso) => setForm({ ...form, exam_date: iso })}
+                placeholder={t("teacher.examTimetable.selectDate")}
+              />
             </div>
             <div>
               <Label>{t("teacher.examTimetable.startTime")}</Label>
@@ -162,7 +168,7 @@ export default function TeacherExamTimetable() {
                     <td className="px-4 py-2 font-medium text-slate-700">{e.exam_name}</td>
                     <td className="px-4 py-2 text-slate-500">{names.classes.get(e.class_id) ?? e.class_id}</td>
                     <td className="px-4 py-2 text-slate-500">{names.subjects.get(e.subject_id) ?? e.subject_id}</td>
-                    <td className="px-4 py-2 text-slate-500">{e.exam_date}</td>
+                    <td className="px-4 py-2 text-slate-500">{formatDate(e.exam_date)}</td>
                     <td className="px-4 py-2 text-slate-500">{e.start_time ?? "—"}</td>
                     <td className="px-4 py-2 text-slate-500">{e.duration_minutes ? `${e.duration_minutes}m` : "—"}</td>
                   </tr>

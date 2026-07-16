@@ -1,23 +1,24 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import type { ColumnDef } from "@tanstack/react-table";
 import { api } from "../../api/client";
 import { adminApi } from "../../api/endpoints";
 import type { School } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, Input, Label, Skeleton } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, Icon, Input, Label, Skeleton } from "../../components/ui";
 import { DataTable } from "../../components/ui/DataTable";
 import { useToast } from "../../components/ui/Toast";
 import { Modal, useConfirm } from "../../components/ui/Modal";
+import { TempCredentialModal } from "../../components/TempCredentialModal";
 
 export default function AdminSchools() {
   const { t } = useTranslation();
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const [name, setName] = useState("");
-  const [address, setAddress] = useState("");
+  const navigate = useNavigate();
   const [detailsFor, setDetailsFor] = useState<School | null>(null);
   const [adminFor, setAdminFor] = useState<School | null>(null);
   const [adminName, setAdminName] = useState("");
@@ -31,17 +32,6 @@ export default function AdminSchools() {
   });
 
   const schools = useQuery({ queryKey: ["admin", "schools"], queryFn: () => api.get<School[]>("/api/v1/admin/schools") });
-
-  const create = useMutation({
-    mutationFn: () => adminApi.createSchool({ name, address: address || undefined }),
-    onSuccess: () => {
-      toast.push(t("admin.schools.schoolCreated"), "success");
-      setName("");
-      setAddress("");
-      qc.invalidateQueries({ queryKey: ["admin", "schools"] });
-    },
-    onError: () => toast.push(t("admin.schools.createSchoolFailed"), "error"),
-  });
 
   const toggle = useMutation({
     mutationFn: (s: School) => adminApi.updateSchool(s.id, { is_active: !s.is_active }),
@@ -149,31 +139,16 @@ export default function AdminSchools() {
     <div>
       <PageTitle subtitle={t("admin.schools.subtitle")}>{t("admin.schools.title")}</PageTitle>
 
-      <Card className="mb-6">
-        <CardHeader title={t("admin.schools.onboardASchool")} />
-        <form
-          className="p-5 flex flex-wrap items-end gap-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            create.mutate();
-          }}
-        >
-          <div className="flex-1 min-w-[180px]">
-            <Label>{t("admin.schools.name")}</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} required />
-          </div>
-          <div className="flex-1 min-w-[180px]">
-            <Label>{t("admin.schools.address")}</Label>
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-          </div>
-          <Button type="submit" disabled={create.isPending}>
-            {create.isPending ? t("admin.schools.creating") : t("admin.schools.create")}
-          </Button>
-        </form>
-      </Card>
-
       <Card>
-        <CardHeader title={t("admin.schools.allSchools")} />
+        <CardHeader
+          title={t("admin.schools.allSchools")}
+          action={
+            <Button size="sm" onClick={() => navigate("/admin/new")}>
+              <Icon name="add" className="w-4 h-4" />
+              {t("admin.schools.onboardASchool")}
+            </Button>
+          }
+        />
         <div className="p-2">
           <DataTable
             data={schools.data ?? []}
@@ -233,41 +208,7 @@ export default function AdminSchools() {
         </form>
       </Modal>
 
-      <Modal
-        open={!!tempCredential}
-        onOpenChange={(open) => !open && setTempCredential(null)}
-        title={t("admin.schools.tempPasswordTitle")}
-        description={t("admin.schools.tempPasswordDesc")}
-        size="sm"
-      >
-        {tempCredential && (
-          <div className="space-y-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("admin.schools.email")}</div>
-              <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("admin.schools.tempPasswordLabel")}</div>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
-                  {tempCredential.password}
-                </code>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigator.clipboard.writeText(tempCredential.password)}
-                >
-                  {t("admin.schools.copy")}
-                </Button>
-              </div>
-            </div>
-            <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
-              {t("admin.schools.done")}
-            </Button>
-          </div>
-        )}
-      </Modal>
+      <TempCredentialModal credential={tempCredential} onClose={() => setTempCredential(null)} />
 
       {confirm.dialog}
     </div>

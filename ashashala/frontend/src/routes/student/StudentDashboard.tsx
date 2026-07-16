@@ -43,14 +43,16 @@ export default function StudentDashboard() {
           <div className="flex gap-2">
             <Link
               to="/student/chat"
-              className="bg-white text-brand-700 font-semibold text-sm rounded-xl px-4 py-2.5 hover:bg-white/90 transition"
+              className="inline-flex items-center gap-1.5 bg-white text-brand-700 font-semibold text-sm rounded-xl px-4 py-2.5 hover:bg-white/90 transition"
             >
+              <Icon name="chat" className="w-4 h-4" />
               {t("student.dashboard.askTutor")}
             </Link>
             <Link
               to="/student/quiz"
-              className="bg-white/15 backdrop-blur text-white font-semibold text-sm rounded-xl px-4 py-2.5 hover:bg-white/25 transition"
+              className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur text-white font-semibold text-sm rounded-xl px-4 py-2.5 hover:bg-white/25 transition"
             >
+              <Icon name="quiz" className="w-4 h-4" />
               {t("student.dashboard.practice")}
             </Link>
           </div>

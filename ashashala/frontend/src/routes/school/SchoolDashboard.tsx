@@ -112,9 +112,9 @@ export default function SchoolDashboard() {
           icon={<Icon name="activity" />}
           action={
             usage.data?.over_quota ? (
-              <Badge tone="red">{t("school.dashboard.overQuota")}</Badge>
+              <Badge tone="red"><Icon name="alert" className="w-3.5 h-3.5" />{t("school.dashboard.overQuota")}</Badge>
             ) : (
-              <Badge tone="green">{t("school.dashboard.withinQuota")}</Badge>
+              <Badge tone="green"><Icon name="check" className="w-3.5 h-3.5" />{t("school.dashboard.withinQuota")}</Badge>
             )
           }
         />

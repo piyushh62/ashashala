@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./stores/auth";
-import { AppLayout, type NavItem } from "./components/layout/AppLayout";
+import { AppLayout, isNavGroup, type NavEntry } from "./components/layout/AppLayout";
 import type { SearchSource } from "./components/layout/CommandPalette";
 import { HOME_FOR, RoleGuard } from "./components/layout/RoleGuard";
 import type { Role, School, UserRow, DocumentRow } from "./types/api";
@@ -11,15 +11,20 @@ import { Spinner } from "./components/ui";
 
 import Login from "./routes/Login";
 import AdminSchools from "./routes/admin/AdminSchools";
+import AdminSchoolCreate from "./routes/admin/AdminSchoolCreate";
 import AdminDashboard from "./routes/admin/AdminDashboard";
 import SchoolDashboard from "./routes/school/SchoolDashboard";
 import SchoolUsers from "./routes/school/SchoolUsers";
+import SchoolUserCreate from "./routes/school/SchoolUserCreate";
 import SchoolStructure from "./routes/school/SchoolStructure";
+import SchoolStructureCreate from "./routes/school/SchoolStructureCreate";
 import SchoolAudit from "./routes/school/SchoolAudit";
 import SchoolAgentActions from "./routes/school/SchoolAgentActions";
 import TeacherDashboard from "./routes/teacher/TeacherDashboard";
 import TeacherMaterials from "./routes/teacher/TeacherMaterials";
+import TeacherMaterialCreate from "./routes/teacher/TeacherMaterialCreate";
 import TeacherTimetable from "./routes/teacher/TeacherTimetable";
+import TeacherTimetableCreate from "./routes/teacher/TeacherTimetableCreate";
 import TeacherFlagged from "./routes/teacher/TeacherFlagged";
 import TeacherStudents from "./routes/teacher/TeacherStudents";
 import TeacherAgentActions from "./routes/teacher/TeacherAgentActions";
@@ -27,9 +32,12 @@ import TeacherExamTimetable from "./routes/teacher/TeacherExamTimetable";
 import TeacherClassProgress from "./routes/teacher/TeacherClassProgress";
 import TeacherMessages from "./routes/teacher/TeacherMessages";
 import TeacherAssignments from "./routes/teacher/TeacherAssignments";
+import TeacherAssignmentCreate from "./routes/teacher/TeacherAssignmentCreate";
 import AdminRoles from "./routes/admin/AdminRoles";
+import AdminRoleCreate from "./routes/admin/AdminRoleCreate";
 import AdminAudit from "./routes/admin/AdminAudit";
 import SchoolRoles from "./routes/school/SchoolRoles";
+import SchoolRoleCreate from "./routes/school/SchoolRoleCreate";
 import StudentDashboard from "./routes/student/StudentDashboard";
 import StudentToday from "./routes/student/StudentToday";
 import StudentChat from "./routes/student/StudentChat";
@@ -52,28 +60,86 @@ const ROLE_TITLE_KEY: Record<Role, string> = {
 
 // NavItem.label holds an i18next translation key here (resolved in navForUser),
 // not display text — keeps this table language-agnostic.
-const NAV: Record<Role, NavItem[]> = {
+const NAV: Record<Role, NavEntry[]> = {
   super_admin: [
-    { to: "/admin", label: "nav.schools", icon: "schools" },
+    {
+      label: "nav.schools",
+      icon: "schools",
+      children: [
+        { to: "/admin", label: "nav.schoolList", icon: "schools" },
+        { to: "/admin/new", label: "nav.addSchool", icon: "add" },
+      ],
+    },
     { to: "/admin/dashboard", label: "nav.platform", icon: "platform" },
-    { to: "/admin/roles", label: "nav.roles", icon: "roles", permission: "role:manage" },
+    {
+      label: "nav.roles",
+      icon: "roles",
+      permission: "role:manage",
+      children: [
+        { to: "/admin/roles", label: "nav.roleList", icon: "roles" },
+        { to: "/admin/roles/new", label: "nav.addRole", icon: "add" },
+      ],
+    },
     { to: "/admin/audit", label: "nav.audit", icon: "audit" },
     { to: "/settings", label: "nav.settings", icon: "settings" },
   ],
   school_admin: [
     { to: "/school", label: "nav.dashboard", icon: "dashboard" },
-    { to: "/school/users", label: "nav.users", icon: "users" },
-    { to: "/school/structure", label: "nav.classes", icon: "structure" },
-    { to: "/school/roles", label: "nav.roles", icon: "roles", permission: "role:manage" },
+    {
+      label: "nav.users",
+      icon: "users",
+      children: [
+        { to: "/school/users", label: "nav.userList", icon: "users" },
+        { to: "/school/users/new", label: "nav.addUser", icon: "add" },
+      ],
+    },
+    {
+      label: "nav.classes",
+      icon: "structure",
+      children: [
+        { to: "/school/structure", label: "nav.structureOverview", icon: "structure" },
+        { to: "/school/structure/new", label: "nav.structureAdd", icon: "add" },
+      ],
+    },
+    {
+      label: "nav.roles",
+      icon: "roles",
+      permission: "role:manage",
+      children: [
+        { to: "/school/roles", label: "nav.roleList", icon: "roles" },
+        { to: "/school/roles/new", label: "nav.addRole", icon: "add" },
+      ],
+    },
     { to: "/school/agent-actions", label: "nav.agentQueue", icon: "agentQueue", permission: "agent_action:view" },
     { to: "/school/audit", label: "nav.audit", icon: "audit" },
     { to: "/settings", label: "nav.settings", icon: "settings" },
   ],
   teacher: [
     { to: "/teacher", label: "nav.dashboard", icon: "dashboard" },
-    { to: "/teacher/materials", label: "nav.materials", icon: "materials" },
-    { to: "/teacher/assignments", label: "nav.assignments", icon: "assignments" },
-    { to: "/teacher/timetable", label: "nav.timetable", icon: "timetable" },
+    {
+      label: "nav.materials",
+      icon: "materials",
+      children: [
+        { to: "/teacher/materials", label: "nav.materialList", icon: "materials" },
+        { to: "/teacher/materials/new", label: "nav.addMaterial", icon: "add" },
+      ],
+    },
+    {
+      label: "nav.assignments",
+      icon: "assignments",
+      children: [
+        { to: "/teacher/assignments", label: "nav.assignmentList", icon: "assignments" },
+        { to: "/teacher/assignments/new", label: "nav.addAssignment", icon: "add" },
+      ],
+    },
+    {
+      label: "nav.timetable",
+      icon: "timetable",
+      children: [
+        { to: "/teacher/timetable", label: "nav.timetableView", icon: "timetable" },
+        { to: "/teacher/timetable/new", label: "nav.addPeriod", icon: "add" },
+      ],
+    },
     { to: "/teacher/exam-timetable", label: "nav.exams", icon: "exams" },
     { to: "/teacher/flagged", label: "nav.flagged", icon: "flagged" },
     { to: "/teacher/students", label: "nav.students", icon: "students", permission: "teacher:portal" },
@@ -117,10 +183,20 @@ const SEARCH_SOURCES: Partial<Record<Role, SearchSource<any>>> = {
   },
 };
 
-function navForUser(role: Role, permissions: string[] | undefined, t: (key: string) => string): NavItem[] {
+function navForUser(role: Role, permissions: string[] | undefined, t: (key: string) => string): NavEntry[] {
+  const has = (p?: string) => !p || (permissions ?? []).includes(p);
   return NAV[role]
-    .filter((n) => !n.permission || (permissions ?? []).includes(n.permission))
-    .map((n) => ({ ...n, label: t(n.label) }));
+    .filter((e) => has(e.permission))
+    .map((e) =>
+      isNavGroup(e)
+        ? {
+            ...e,
+            label: t(e.label),
+            children: e.children.filter((c) => has(c.permission)).map((c) => ({ ...c, label: t(c.label) })),
+          }
+        : { ...e, label: t(e.label) },
+    )
+    .filter((e) => !isNavGroup(e) || e.children.length > 0);
 }
 
 function Shell({
@@ -185,20 +261,31 @@ export default function App() {
 
       {/* Super Admin */}
       <Route path="/admin" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminSchools /></Shell>} />
+      <Route path="/admin/new" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminSchoolCreate /></Shell>} />
       <Route path="/admin/dashboard" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminDashboard /></Shell>} />
       <Route
         path="/admin/roles"
         element={<Shell role="super_admin" permissions={["platform:admin", "role:manage"]}><AdminRoles /></Shell>}
+      />
+      <Route
+        path="/admin/roles/new"
+        element={<Shell role="super_admin" permissions={["platform:admin", "role:manage"]}><AdminRoleCreate /></Shell>}
       />
       <Route path="/admin/audit" element={<Shell role="super_admin" permissions={["platform:admin"]}><AdminAudit /></Shell>} />
 
       {/* School Admin */}
       <Route path="/school" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolDashboard /></Shell>} />
       <Route path="/school/users" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolUsers /></Shell>} />
+      <Route path="/school/users/new" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolUserCreate /></Shell>} />
       <Route path="/school/structure" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolStructure /></Shell>} />
+      <Route path="/school/structure/new" element={<Shell role="school_admin" permissions={["school:admin"]}><SchoolStructureCreate /></Shell>} />
       <Route
         path="/school/roles"
         element={<Shell role="school_admin" permissions={["school:admin", "role:manage"]}><SchoolRoles /></Shell>}
+      />
+      <Route
+        path="/school/roles/new"
+        element={<Shell role="school_admin" permissions={["school:admin", "role:manage"]}><SchoolRoleCreate /></Shell>}
       />
       <Route
         path="/school/agent-actions"
@@ -209,8 +296,11 @@ export default function App() {
       {/* Teacher */}
       <Route path="/teacher" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherDashboard /></Shell>} />
       <Route path="/teacher/materials" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherMaterials /></Shell>} />
+      <Route path="/teacher/materials/new" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherMaterialCreate /></Shell>} />
       <Route path="/teacher/assignments" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherAssignments /></Shell>} />
+      <Route path="/teacher/assignments/new" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherAssignmentCreate /></Shell>} />
       <Route path="/teacher/timetable" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherTimetable /></Shell>} />
+      <Route path="/teacher/timetable/new" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherTimetableCreate /></Shell>} />
       <Route path="/teacher/exam-timetable" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherExamTimetable /></Shell>} />
       <Route path="/teacher/flagged" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherFlagged /></Shell>} />
       <Route path="/teacher/students" element={<Shell role="teacher" permissions={["teacher:portal"]}><TeacherStudents /></Shell>} />

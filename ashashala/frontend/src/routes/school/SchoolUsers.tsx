@@ -1,16 +1,20 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import { z } from "zod";
 import { schoolApi } from "../../api/endpoints";
 import type { Role, UserRow } from "../../types/api";
 import { PageTitle } from "../../components/layout/AppLayout";
-import { Badge, Button, Card, CardHeader, EmptyState, Input, Pager, Select, Skeleton, Table } from "../../components/ui";
+import { Badge, Button, Card, CardHeader, EmptyState, Icon, Input, Pager, Select, Skeleton, Table } from "../../components/ui";
 import { FormField } from "../../components/ui/FormField";
 import { Modal, useConfirm } from "../../components/ui/Modal";
 import { useToast } from "../../components/ui/Toast";
+import { TempCredentialModal } from "../../components/TempCredentialModal";
+import { exportRowsToXlsx } from "../../lib/exportXlsx";
+import { todayIso } from "../../lib/dates";
 
 const ROLES: Role[] = ["teacher", "student", "parent"];
 const ROLE_TITLE_KEY: Record<Role, string> = {
@@ -20,20 +24,6 @@ const ROLE_TITLE_KEY: Record<Role, string> = {
   student: "roleTitle.student",
   parent: "roleTitle.parent",
 };
-
-const createUserSchema = z
-  .object({
-    name: z.string().min(1, "Name is required"),
-    email: z.string().min(1, "Email is required").email("Enter a valid email address"),
-    role: z.enum(["teacher", "student", "parent"]),
-    grade: z.string().optional(),
-  })
-  .refine((v) => v.role !== "student" || (v.grade && v.grade.trim().length > 0), {
-    message: "Grade is required for students",
-    path: ["grade"],
-  });
-
-type CreateUserForm = z.infer<typeof createUserSchema>;
 
 const editUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -54,13 +44,12 @@ export default function SchoolUsers() {
   const toast = useToast();
   const qc = useQueryClient();
   const confirm = useConfirm();
-  const fileInput = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<Role | "">("");
   const [tempCredential, setTempCredential] = useState<{ email: string; password: string } | null>(null);
   const [editingUser, setEditingUser] = useState<UserRow | null>(null);
-  const [bulkResult, setBulkResult] = useState<{ id: string; email: string; temp_password: string }[] | null>(null);
   const [absentTarget, setAbsentTarget] = useState<UserRow | null>(null);
-  const [absenceDate, setAbsenceDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [absenceDate, setAbsenceDate] = useState(() => todayIso());
   const [absenceReason, setAbsenceReason] = useState("");
 
   const PAGE_SIZE = 20;
@@ -79,37 +68,29 @@ export default function SchoolUsers() {
   const userRows = users.data?.items ?? [];
   const total = users.data?.total ?? 0;
 
-  const {
-    register,
-    handleSubmit,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<CreateUserForm>({
-    resolver: zodResolver(createUserSchema),
-    defaultValues: { name: "", email: "", role: "student", grade: "" },
-  });
-  const selectedRole = watch("role");
-
-  const create = useMutation({
-    mutationFn: (values: CreateUserForm) =>
-      schoolApi.createUser({
-        name: values.name,
-        email: values.email,
-        role: values.role,
-        grade: values.grade ? Number(values.grade) : undefined,
-      }),
-    onSuccess: (res, values) => {
-      if (res.temp_password) {
-        setTempCredential({ email: values.email, password: res.temp_password });
-      } else {
-        toast.push(t("school.users.userCreated"), "success");
-      }
-      reset();
-      invalidateUsers();
-    },
-    onError: () => toast.push(t("school.users.createUserFailed"), "error"),
-  });
+  const exportUsers = () => {
+    if (!userRows.length) return;
+    exportRowsToXlsx(
+      userRows.map((u) => ({
+        name: u.name,
+        email: u.email,
+        role: t(ROLE_TITLE_KEY[u.role]),
+        grade: u.grade ?? "",
+        status: u.is_active ? t("school.users.active") : t("school.users.inactive"),
+      })),
+      {
+        filename: `users-${filter || "all"}-${todayIso()}`,
+        sheetName: t("school.users.title"),
+        headers: {
+          name: t("school.users.name"),
+          email: t("school.users.email"),
+          role: t("school.users.role"),
+          grade: t("school.users.grade"),
+          status: t("school.users.status"),
+        },
+      },
+    );
+  };
 
   const {
     register: registerEdit,
@@ -152,16 +133,6 @@ export default function SchoolUsers() {
     onError: () => toast.push(t("school.users.passwordResetFailed"), "error"),
   });
 
-  const mBulk = useMutation({
-    mutationFn: (form: FormData) => schoolApi.bulkImportUsers(form),
-    onSuccess: (res) => {
-      setBulkResult(res.created);
-      invalidateUsers();
-      if (fileInput.current) fileInput.current.value = "";
-    },
-    onError: () => toast.push(t("school.users.csvImportFailed"), "error"),
-  });
-
   const mMarkAbsent = useMutation({
     mutationFn: () =>
       schoolApi.markTeacherAbsent({
@@ -182,129 +153,11 @@ export default function SchoolUsers() {
     onError: () => toast.push(t("school.users.absenceRecordFailed"), "error"),
   });
 
-  const onBulkFileChosen = (file: File | null) => {
-    if (!file) return;
-    const form = new FormData();
-    form.append("file", file);
-    mBulk.mutate(form);
-  };
-
   return (
     <div>
       <PageTitle subtitle={t("school.users.subtitle")}>{t("school.users.title")}</PageTitle>
 
-      <Card className="mb-6">
-        <CardHeader title={t("school.users.addUser")} />
-        <form
-          className="p-5 grid md:grid-cols-5 gap-3 items-start"
-          onSubmit={handleSubmit((values) => create.mutateAsync(values))}
-        >
-          <FormField label={t("school.users.name")} error={errMsg(errors.name?.message)}>
-            <Input invalid={!!errors.name} {...register("name")} />
-          </FormField>
-          <FormField label={t("school.users.email")} error={errMsg(errors.email?.message)}>
-            <Input type="email" invalid={!!errors.email} {...register("email")} />
-          </FormField>
-          <FormField label={t("school.users.role")}>
-            <Select {...register("role")}>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {t(ROLE_TITLE_KEY[r])}
-                </option>
-              ))}
-            </Select>
-          </FormField>
-          <FormField label={t("school.users.grade")} error={errMsg(errors.grade?.message)} optional={selectedRole !== "student"}>
-            <Input type="number" invalid={!!errors.grade} disabled={selectedRole !== "student"} {...register("grade")} />
-          </FormField>
-          <Button type="submit" disabled={isSubmitting} className="mt-6">
-            {isSubmitting ? t("school.users.adding") : t("school.users.add")}
-          </Button>
-        </form>
-      </Card>
-
-      <Card className="mb-6">
-        <CardHeader
-          title={t("school.users.bulkImportTitle")}
-          subtitle={t("school.users.bulkImportSubtitle")}
-        />
-        <div className="p-5 flex items-center gap-3">
-          <input
-            ref={fileInput}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={(e) => onBulkFileChosen(e.target.files?.[0] ?? null)}
-            disabled={mBulk.isPending}
-          />
-          {mBulk.isPending && <span className="text-sm text-slate-400">{t("school.users.importing")}</span>}
-        </div>
-      </Card>
-
-      <Modal
-        open={!!tempCredential}
-        onOpenChange={(open) => !open && setTempCredential(null)}
-        title={t("school.users.tempPasswordTitle")}
-        description={t("school.users.tempPasswordDesc")}
-        size="sm"
-      >
-        {tempCredential && (
-          <div className="space-y-3">
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("school.users.email")}</div>
-              <div className="text-sm font-medium text-slate-700">{tempCredential.email}</div>
-            </div>
-            <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">{t("school.users.tempPasswordLabel")}</div>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="flex-1 px-3 py-2 rounded-lg bg-slate-50 border border-slate-200 text-sm font-mono text-slate-700">
-                  {tempCredential.password}
-                </code>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => navigator.clipboard.writeText(tempCredential.password)}
-                >
-                  {t("school.users.copy")}
-                </Button>
-              </div>
-            </div>
-            <Button type="button" className="w-full" onClick={() => setTempCredential(null)}>
-              {t("school.users.done")}
-            </Button>
-          </div>
-        )}
-      </Modal>
-
-      <Modal
-        open={!!bulkResult}
-        onOpenChange={(open) => !open && setBulkResult(null)}
-        title={t("school.users.importCompleteTitle")}
-        description={bulkResult ? t("school.users.importCompleteDesc", { count: bulkResult.length }) : undefined}
-        size="md"
-      >
-        {bulkResult && (
-          <div className="space-y-3">
-            {bulkResult.length === 0 ? (
-              <EmptyState title={t("school.users.noRowsImported")} hint={t("school.users.noRowsImportedHint")} />
-            ) : (
-              <div className="max-h-72 overflow-y-auto">
-                <Table head={[t("school.users.email"), t("school.users.colTempPassword")]}>
-                  {bulkResult.map((r) => (
-                    <tr key={r.id} className="border-b border-slate-50">
-                      <td className="px-4 py-2 text-slate-700">{r.email}</td>
-                      <td className="px-4 py-2 font-mono text-xs text-slate-600">{r.temp_password}</td>
-                    </tr>
-                  ))}
-                </Table>
-              </div>
-            )}
-            <Button type="button" className="w-full" onClick={() => setBulkResult(null)}>
-              {t("school.users.done")}
-            </Button>
-          </div>
-        )}
-      </Modal>
+      <TempCredentialModal credential={tempCredential} onClose={() => setTempCredential(null)} />
 
       <Modal
         open={!!editingUser}
@@ -360,18 +213,28 @@ export default function SchoolUsers() {
         <CardHeader
           title={t("school.users.allUsers")}
           action={
-            <Select
-              className="w-40"
-              value={filter}
-              onChange={(e) => changeFilter(e.target.value as Role | "")}
-            >
-              <option value="">{t("school.users.allRolesOption")}</option>
-              {ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {t(ROLE_TITLE_KEY[r])}
-                </option>
-              ))}
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select
+                className="w-40"
+                value={filter}
+                onChange={(e) => changeFilter(e.target.value as Role | "")}
+              >
+                <option value="">{t("school.users.allRolesOption")}</option>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {t(ROLE_TITLE_KEY[r])}
+                  </option>
+                ))}
+              </Select>
+              <Button variant="ghost" size="sm" onClick={exportUsers} disabled={!userRows.length}>
+                <Icon name="download" className="w-4 h-4" />
+                {t("school.users.exportExcel")}
+              </Button>
+              <Button size="sm" onClick={() => navigate("/school/users/new")}>
+                <Icon name="add" className="w-4 h-4" />
+                {t("school.users.addUser")}
+              </Button>
+            </div>
           }
         />
         <div className="p-2">
@@ -400,7 +263,7 @@ export default function SchoolUsers() {
                         variant="ghost"
                         size="sm"
                         onClick={() => {
-                          setAbsenceDate(new Date().toISOString().slice(0, 10));
+                          setAbsenceDate(todayIso());
                           setAbsenceReason("");
                           setAbsentTarget(u);
                         }}
